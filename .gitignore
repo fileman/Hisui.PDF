@@ -1,0 +1,24 @@
+## .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+## Build / publish output
+[Pp]ublish/
+artifacts/
+TestResults/
+*.binlog
+
+## Rider / VS Code
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Claude Code (local, machine-specific settings — keep out of the public repo)
+.claude/settings.local.json

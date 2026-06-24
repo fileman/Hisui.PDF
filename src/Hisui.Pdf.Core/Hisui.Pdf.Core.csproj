@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Hisui.Pdf.Core</RootNamespace>
+    <AssemblyName>Hisui.Pdf.Core</AssemblyName>
+    <Authors>Emanuele Filardo</Authors>
+    <Copyright>Copyright (c) 2026 Emanuele Filardo</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- CA1416: PDFtoImage annotates its API as "not supported on all platforms" but it explicitly
+         supports Windows / Linux / macOS (all our targets). Suppress to avoid false positives. -->
+    <NoWarn>CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Structural + write ops (merge/split/rotate/encrypt/metadata/AcroForm). -->
+    <PackageReference Include="PDFsharp" />
+    <!-- Read / extract (text with coordinates, images, structure). -->
+    <PackageReference Include="PdfPig" />
+    <!-- Page rendering to PNG (PDFium + SkiaSharp). -->
+    <PackageReference Include="PDFtoImage" />
+    <!-- DI + logging abstractions only — Core stays UI/host agnostic. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tests exercise the internal service implementations directly. -->
+    <InternalsVisibleTo Include="Hisui.Pdf.Core.Tests" />
+  </ItemGroup>
+
+</Project>

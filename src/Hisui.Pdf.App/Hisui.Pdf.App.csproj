@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- net10.0 (no -windows suffix) enables cross-platform builds. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Hisui.Pdf.App</RootNamespace>
+    <AssemblyName>Hisui.Pdf.App</AssemblyName>
+    <Version>1.0.0</Version>
+    <Authors>Emanuele Filardo</Authors>
+    <Copyright>Copyright (c) 2026 Emanuele Filardo</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- Avalonia handles DPI awareness internally; no app.manifest needed. -->
+    <!-- NU1903: Tmds.DBus.Protocol 0.20.0 vulnerability — Linux-only D-Bus transitive dep of Avalonia,
+         not reachable on Windows. Suppress until Avalonia ships a patched transitive version. -->
+    <NoWarn>NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hisui.Pdf.Core\Hisui.Pdf.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Localization dictionaries, loaded at runtime via AssetLoader (avares://). -->
+    <AvaloniaResource Include="Assets\i18n\*.json" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,151 @@
+Hisui PDF - Third-Party Notices
+================================
+
+Hisui PDF is licensed under the MIT License (see the LICENSE file).
+
+This file lists the third-party components distributed with Hisui PDF and the
+licenses under which they are provided. Each component is the property of its
+respective copyright holders.
+
+
+--------------------------------------------------------------------------------
+Components
+--------------------------------------------------------------------------------
+
+1. PDFsharp 6.2.4
+   License  : MIT
+   Copyright: (c) 2026 empira (PDFsharp Team)
+   Project  : https://docs.pdfsharp.net/
+
+2. PdfPig 0.1.14
+   License  : Apache-2.0
+   Copyright: (c) UglyToad and the PdfPig contributors
+   Project  : https://github.com/UglyToad/PdfPig
+
+3. PDFtoImage 5.2.1
+   License  : MIT
+   Copyright: (c) David Sungaila
+   Project  : https://github.com/sungaila/PDFtoImage
+
+4. SkiaSharp 3.119.2
+   (incl. SkiaSharp.NativeAssets.Win32 / macOS / Linux.NoDependencies)
+   License  : MIT  (managed binding)
+   Copyright: (c) Microsoft Corporation. All rights reserved.
+   Project  : https://github.com/mono/SkiaSharp
+   Note     : Bundles the native Skia graphics library by Google LLC, which is
+              licensed under the BSD-3-Clause License (see below).
+
+5. PDFium (native binaries)
+   bblanchon.PDFium.Win32 / Linux / macOS 147.0.7690
+   License  : Apache-2.0  (binary packaging)
+   Copyright: (c) Benoit Blanchon 2017-2025
+   Project  : https://github.com/bblanchon/pdfium-binaries
+   Note     : Ships Google's PDFium library, which is licensed under the
+              BSD-3-Clause License (Copyright 2014 The PDFium Authors).
+
+6. CommunityToolkit.Mvvm 8.4.2
+   License  : MIT
+   Copyright: (c) .NET Foundation and Contributors. All rights reserved.
+   Project  : https://github.com/CommunityToolkit/dotnet
+
+7. Microsoft.Extensions.* 10.0.9
+   (Hosting, DependencyInjection.Abstractions, Logging.Abstractions, Logging.Debug)
+   License  : MIT
+   Copyright: (c) Microsoft Corporation. All rights reserved.
+   Project  : https://dot.net/
+
+8. Avalonia 11.2.0
+   (incl. Avalonia.Desktop, Avalonia.Themes.Fluent)
+   License  : MIT
+   Copyright: Copyright 2013-2024 (c) The AvaloniaUI Project
+   Project  : https://avaloniaui.net/
+
+9. Inter (font), bundled via Avalonia.Fonts.Inter 11.2.0
+   License  : SIL Open Font License 1.1 (OFL-1.1)
+   Copyright: (c) The Inter Project Authors (https://github.com/rsms/inter)
+   Project  : https://rsms.me/inter/
+   Note     : The Avalonia.Fonts.Inter package code is MIT ((c) The AvaloniaUI
+              Project); the embedded Inter font itself is licensed OFL-1.1.
+              "Inter" is a Reserved Font Name under the OFL.
+
+
+--------------------------------------------------------------------------------
+License texts
+--------------------------------------------------------------------------------
+
+### MIT License
+
+Applies to: PDFsharp, PDFtoImage, SkiaSharp (managed binding),
+CommunityToolkit.Mvvm, Microsoft.Extensions.*, Avalonia (and the
+Avalonia.Fonts.Inter package code), with the copyright holders listed above.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+### BSD 3-Clause License
+
+Applies to the native libraries bundled by the packages above:
+Skia (Copyright (c) Google LLC) and PDFium (Copyright 2014 The PDFium Authors).
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+### Apache License 2.0
+
+Applies to: PdfPig and the PDFium binary packaging (bblanchon.PDFium).
+
+The complete Apache License 2.0 text is reproduced verbatim at:
+    https://www.apache.org/licenses/LICENSE-2.0
+A copy ("LICENSE-2.0.txt") should be shipped alongside this file in the
+distribution. The Apache-2.0 license includes an express grant of patent
+rights from the contributors of the above components.
+
+
+### SIL Open Font License, Version 1.1
+
+Applies to: the Inter font (bundled via Avalonia.Fonts.Inter).
+
+The complete OFL 1.1 text is reproduced verbatim at:
+    https://openfontlicense.org/open-font-license-official-text/
+    (SPDX identifier: OFL-1.1)
+A copy ("OFL.txt") should be shipped alongside this file in the distribution.
+Under the OFL, the font may be bundled and redistributed freely, must remain
+under the OFL, may not be sold by itself, and the Reserved Font Name "Inter"
+may not be used for modified versions.

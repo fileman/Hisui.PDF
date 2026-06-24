@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0}
+</style>
+</helmet>
+
+<div style="min-width:100%;min-height:100vh;box-sizing:border-box;padding:48px;background:#e7e5df;font-family:'Segoe UI Variable Text','Segoe UI',-apple-system,system-ui,sans-serif;color:#1a1a1a">
+
+  <!-- Intro -->
+  <div style="max-width:920px;margin:0 0 30px">
+    <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a8782;font-weight:600">Handoff per sviluppo · Avalonia</div>
+    <h1 style="font-size:30px;line-height:1.15;margin:8px 0 14px;font-weight:600;letter-spacing:-.01em">Hisui PDF — Ribbon · tema chiaro e scuro</h1>
+    <p style="font-size:14.5px;line-height:1.6;color:#46443f;margin:0">Direzione <strong>02 · Ribbon</strong> rifinita, nei due temi Windows 11 Fluent. Comandi raggruppati per attività (File · Pagine · Modifica · Esporta), strip a schede, griglia miniature. Le due varianti condividono struttura, spaziature e icone: cambia solo la palette. Token e misure nella legenda in fondo.</p>
+  </div>
+
+  <!-- Frames -->
+  <div style="display:flex;gap:56px;align-items:flex-start;width:max-content">
+
+    <!-- ================= LIGHT ================= -->
+    <div style="flex:none;width:1120px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+        <span style="width:11px;height:11px;border-radius:50%;background:#fafafa;border:1px solid #00000020;box-shadow:inset 0 0 0 2px #fff"></span>
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a">Tema chiaro</div>
+        <div style="font-size:13px;color:#8a8782">Light · Mica</div>
+      </div>
+      <div style="border-radius:8px;overflow:hidden;background:#f3f3f3;border:1px solid #00000018;box-shadow:0 24px 60px -14px rgba(0,0,0,.30),0 6px 16px rgba(0,0,0,.10)">
+
+        <!-- Title bar -->
+        <div style="height:40px;display:flex;align-items:center;padding-left:14px;background:linear-gradient(#f7f7f7,#f1f1f1);border-bottom:1px solid #00000010">
+          <div style="width:16px;height:16px;border-radius:4px;background:linear-gradient(135deg,#3aa0ff,#005FB8);box-shadow:0 1px 2px rgba(0,0,0,.25)"></div>
+          <div style="font-size:12.5px;color:#3a3a3a;margin-left:10px">Hisui PDF — documento.pdf</div>
+          <div style="margin-left:auto;display:flex;height:40px">
+            <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#5a5a5a" style-hover="background:#0000000d"><svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 5.5h9" stroke="currentColor" stroke-width="1"></path></svg></div>
+            <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#5a5a5a" style-hover="background:#0000000d"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" stroke-width="1"></rect></svg></div>
+            <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#5a5a5a" style-hover="background:#c42b1c;color:#fff"><svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 1l9 9M10 1l-9 9" stroke="currentColor" stroke-width="1"></path></svg></div>
+          </div>
+        </div>
+
+        <!-- Tab strip -->
+        <div style="display:flex;align-items:flex-end;gap:2px;padding:0 12px;background:#fafafa;border-bottom:1px solid #0000000f;height:38px">
+          <div style="font-size:12.5px;color:#fff;background:#005FB8;padding:7px 14px;border-radius:6px 6px 0 0;margin-bottom:-1px;font-weight:600">File</div>
+          <div style="font-size:12.5px;color:#1a1a1a;padding:7px 14px;position:relative;font-weight:600">Home<div style="position:absolute;left:14px;right:14px;bottom:0;height:2.5px;border-radius:2px;background:#005FB8"></div></div>
+          <div style="font-size:12.5px;color:#5d5d5d;padding:7px 14px" style-hover="color:#1a1a1a">Pagine</div>
+          <div style="font-size:12.5px;color:#5d5d5d;padding:7px 14px" style-hover="color:#1a1a1a">Proteggi</div>
+          <div style="font-size:12.5px;color:#5d5d5d;padding:7px 14px" style-hover="color:#1a1a1a">Visualizza</div>
+        </div>
+
+        <!-- Ribbon body -->
+        <div style="display:flex;align-items:stretch;padding:8px 6px 4px;background:#f6f6f6;border-bottom:1px solid #0000000f;height:104px">
+          <!-- File -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:58px;border-radius:6px;color:#005FB8" style-hover="background:#005FB810"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 4.5h4l1.2 1.6H14V13H2z"></path></svg><span style="font-size:11.5px;color:#1a1a1a">Apri</span></div>
+              <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 3v10M3 8h10"></path></svg><span style="font-size:12px;color:#1a1a1a">Aggiungi</span></div>
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 3h7l3 3v7H3z"></path><path d="M5 3v4h5"></path></svg><span style="font-size:12px;color:#1a1a1a">Salva con nome</span></div>
+              </div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8782;text-align:center;padding-top:3px">File</div>
+          </div>
+          <div style="width:1px;background:#0000000f;margin:4px 0"></div>
+          <!-- Pagine -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1;align-items:center">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M11 6a4 4 0 1 0 1 3"></path><path d="M11 3v3H8"></path></svg><span style="font-size: 11.5px; color: #1a1a1a; text-align: center">Ruota orario</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M5 6a4 4 0 1 1-1 3"></path><path d="M5 3v3h3"></path></svg><span style="font-size: 11.5px; color: #1a1a1a; text-align: center">Ruota antiorario</span></div>
+              <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 5h10M6 5V3h4v2M5 5l.7 9h4.6L11 5"></path></svg><span style="font-size:12px;color:#1a1a1a">Elimina</span></div>
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 13V4M4 8l4-4 4 4"></path></svg><span style="font-size:12px;color:#1a1a1a">Su / Giù</span></div>
+              </div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8782;text-align:center;padding-top:3px">Pagine</div>
+          </div>
+          <div style="width:1px;background:#0000000f;margin:4px 0"></div>
+          <!-- Modifica -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1;align-items:center">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#9a9a9a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 5L3 8l3 3"></path><path d="M3 8h7a3 3 0 0 1 0 6H7"></path></svg><span style="font-size:11.5px;color:#9a9a9a">Annulla</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#9a9a9a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M10 5l3 3-3 3"></path><path d="M13 8H6a3 3 0 0 0 0 6h2"></path></svg><span style="font-size:11.5px;color:#9a9a9a">Ripeti</span></div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8782;text-align:center;padding-top:3px">Modifica</div>
+          </div>
+          <div style="width:1px;background:#0000000f;margin:4px 0"></div>
+          <!-- Esporta -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1;align-items:center">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:58px;border-radius:6px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 2h6l2.5 2.5V14H4z"></path><path d="M8 7v4M6 9l2 2 2-2"></path></svg><span style="font-size:11.5px;color:#1a1a1a">Estrai</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:58px;border-radius:6px;color:#3a3a3a" style-hover="background:#0000000a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M8 2v12M3 5L1.5 8 3 11M13 5l1.5 3L13 11"></path></svg><span style="font-size:11.5px;color:#1a1a1a">Dividi</span></div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8782;text-align:center;padding-top:3px">Esporta</div>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div style="display:flex;height:512px">
+          <div style="width:266px;flex:none;background:#f3f3f3;border-right:1px solid #0000000f;padding:14px 14px;overflow:hidden">
+            <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8a8782;font-weight:600;padding:0 2px 12px">Pagine · 6</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 16px">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border:1px solid #00000016;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);background-image:repeating-linear-gradient(180deg,#ececec 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#5d5d5d">1</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border:1px solid #00000016;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);background-image:repeating-linear-gradient(180deg,#ececec 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#5d5d5d">2</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border:2px solid #005FB8;border-radius:3px;box-shadow:0 2px 10px rgba(0,95,184,.25);background-image:repeating-linear-gradient(180deg,#e4e4e4 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#005FB8;font-weight:600">3</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border:1px solid #00000016;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);background-image:repeating-linear-gradient(180deg,#ececec 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#5d5d5d">4</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border:1px solid #00000016;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);background-image:repeating-linear-gradient(180deg,#ececec 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#5d5d5d">5</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border:1px solid #00000016;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);background-image:repeating-linear-gradient(180deg,#ececec 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#5d5d5d">6</div></div>
+            </div>
+          </div>
+
+          <div style="flex:1;background:#e8e8e8;display:flex;align-items:center;justify-content:center;position:relative">
+            <div style="position:absolute;top:14px;right:18px;display:flex;align-items:center;gap:2px;background:#ffffffd9;backdrop-filter:blur(8px);border:1px solid #00000012;border-radius:8px;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+              <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#3a3a3a;border-radius:5px" style-hover="background:#0000000a"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.4"><path d="M4 8h8"></path></svg></div>
+              <div style="font-size:12px;color:#3a3a3a;min-width:42px;text-align:center">100%</div>
+              <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#3a3a3a;border-radius:5px" style-hover="background:#0000000a"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.4"><path d="M8 4v8M4 8h8"></path></svg></div>
+            </div>
+            <div style="width:368px;height:490px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.16);border:1px solid #00000010;padding:32px 34px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div style="display:flex;flex-direction:column;gap:7px"><div style="width:112px;height:9px;border-radius:2px;background:#005FB8"></div><div style="width:78px;height:6px;border-radius:2px;background:#c7c7c7"></div></div>
+                <div style="width:42px;height:42px;border-radius:7px;background:#005FB814;border:1px solid #005FB826"></div>
+              </div>
+              <div style="width:80%;height:16px;border-radius:3px;background:#222;margin-top:6px"></div>
+              <div style="width:58%;height:8px;border-radius:2px;background:#aaa"></div>
+              <div style="height:1px;background:#0000000f;margin:4px 0"></div>
+              <div style="height:70px;border-radius:2px;background:repeating-linear-gradient(180deg,#e3e3e3 0 5px,#fff 5px 16px)"></div>
+              <div style="width:38%;height:9px;border-radius:2px;background:#444;margin-top:2px"></div>
+              <div style="display:flex;align-items:flex-end;gap:10px;height:90px;padding-top:6px">
+                <div style="flex:1;height:46%;background:#005FB840;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:68%;background:#005FB855;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:54%;background:#005FB840;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:88%;background:#005FB8;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:62%;background:#005FB855;border-radius:3px 3px 0 0"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:30px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#fafafa;border-top:1px solid #0000000f;font-size:12px;color:#5d5d5d">
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#3aa76d"></span>Pronto</div>
+          <div style="margin-left:auto">Pagina 3 di 6 · A4 · 210×297 mm</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= DARK ================= -->
+    <div style="flex:none;width:1120px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+        <span style="width:11px;height:11px;border-radius:50%;background:#202020;border:1px solid #ffffff30"></span>
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a">Tema scuro</div>
+        <div style="font-size:13px;color:#8a8782">Dark · Mica</div>
+      </div>
+      <div style="border-radius:8px;overflow:hidden;background:#202020;border:1px solid #ffffff14;box-shadow:0 24px 60px -14px rgba(0,0,0,.55),0 6px 16px rgba(0,0,0,.30)">
+
+        <!-- Title bar -->
+        <div style="height:40px;display:flex;align-items:center;padding-left:14px;background:#2b2b2b;border-bottom:1px solid #ffffff0d">
+          <div style="width:16px;height:16px;border-radius:4px;background:linear-gradient(135deg,#7ad3ff,#1f8fff);box-shadow:0 1px 2px rgba(0,0,0,.4)"></div>
+          <div style="font-size:12.5px;color:#cfcfcf;margin-left:10px">Hisui PDF — documento.pdf</div>
+          <div style="margin-left:auto;display:flex;height:40px">
+            <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#b8b8b8" style-hover="background:#ffffff12"><svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 5.5h9" stroke="currentColor" stroke-width="1"></path></svg></div>
+            <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#b8b8b8" style-hover="background:#ffffff12"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" stroke-width="1"></rect></svg></div>
+            <div style="width:46px;display:flex;align-items:center;justify-content:center;color:#b8b8b8" style-hover="background:#c42b1c;color:#fff"><svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 1l9 9M10 1l-9 9" stroke="currentColor" stroke-width="1"></path></svg></div>
+          </div>
+        </div>
+
+        <!-- Tab strip -->
+        <div style="display:flex;align-items:flex-end;gap:2px;padding:0 12px;background:#262626;border-bottom:1px solid #ffffff0d;height:38px">
+          <div style="font-size:12.5px;color:#10120f;background:#60CDFF;padding:7px 14px;border-radius:6px 6px 0 0;margin-bottom:-1px;font-weight:600">File</div>
+          <div style="font-size:12.5px;color:#f3f3f3;padding:7px 14px;position:relative;font-weight:600">Home<div style="position:absolute;left:14px;right:14px;bottom:0;height:2.5px;border-radius:2px;background:#60CDFF"></div></div>
+          <div style="font-size:12.5px;color:#9a9a9a;padding:7px 14px" style-hover="color:#f3f3f3">Pagine</div>
+          <div style="font-size:12.5px;color:#9a9a9a;padding:7px 14px" style-hover="color:#f3f3f3">Proteggi</div>
+          <div style="font-size:12.5px;color:#9a9a9a;padding:7px 14px" style-hover="color:#f3f3f3">Visualizza</div>
+        </div>
+
+        <!-- Ribbon body -->
+        <div style="display:flex;align-items:stretch;padding:8px 6px 4px;background:#242424;border-bottom:1px solid #ffffff0d;height:104px">
+          <!-- File -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:58px;border-radius:6px;color:#60CDFF" style-hover="background:#60cdff14"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 4.5h4l1.2 1.6H14V13H2z"></path></svg><span style="font-size:11.5px;color:#f3f3f3">Apri</span></div>
+              <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 3v10M3 8h10"></path></svg><span style="font-size:12px;color:#f3f3f3">Aggiungi</span></div>
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 3h7l3 3v7H3z"></path><path d="M5 3v4h5"></path></svg><span style="font-size:12px;color:#f3f3f3">Salva con nome</span></div>
+              </div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8a8a;text-align:center;padding-top:3px">File</div>
+          </div>
+          <div style="width:1px;background:#ffffff0d;margin:4px 0"></div>
+          <!-- Pagine -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1;align-items:center">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M11 6a4 4 0 1 0 1 3"></path><path d="M11 3v3H8"></path></svg><span style="font-size: 11.5px; color: #f3f3f3; text-align: center">Ruota orario</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M5 6a4 4 0 1 1-1 3"></path><path d="M5 3v3h3"></path></svg><span style="font-size: 11.5px; color: #f3f3f3; text-align: center">Ruota antiorario</span></div>
+              <div style="display:flex;flex-direction:column;justify-content:center;gap:3px">
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 5h10M6 5V3h4v2M5 5l.7 9h4.6L11 5"></path></svg><span style="font-size:12px;color:#f3f3f3">Elimina</span></div>
+                <div style="display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:5px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 13V4M4 8l4-4 4 4"></path></svg><span style="font-size:12px;color:#f3f3f3">Su / Giù</span></div>
+              </div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8a8a;text-align:center;padding-top:3px">Pagine</div>
+          </div>
+          <div style="width:1px;background:#ffffff0d;margin:4px 0"></div>
+          <!-- Modifica -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1;align-items:center">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#5a5a5a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 5L3 8l3 3"></path><path d="M3 8h7a3 3 0 0 1 0 6H7"></path></svg><span style="font-size:11.5px;color:#5a5a5a">Annulla</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:54px;border-radius:6px;color:#5a5a5a"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M10 5l3 3-3 3"></path><path d="M13 8H6a3 3 0 0 0 0 6h2"></path></svg><span style="font-size:11.5px;color:#5a5a5a">Ripeti</span></div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8a8a;text-align:center;padding-top:3px">Modifica</div>
+          </div>
+          <div style="width:1px;background:#ffffff0d;margin:4px 0"></div>
+          <!-- Esporta -->
+          <div style="display:flex;flex-direction:column;padding:0 10px">
+            <div style="display:flex;gap:4px;flex:1;align-items:center">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:58px;border-radius:6px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 2h6l2.5 2.5V14H4z"></path><path d="M8 7v4M6 9l2 2 2-2"></path></svg><span style="font-size:11.5px;color:#f3f3f3">Estrai</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:58px;border-radius:6px;color:#cfcfcf" style-hover="background:#ffffff0e"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M8 2v12M3 5L1.5 8 3 11M13 5l1.5 3L13 11"></path></svg><span style="font-size:11.5px;color:#f3f3f3">Dividi</span></div>
+            </div>
+            <div style="font-size:10.5px;color:#8a8a8a;text-align:center;padding-top:3px">Esporta</div>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div style="display:flex;height:512px">
+          <div style="width:266px;flex:none;background:#262626;border-right:1px solid #ffffff0d;padding:14px 14px;overflow:hidden">
+            <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8a8a8a;font-weight:600;padding:0 2px 12px">Pagine · 6</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 16px">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4);background-image:repeating-linear-gradient(180deg,#e6e6e6 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#9a9a9a">1</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4);background-image:repeating-linear-gradient(180deg,#e6e6e6 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#9a9a9a">2</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border:2px solid #60CDFF;border-radius:3px;box-shadow:0 2px 12px rgba(96,205,255,.3);background-image:repeating-linear-gradient(180deg,#e0e0e0 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#60CDFF;font-weight:600">3</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4);background-image:repeating-linear-gradient(180deg,#e6e6e6 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#9a9a9a">4</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4);background-image:repeating-linear-gradient(180deg,#e6e6e6 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#9a9a9a">5</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;aspect-ratio:.74;background:#fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4);background-image:repeating-linear-gradient(180deg,#e6e6e6 0 3px,#fff 3px 10px);background-size:100% 10px;background-position:0 16px"></div><div style="font-size:11.5px;color:#9a9a9a">6</div></div>
+            </div>
+          </div>
+
+          <div style="flex:1;background:#1a1a1a;display:flex;align-items:center;justify-content:center;position:relative">
+            <div style="position:absolute;top:14px;right:18px;display:flex;align-items:center;gap:2px;background:#2c2c2cd9;backdrop-filter:blur(8px);border:1px solid #ffffff1a;border-radius:8px;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,.3)">
+              <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#cfcfcf;border-radius:5px" style-hover="background:#ffffff12"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.4"><path d="M4 8h8"></path></svg></div>
+              <div style="font-size:12px;color:#cfcfcf;min-width:42px;text-align:center">100%</div>
+              <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#cfcfcf;border-radius:5px" style-hover="background:#ffffff12"><svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.4"><path d="M8 4v8M4 8h8"></path></svg></div>
+            </div>
+            <div style="width:368px;height:490px;background:#fff;box-shadow:0 8px 40px rgba(0,0,0,.5);padding:32px 34px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div style="display:flex;flex-direction:column;gap:7px"><div style="width:112px;height:9px;border-radius:2px;background:#1f8fff"></div><div style="width:78px;height:6px;border-radius:2px;background:#c7c7c7"></div></div>
+                <div style="width:42px;height:42px;border-radius:7px;background:#1f8fff14;border:1px solid #1f8fff26"></div>
+              </div>
+              <div style="width:80%;height:16px;border-radius:3px;background:#222;margin-top:6px"></div>
+              <div style="width:58%;height:8px;border-radius:2px;background:#aaa"></div>
+              <div style="height:1px;background:#0000000f;margin:4px 0"></div>
+              <div style="height:70px;border-radius:2px;background:repeating-linear-gradient(180deg,#e3e3e3 0 5px,#fff 5px 16px)"></div>
+              <div style="width:38%;height:9px;border-radius:2px;background:#444;margin-top:2px"></div>
+              <div style="display:flex;align-items:flex-end;gap:10px;height:90px;padding-top:6px">
+                <div style="flex:1;height:46%;background:#1f8fff40;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:68%;background:#1f8fff66;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:54%;background:#1f8fff40;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:88%;background:#1f8fff;border-radius:3px 3px 0 0"></div>
+                <div style="flex:1;height:62%;background:#1f8fff66;border-radius:3px 3px 0 0"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:30px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#262626;border-top:1px solid #ffffff0d;font-size:12px;color:#9a9a9a">
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#3aa76d"></span>Pronto</div>
+          <div style="margin-left:auto">Pagina 3 di 6 · A4 · 210×297 mm</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Spec / tokens for code -->
+  <div style="margin-top:44px;background:#fff;border:1px solid #00000012;border-radius:8px;padding:26px 30px;max-width:1180px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+    <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:4px">Specifiche per l'implementazione</div>
+    <div style="font-size:12.5px;color:#8a8782;margin-bottom:22px">Token Fluent / WinUI. In Avalonia mappa su <code style="font-family:Consolas,monospace;background:#00000008;padding:1px 5px;border-radius:4px">ThemeDictionaries</code> (Light / Dark) di <code style="font-family:Consolas,monospace;background:#00000008;padding:1px 5px;border-radius:4px">ResourceDictionary</code>.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:34px">
+
+      <!-- Colors -->
+      <div>
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a8782;font-weight:700;margin-bottom:14px">Colori</div>
+        <div style="display:flex;flex-direction:column;gap:11px;font-size:12.5px">
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Accent (chiaro)</span><span style="width:18px;height:18px;border-radius:4px;background:#005FB8;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#005FB8</code><span style="color:#9a9a9a">SystemAccentColor</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Accent (scuro)</span><span style="width:18px;height:18px;border-radius:4px;background:#60CDFF;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#60CDFF</code><span style="color:#9a9a9a">SystemAccentColorLight2</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Sfondo finestra · chiaro</span><span style="width:18px;height:18px;border-radius:4px;background:#f3f3f3;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#F3F3F3</code><span style="color:#9a9a9a">SolidBackgroundFillColorBase</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Sfondo finestra · scuro</span><span style="width:18px;height:18px;border-radius:4px;background:#202020;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#202020</code><span style="color:#9a9a9a">SolidBackgroundFillColorBase</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Ribbon / barra · chiaro</span><span style="width:18px;height:18px;border-radius:4px;background:#f6f6f6;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#F6F6F6</code><span style="color:#9a9a9a">LayerFillColorDefault</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Ribbon / barra · scuro</span><span style="width:18px;height:18px;border-radius:4px;background:#242424;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#242424</code><span style="color:#9a9a9a">LayerFillColorDefault</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Pannello miniature · scuro</span><span style="width:18px;height:18px;border-radius:4px;background:#262626;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#262626</code><span style="color:#9a9a9a">CardBackgroundFillColor</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Errore / chiudi hover</span><span style="width:18px;height:18px;border-radius:4px;background:#c42b1c;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#C42B1C</code><span style="color:#9a9a9a">SystemFillColorCritical</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:200px;color:#46443f">Stato pronto</span><span style="width:18px;height:18px;border-radius:4px;background:#3aa76d;border:1px solid #00000012"></span><code style="font-family:Consolas,monospace;color:#1a1a1a">#3AA76D</code><span style="color:#9a9a9a">SystemFillColorSuccess</span></div>
+        </div>
+      </div>
+
+      <!-- Metrics + type -->
+      <div>
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a8782;font-weight:700;margin-bottom:14px">Tipografia &amp; misure</div>
+        <div style="display:flex;flex-direction:column;gap:11px;font-size:12.5px;color:#46443f">
+          <div style="display:flex;gap:12px"><span style="width:200px">Font</span><code style="font-family:Consolas,monospace;color:#1a1a1a">Segoe UI Variable</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Titolo finestra / etichette</span><code style="font-family:Consolas,monospace;color:#1a1a1a">12.5px · 400</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Scheda attiva</span><code style="font-family:Consolas,monospace;color:#1a1a1a">12.5px · 600</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Caption gruppo ribbon</span><code style="font-family:Consolas,monospace;color:#1a1a1a">10.5px · 400</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Barra del titolo (h)</span><code style="font-family:Consolas,monospace;color:#1a1a1a">40px</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Strip schede (h)</span><code style="font-family:Consolas,monospace;color:#1a1a1a">38px</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Corpo ribbon (h)</span><code style="font-family:Consolas,monospace;color:#1a1a1a">104px</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Status bar (h)</span><code style="font-family:Consolas,monospace;color:#1a1a1a">30px</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Pannello miniature (w)</span><code style="font-family:Consolas,monospace;color:#1a1a1a">266px</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Icone grandi / piccole</span><code style="font-family:Consolas,monospace;color:#1a1a1a">24px / 16px</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Angoli · pulsanti / finestra</span><code style="font-family:Consolas,monospace;color:#1a1a1a">6px / 8px</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Hover pulsante</span><code style="font-family:Consolas,monospace;color:#1a1a1a">SubtleFillColorSecondary</code></div>
+          <div style="display:flex;gap:12px"><span style="width:200px">Caption pagina selez.</span><code style="font-family:Consolas,monospace;color:#1a1a1a">border 2px · accent</code></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:Hisui.Pdf.App.Converters"
+        xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
+        x:Class="Hisui.Pdf.App.Views.AnnotationInputDialog"
+        Title="{loc:Tr Dialog.Title}"
+        Width="430" SizeToContent="Height"
+        MinHeight="200"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Resources>
+        <conv:HexToBrushConverter x:Key="HexToBrush" />
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- Field caption: matches AboutDialog's secondary-text token. -->
+        <Style Selector="TextBlock.caption">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#888888" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Padding" Value="8,5" />
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="Padding" Value="16,6" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Margin="24,20,24,18" LastChildFill="True">
+
+        <!-- Header -->
+        <StackPanel DockPanel.Dock="Top" Spacing="3" Margin="0,0,0,14">
+            <TextBlock Name="ToolLabel" FontSize="18" FontWeight="Bold" />
+            <TextBlock Name="HintLabel" FontSize="12" Foreground="#888888"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Border DockPanel.Dock="Top" Height="1" Background="#E0E0E0" Margin="0,0,0,16" />
+
+        <!-- Footer buttons -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,18,0,0">
+            <Button Grid.Column="1" Content="{loc:Tr Dialog.Cancel}" Name="CancelButton"
+                    IsCancel="True" Margin="0,0,8,0" />
+            <Button Grid.Column="2" Content="{loc:Tr Dialog.Apply}" Name="ApplyButton"
+                    Classes="accent" IsDefault="True" />
+        </Grid>
+
+        <!-- Content (fills) -->
+        <StackPanel Spacing="14" Name="ContentPanel">
+
+            <!-- Validation banner -->
+            <Border Name="ErrorBanner" IsVisible="False" Background="#FDECEA"
+                    BorderBrush="#F5C6CB" BorderThickness="1" CornerRadius="4"
+                    Padding="10,7">
+                <TextBlock Name="ErrorLabel" Foreground="#C62828" FontSize="12" TextWrapping="Wrap" />
+            </Border>
+
+            <!-- Text input — FreeText, StickyNote, Watermark, TextEdit -->
+            <StackPanel Name="TextSection" IsVisible="False">
+                <TextBlock Name="TextLabel" Classes="caption" Text="{loc:Tr Label.Text}" />
+                <TextBox Name="AnnotTextBox" AcceptsReturn="True" MinHeight="64"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Color input + live swatch — Highlight, Rectangle, FreeText -->
+            <StackPanel Name="ColorSection" IsVisible="False">
+                <TextBlock Classes="caption" Text="{loc:Tr Field.Color}" />
+                <Grid ColumnDefinitions="Auto,*">
+                    <Border Grid.Column="0" Width="28" Height="28" CornerRadius="3"
+                            BorderBrush="#CCCCCC" BorderThickness="1" Margin="0,0,8,0"
+                            Background="{Binding #ColorInput.Text, Converter={StaticResource HexToBrush}}" />
+                    <TextBox Grid.Column="1" Name="ColorInput" Watermark="#RRGGBB" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Opacity — Highlight, Watermark -->
+            <StackPanel Name="OpacitySection" IsVisible="False">
+                <TextBlock Name="OpacityLabel" Classes="caption" Text="{loc:Tr Field.Opacity}" />
+                <NumericUpDown Name="OpacityInput" Minimum="0.1" Maximum="1.0"
+                               Increment="0.05" Value="0.4" FormatString="0.00" />
+            </StackPanel>
+
+            <!-- Fill color — Rectangle -->
+            <StackPanel Name="FillSection" IsVisible="False">
+                <CheckBox Name="FillCheck" Content="{loc:Tr Field.Fill}" Margin="0,0,0,4" />
+                <Grid ColumnDefinitions="Auto,*" IsEnabled="{Binding IsChecked, ElementName=FillCheck}">
+                    <Border Grid.Column="0" Width="28" Height="28" CornerRadius="3"
+                            BorderBrush="#CCCCCC" BorderThickness="1" Margin="0,0,8,0"
+                            Background="{Binding #FillInput.Text, Converter={StaticResource HexToBrush}}" />
+                    <TextBox Grid.Column="1" Name="FillInput" Watermark="#RRGGBB" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Line width — Rectangle -->
+            <StackPanel Name="LineWidthSection" IsVisible="False">
+                <TextBlock Classes="caption" Text="{loc:Tr Field.LineWidth}" />
+                <NumericUpDown Name="LineWidthInput" Minimum="0.1" Maximum="20"
+                               Increment="0.5" Value="2.0" FormatString="0.0" />
+            </StackPanel>
+
+            <!-- Image picker — ImageOverlay -->
+            <StackPanel Name="ImageSection" IsVisible="False">
+                <TextBlock Classes="caption" Text="{loc:Tr Field.Image}" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0" Name="ImagePathBox" IsReadOnly="True"
+                             Watermark="{loc:Tr Field.Image.None}" />
+                    <Button Grid.Column="1" Content="{loc:Tr Field.Browse}" Name="BrowseImageButton"
+                            Margin="8,0,0,0" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Watermark extras — Watermark -->
+            <StackPanel Name="WatermarkSection" IsVisible="False" Spacing="12">
+                <StackPanel>
+                    <TextBlock Classes="caption" Text="{loc:Tr Field.FontSize}" />
+                    <NumericUpDown Name="WmFontSizeInput" Minimum="6" Maximum="300"
+                                   Increment="2" Value="48" FormatString="0" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Classes="caption" Text="{loc:Tr Field.Rotation}" />
+                    <NumericUpDown Name="WmRotationInput" Minimum="-180" Maximum="180"
+                                   Increment="5" Value="45" FormatString="0" />
+                </StackPanel>
+            </StackPanel>
+
+        </StackPanel>
+
+    </DockPanel>
+</Window>

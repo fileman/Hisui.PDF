@@ -1,0 +1,38 @@
+using Hisui.Pdf.Core.Services;
+using Hisui.Pdf.Core.Tests.Fixtures;
+using PdfSharp.Pdf.IO;
+using Xunit;
+
+namespace Hisui.Pdf.Core.Tests;
+
+public class PdfOptimizerTests
+{
+    private readonly PdfOptimizer _sut = new();
+
+    [Fact]
+    public async Task OptimizeAsync_ProducesValidPdf()
+    {
+        var pdf = PdfFixtureBuilder.Create(2);
+        var result = await _sut.OptimizeAsync(pdf);
+        Assert.True(result[0] == '%' && result[1] == 'P' && result[2] == 'D' && result[3] == 'F');
+    }
+
+    [Fact]
+    public async Task OptimizeAsync_PreservesPageCount()
+    {
+        const int pages = 4;
+        var pdf = PdfFixtureBuilder.Create(pages);
+        var result = await _sut.OptimizeAsync(pdf);
+
+        using var doc = PdfReader.Open(new MemoryStream(result), PdfDocumentOpenMode.Import);
+        Assert.Equal(pages, doc.PageCount);
+    }
+
+    [Fact]
+    public async Task OptimizeAsync_EmptyPagesPdf_ProducesValidOutput()
+    {
+        var pdf = PdfFixtureBuilder.Create(1);
+        var result = await _sut.OptimizeAsync(pdf);
+        Assert.NotEmpty(result);
+    }
+}

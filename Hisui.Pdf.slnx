@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Hisui.Pdf.Core/Hisui.Pdf.Core.csproj" />
+    <Project Path="src/Hisui.Pdf.App/Hisui.Pdf.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hisui.Pdf.Core.Tests/Hisui.Pdf.Core.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,16 @@
+<Project>
+
+  <!-- Common compiler settings shared by every project in the solution. -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Authors>Hisui</Authors>
+    <Product>Hisui PDF</Product>
+    <Company>Hisui</Company>
+    <Copyright>Copyright © Hisui</Copyright>
+  </PropertyGroup>
+
+</Project>

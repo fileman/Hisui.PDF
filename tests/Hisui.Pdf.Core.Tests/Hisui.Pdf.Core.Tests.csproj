@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- xUnit v3 runs on Microsoft Testing Platform. Route `dotnet test` through MTP too;
+         the produced exe accepts a class filter (filter-class) for scoped runs. -->
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <!-- xUnit1051: suggests TestContext.Current.CancellationToken on token-taking calls. Noise for
+         these short unit tests, which pass CancellationToken.None by design. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Moq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hisui.Pdf.Core\Hisui.Pdf.Core.csproj" />
+  </ItemGroup>
+
+</Project>
