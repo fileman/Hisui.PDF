@@ -59,19 +59,20 @@ dotnet test Hisui.Pdf.slnx
 
 ### OCR setup
 
-The OCR feature needs Tesseract language data and (on Linux/macOS) the native
-Tesseract/Leptonica libraries:
+OCR works out of the box. The **English and Italian** language data
+(`eng`/`ita`, the `tessdata_fast` models) ships in a `tessdata` folder next to
+the executable, and the native engine binaries are bundled on Windows via the
+`Tesseract` package.
 
-- **Language data** — place the `*.traineddata` files in a `tessdata` folder
-  next to the app, or point the `TESSDATA_PREFIX` environment variable at them.
-  Grab `eng.traineddata` (and any other languages) from
+- **More languages** — drop extra `*.traineddata` files into the `tessdata`
+  folder next to the app (or point the `TESSDATA_PREFIX` environment variable at
+  them) and pass the language code. Grab them from
   [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast).
-- **Native libraries** — Windows binaries ship with the `Tesseract` package;
-  on Linux install `libtesseract`/`libleptonica`, on macOS run
-  `brew install tesseract leptonica`.
+- **Native libraries on Linux/macOS** — install the system Tesseract/Leptonica:
+  on Linux `libtesseract`/`libleptonica`, on macOS `brew install tesseract leptonica`.
 
-If either is missing the app reports a clear message instead of failing — the
-rest of the editor keeps working.
+If a language or native library is missing the app reports a clear message
+instead of failing — the rest of the editor keeps working.
 
 ## License
 

@@ -64,11 +64,16 @@ public static class PdfFixtureBuilder
     /// Creates a single-page A4 PDF that contains a raster image but no text layer — i.e. it looks
     /// like a scanned page to the OCR scanned-page detector.
     /// </summary>
-    public static byte[] CreateScanned()
+    public static byte[] CreateScanned(int rotate = 0, int cropInset = 0)
     {
         using var document = new PdfDocument();
         var page = document.AddPage();
         page.Size = PdfSharp.PageSize.A4;
+        if (rotate != 0) page.Rotate = rotate; // exercises rotated-scan handling in the OCR text layer
+        if (cropInset != 0) // a CropBox smaller than the MediaBox — exercises crop-aware text placement
+            page.CropBox = new PdfRectangle(
+                new XPoint(cropInset, cropInset),
+                new XPoint(page.Width.Point - cropInset, page.Height.Point - cropInset));
 
         using (var gfx = XGraphics.FromPdfPage(page))
         using (var imgStream = new MemoryStream(OnePixelPng))

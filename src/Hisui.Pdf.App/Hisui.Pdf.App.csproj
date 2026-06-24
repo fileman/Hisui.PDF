@@ -36,6 +36,12 @@
     <AvaloniaResource Include="Assets\i18n\*.json" />
   </ItemGroup>
 
+  <ItemGroup Label="OCR — ship Tesseract language data in a 'tessdata' folder next to the executable">
+    <!-- Resolved at runtime via AppContext.BaseDirectory/tessdata (see TesseractOcrEngine.ResolveTessData).
+         eng + ita are the 'tessdata_fast' variants matching the en/it UI; add more *.traineddata to bundle them. -->
+    <None Include="tessdata\*.traineddata" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup Label="Distribution — ship license + third-party notices next to the executable">
     <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" Visible="false" />
