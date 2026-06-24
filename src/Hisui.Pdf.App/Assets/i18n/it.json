@@ -57,6 +57,14 @@
   "Annotate.CanvasTooltip": "Trascina per annotare",
   "Annotate.RotationHint": "Riporta la rotazione della pagina a 0° per poterla annotare.",
 
+  "Search.Placeholder": "Trova nel documento",
+  "Search.Count": "{0} / {1}",
+  "Search.NoResults": "Nessun risultato",
+  "Search.MatchCase": "Maiuscole/minuscole",
+  "Search.WholeWord": "Parola intera",
+  "Search.Prev": "Risultato precedente",
+  "Search.Next": "Risultato successivo",
+
   "Busy.Cancel": "Annulla",
 
   "Status.Ready": "Pronto",
@@ -72,6 +80,7 @@
   "Status.OcrSaved": "PDF ricercabile salvato ({0} pagine): {1}",
   "Status.OcrNoScanned": "Nessuna pagina scansionata da elaborare",
   "Status.OcrUnavailable": "OCR non disponibile: {0}",
+  "Status.Searching": "Ricerca in corso...",
   "Status.Adding": "Aggiunta {0}...",
   "Status.Canceled": "Operazione annullata",
   "Status.Error": "Errore: {0}",

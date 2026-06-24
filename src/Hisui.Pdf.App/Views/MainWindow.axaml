@@ -230,14 +230,40 @@
             <Border DockPanel.Dock="Top" Height="38"
                     Background="{DynamicResource RibbonTabStripBrush}"
                     BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="0,0,0,1">
-                <StackPanel Orientation="Horizontal" Spacing="2" Margin="12,0" VerticalAlignment="Bottom">
-                    <Button Classes="ribbon-filepill" Content="{loc:Tr Ribbon.FilePill}" Click="OnFileBackstageClick"
-                            ToolTip.Tip="{loc:Tr Ribbon.FilePill.Tooltip}" />
-                    <RadioButton Classes="ribbon-tab" GroupName="RibbonTabs" Content="{loc:Tr Ribbon.Tab.Home}"
-                                 IsChecked="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Home, Mode=TwoWay}" />
-                    <RadioButton Classes="ribbon-tab" GroupName="RibbonTabs" Content="{loc:Tr Ribbon.Tab.Annotate}"
-                                 IsChecked="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Annota, Mode=TwoWay}" />
-                </StackPanel>
+                <Grid Margin="12,0" ColumnDefinitions="Auto,*,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Bottom">
+                        <Button Classes="ribbon-filepill" Content="{loc:Tr Ribbon.FilePill}" Click="OnFileBackstageClick"
+                                ToolTip.Tip="{loc:Tr Ribbon.FilePill.Tooltip}" />
+                        <RadioButton Classes="ribbon-tab" GroupName="RibbonTabs" Content="{loc:Tr Ribbon.Tab.Home}"
+                                     IsChecked="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Home, Mode=TwoWay}" />
+                        <RadioButton Classes="ribbon-tab" GroupName="RibbonTabs" Content="{loc:Tr Ribbon.Tab.Annotate}"
+                                     IsChecked="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Annota, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <!-- Find-in-document bar -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center"
+                                IsEnabled="{Binding IsDocumentLoaded}">
+                        <TextBox Width="190" Height="27" Padding="8,2" VerticalContentAlignment="Center"
+                                 Watermark="{loc:Tr Search.Placeholder}" Text="{Binding SearchQuery}">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <ToggleButton Content="Aa" FontSize="12" MinWidth="30" Height="27" Padding="6,0"
+                                      IsChecked="{Binding SearchMatchCase}" ToolTip.Tip="{loc:Tr Search.MatchCase}" />
+                        <ToggleButton Content="|ab|" FontSize="12" MinWidth="34" Height="27" Padding="6,0"
+                                      IsChecked="{Binding SearchWholeWord}" ToolTip.Tip="{loc:Tr Search.WholeWord}" />
+                        <TextBlock Text="{Binding SearchSummary}" VerticalAlignment="Center" MinWidth="46"
+                                   TextAlignment="Center" FontSize="11.5"
+                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                        <Button Classes="ribbon-icon" Command="{Binding PrevMatchCommand}" ToolTip.Tip="{loc:Tr Search.Prev}">
+                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconUp}" />
+                        </Button>
+                        <Button Classes="ribbon-icon" Command="{Binding NextMatchCommand}" ToolTip.Tip="{loc:Tr Search.Next}">
+                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconDown}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <!-- ── Ribbon body ── -->
@@ -516,6 +542,32 @@
                                     <RotateTransform Angle="{Binding PreviewRotationAngle}" />
                                 </Image.RenderTransform>
                             </Image>
+
+            <!-- Search-match highlight layer (over the image, under the annotation canvas) -->
+                            <ItemsControl x:Name="HighlightLayer" ItemsSource="{Binding Highlights}"
+                                          HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False"
+                                          Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                          Height="{Binding #PreviewImageControl.Bounds.Height}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.Styles>
+                                    <Style Selector="ContentPresenter">
+                                        <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                                        <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                                    </Style>
+                                </ItemsControl.Styles>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Rectangle Width="{Binding Width}" Height="{Binding Height}"
+                                                   Fill="{Binding Fill}" Stroke="{Binding Stroke}"
+                                                   StrokeThickness="{Binding StrokeThickness}"
+                                                   RadiusX="1.5" RadiusY="1.5" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
                             <Canvas x:Name="AnnotationCanvas"
                                     Background="Transparent"

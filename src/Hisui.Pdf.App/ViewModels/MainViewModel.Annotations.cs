@@ -64,6 +64,8 @@ public partial class MainViewModel
         ExtractSelectedCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
+        SearchCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(IsDocumentLoaded));
     }
 
     public bool IsAnnotationActive => ActiveTool != AnnotationTool.None;
@@ -89,6 +91,7 @@ public partial class MainViewModel
     {
         OnPropertyChanged(nameof(CanAnnotate));
         OnPropertyChanged(nameof(ShowRotationHint));
+        RecomputeHighlights(); // search highlights only render at 0°
     }
 
     [RelayCommand]

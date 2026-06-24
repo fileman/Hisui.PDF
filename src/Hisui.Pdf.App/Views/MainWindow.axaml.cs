@@ -1,9 +1,11 @@
 using System.IO;
 using System.Windows.Input;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Reactive;
 using Hisui.Pdf.App.Localization;
 using Hisui.Pdf.App.Services;
 using Hisui.Pdf.App.ViewModels;
@@ -32,6 +34,13 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
+        // Push the preview image's size to the VM so it can place search highlights in pixel space.
+        if (this.FindControl<Image>("PreviewImageControl") is { } preview)
+            preview.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b =>
+            {
+                if (DataContext is MainViewModel vm) vm.UpdateSearchOverlaySize(b.Width, b.Height);
+            }));
+
         _annotCanvas = this.FindControl<Canvas>("AnnotationCanvas");
         if (_annotCanvas is null) return;
 

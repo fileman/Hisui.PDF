@@ -70,7 +70,7 @@ public partial class MainViewModel : ObservableObject
             if (!IsBusy) StatusMessage = _loc["Status.Ready"];
         };
 
-        Pages.CollectionChanged += (_, _) => RaisePageInfoChanged();
+        Pages.CollectionChanged += (_, _) => { RaisePageInfoChanged(); InvalidateSearch(); };
         RefreshRecentFilesMenu();
     }
 
@@ -88,6 +88,9 @@ public partial class MainViewModel : ObservableObject
     public bool HasRecentFiles => RecentFiles.Count > 0;
 
     private bool HasDocument => _session is not null && Pages.Count > 0;
+
+    /// <summary>Public mirror of <see cref="HasDocument"/> for view bindings (e.g. enabling the find bar).</summary>
+    public bool IsDocumentLoaded => HasDocument;
     private bool CanEditSelected => HasDocument && SelectedPage is not null;
     private bool CanUndo => _session?.CanUndo ?? false;
     private bool CanRedo => _session?.CanRedo ?? false;
@@ -96,6 +99,7 @@ public partial class MainViewModel : ObservableObject
     {
         RaisePageInfoChanged();
         _ = UpdatePreviewAsync(value);
+        RecomputeHighlights(); // refreshed again by the preview-size push once the new page lays out
     }
 
     // ── Commands ────────────────────────────────────────────────────────────
