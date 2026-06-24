@@ -83,6 +83,11 @@
   "Menu.About": "Informazioni...",
   "Menu.Exit": "Esci",
   "Menu.Language": "Lingua",
+  "Menu.Theme": "Tema",
+
+  "Theme.System": "Allineato al sistema",
+  "Theme.Light": "Chiaro",
+  "Theme.Dark": "Scuro",
 
   "Dialog.Title": "Parametri annotazione",
   "Dialog.Cancel": "Annulla",

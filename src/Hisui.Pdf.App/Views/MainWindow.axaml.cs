@@ -85,6 +85,21 @@ public partial class MainWindow : Window
             language.Items.Add(item);
         }
         flyout.Items.Add(language);
+
+        var theme = new MenuItem { Header = loc["Menu.Theme"] };
+        foreach (var option in vm.Themes)
+        {
+            var item = new MenuItem
+            {
+                Header = loc[option.DisplayNameKey],
+                Command = vm.SetThemeCommand,
+                CommandParameter = option.Code,
+                // A leading check marks the active theme.
+                Icon = option.Code == vm.CurrentTheme ? new TextBlock { Text = "✓" } : null,
+            };
+            theme.Items.Add(item);
+        }
+        flyout.Items.Add(theme);
         flyout.Items.Add(new Separator());
 
         var info = new MenuItem { Header = loc["Menu.About"] };

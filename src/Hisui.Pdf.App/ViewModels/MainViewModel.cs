@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Hisui.Pdf.App.Imaging;
 using Hisui.Pdf.App.Localization;
 using Hisui.Pdf.App.Services;
+using Hisui.Pdf.App.Theming;
 using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
 
@@ -319,6 +320,21 @@ public partial class MainViewModel : ObservableObject
         _settings.Settings.Language = code;
         _settings.Save();
         OnPropertyChanged(nameof(CurrentLanguage));
+    }
+
+    /// <summary>Themes offered in the backstage theme submenu.</summary>
+    public IReadOnlyList<ThemeOption> Themes => ThemeManager.AvailableThemes;
+
+    /// <summary>Active theme code; used to check-mark the current entry in the menu.</summary>
+    public string CurrentTheme => _settings.Settings.Theme;
+
+    [RelayCommand]
+    private void SetTheme(string code)
+    {
+        ThemeManager.Apply(code);
+        _settings.Settings.Theme = ThemeManager.Normalize(code);
+        _settings.Save();
+        OnPropertyChanged(nameof(CurrentTheme));
     }
 
     [RelayCommand]
