@@ -45,6 +45,9 @@ public partial class App : Application
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             Localizer.Instance.SetLanguage(settings.Settings.Language ?? Localizer.BaseLanguage);
 
+            // Apply the saved theme (Light / Dark / System) before the first window is shown.
+            Theming.ThemeManager.Apply(settings.Settings.Theme);
+
             var window = _host.Services.GetRequiredService<MainWindow>();
             desktop.MainWindow = window;
 

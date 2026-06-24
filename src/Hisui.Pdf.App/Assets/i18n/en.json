@@ -83,6 +83,11 @@
   "Menu.About": "About...",
   "Menu.Exit": "Exit",
   "Menu.Language": "Language",
+  "Menu.Theme": "Theme",
+
+  "Theme.System": "Match system",
+  "Theme.Light": "Light",
+  "Theme.Dark": "Dark",
 
   "Dialog.Title": "Annotation settings",
   "Dialog.Cancel": "Cancel",
