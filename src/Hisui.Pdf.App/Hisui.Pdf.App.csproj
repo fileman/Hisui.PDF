@@ -36,4 +36,10 @@
     <AvaloniaResource Include="Assets\i18n\*.json" />
   </ItemGroup>
 
+  <ItemGroup Label="Distribution — ship license + third-party notices next to the executable">
+    <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\licenses\*.txt" Link="licenses\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
 </Project>

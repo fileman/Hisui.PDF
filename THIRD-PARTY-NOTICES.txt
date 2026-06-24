@@ -131,21 +131,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Applies to: PdfPig and the PDFium binary packaging (bblanchon.PDFium).
 
-The complete Apache License 2.0 text is reproduced verbatim at:
-    https://www.apache.org/licenses/LICENSE-2.0
-A copy ("LICENSE-2.0.txt") should be shipped alongside this file in the
-distribution. The Apache-2.0 license includes an express grant of patent
-rights from the contributors of the above components.
+The complete Apache License 2.0 text ships with this distribution as
+"licenses/LICENSE-2.0.txt" (canonical text: https://www.apache.org/licenses/LICENSE-2.0).
+The Apache-2.0 license includes an express grant of patent rights from the
+contributors of the above components.
 
 
 ### SIL Open Font License, Version 1.1
 
 Applies to: the Inter font (bundled via Avalonia.Fonts.Inter).
 
-The complete OFL 1.1 text is reproduced verbatim at:
-    https://openfontlicense.org/open-font-license-official-text/
-    (SPDX identifier: OFL-1.1)
-A copy ("OFL.txt") should be shipped alongside this file in the distribution.
+The complete OFL 1.1 text (with the Inter copyright notice) ships with this
+distribution as "licenses/OFL.txt" (SPDX identifier: OFL-1.1).
 Under the OFL, the font may be bundled and redistributed freely, must remain
 under the OFL, may not be sold by itself, and the Reserved Font Name "Inter"
 may not be used for modified versions.
