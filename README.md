@@ -20,6 +20,9 @@ single Avalonia desktop app that runs on Windows, Linux and macOS.
 - **Security & metadata** — AES-256 encryption/decryption, document metadata
   editing.
 - **Extraction** — pull out text (with coordinates) and embedded images.
+- **OCR** — turn scanned (image-only) PDFs into searchable PDFs by adding an
+  invisible, selectable text layer (Tesseract). Scanned pages are detected
+  automatically.
 - **Localization** — English and Italian UI, switchable at runtime.
 
 ## Tech stack
@@ -29,6 +32,7 @@ single Avalonia desktop app that runs on Windows, Linux and macOS.
 - **[PDFsharp](https://docs.pdfsharp.net/)** — structural & write operations
 - **[PdfPig](https://github.com/UglyToad/PdfPig)** — text/image extraction
 - **[PDFtoImage](https://github.com/sungaila/PDFtoImage)** (PDFium) — page rendering
+- **[Tesseract](https://github.com/charlesw/tesseract)** — OCR for scanned PDFs
 - **[SkiaSharp](https://github.com/mono/SkiaSharp)** — raster compositing
 - **CommunityToolkit.Mvvm** + **Microsoft.Extensions.Hosting** — MVVM & DI
 
@@ -52,6 +56,22 @@ dotnet run --project src/Hisui.Pdf.App
 # Run the tests (xUnit v3 on Microsoft Testing Platform — run the test exe)
 dotnet test Hisui.Pdf.slnx
 ```
+
+### OCR setup
+
+The OCR feature needs Tesseract language data and (on Linux/macOS) the native
+Tesseract/Leptonica libraries:
+
+- **Language data** — place the `*.traineddata` files in a `tessdata` folder
+  next to the app, or point the `TESSDATA_PREFIX` environment variable at them.
+  Grab `eng.traineddata` (and any other languages) from
+  [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast).
+- **Native libraries** — Windows binaries ship with the `Tesseract` package;
+  on Linux install `libtesseract`/`libleptonica`, on macOS run
+  `brew install tesseract leptonica`.
+
+If either is missing the app reports a clear message instead of failing — the
+rest of the editor keeps working.
 
 ## License
 

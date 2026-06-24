@@ -10,6 +10,9 @@
     <PackageVersion Include="PDFsharp" Version="6.2.4" />
     <PackageVersion Include="PdfPig" Version="0.1.14" />
     <PackageVersion Include="PDFtoImage" Version="5.2.1" />
+    <!-- OCR for scanned PDFs (Tesseract 5 engine). Apache-2.0; bundles Windows natives,
+         uses system libtesseract/libleptonica on Linux/macOS. -->
+    <PackageVersion Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
   <!-- MVVM + Generic Host for the app. -->

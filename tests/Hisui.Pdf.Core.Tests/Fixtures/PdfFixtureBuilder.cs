@@ -59,4 +59,31 @@ public static class PdfFixtureBuilder
         document.Save(ms);
         return ms.ToArray();
     }
+
+    /// <summary>
+    /// Creates a single-page A4 PDF that contains a raster image but no text layer — i.e. it looks
+    /// like a scanned page to the OCR scanned-page detector.
+    /// </summary>
+    public static byte[] CreateScanned()
+    {
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+
+        using (var gfx = XGraphics.FromPdfPage(page))
+        using (var imgStream = new MemoryStream(OnePixelPng))
+        {
+            var image = XImage.FromStream(imgStream);
+            // Stretch the 1×1 image across most of the page so it reads as page content.
+            gfx.DrawImage(image, 40, 40, page.Width.Point - 80, page.Height.Point - 80);
+        }
+
+        using var ms = new MemoryStream();
+        document.Save(ms);
+        return ms.ToArray();
+    }
+
+    // A minimal valid 1×1 opaque PNG (white pixel).
+    private static readonly byte[] OnePixelPng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
 }

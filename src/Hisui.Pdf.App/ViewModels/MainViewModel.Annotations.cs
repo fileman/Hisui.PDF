@@ -54,6 +54,7 @@ public partial class MainViewModel
     {
         SaveAsCommand.NotifyCanExecuteChanged();
         SplitToSinglePagesCommand.NotifyCanExecuteChanged();
+        MakeSearchableCommand.NotifyCanExecuteChanged();
         AddWatermarkCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         RotateLeftCommand.NotifyCanExecuteChanged();

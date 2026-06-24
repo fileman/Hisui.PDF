@@ -28,6 +28,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfAnnotationService _annotations;
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
+    private readonly IPdfOcrService _ocr;
     private readonly ILocalizer _loc;
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
@@ -44,6 +45,7 @@ public partial class MainViewModel : ObservableObject
         IPdfAnnotationService annotations,
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
+        IPdfOcrService ocr,
         ILocalizer localizer)
     {
         _pageService = pageService;
@@ -53,6 +55,7 @@ public partial class MainViewModel : ObservableObject
         _annotations = annotations;
         _textEdit = textEdit;
         _textExtractor = textExtractor;
+        _ocr = ocr;
         _loc = localizer;
 
         StatusMessage = _loc["Status.Ready"];
@@ -303,6 +306,40 @@ public partial class MainViewModel : ObservableObject
                 await Task.Run(() => File.WriteAllBytes(file, bytes), ct);
             }
             StatusMessage = _loc.Format("Status.Split", chunks.Count, folder);
+        });
+    }
+
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task MakeSearchableAsync()
+    {
+        if (!HasDocument) return;
+
+        var path = await _dialogs.SavePdfAsync("documento-ocr.pdf");
+        if (path is null) return;
+
+        await RunBusyAsync(_loc["Status.Ocr"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+
+            // Detect first so we can give a clear message instead of silently producing an identical file.
+            var scanned = await _ocr.DetectScannedPagesAsync(current, ct);
+            if (scanned.Count == 0)
+            {
+                StatusMessage = _loc["Status.OcrNoScanned"];
+                return;
+            }
+
+            try
+            {
+                var searchable = await _ocr.MakeSearchableAsync(current, options: null, ct);
+                await Task.Run(() => File.WriteAllBytes(path, searchable), ct);
+                StatusMessage = _loc.Format("Status.OcrSaved", scanned.Count, Path.GetFileName(path));
+            }
+            catch (OcrUnavailableException ex)
+            {
+                // Missing native engine / language data is a configuration issue, not a crash — explain it.
+                StatusMessage = _loc.Format("Status.OcrUnavailable", ex.Message);
+            }
         });
     }
 
