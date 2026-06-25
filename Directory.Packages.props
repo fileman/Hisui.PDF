@@ -15,6 +15,12 @@
     <PackageVersion Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
+  <!-- Windows printing (System.Drawing.Printing): printer enumeration, duplex, page ranges. Used only
+       behind OperatingSystem.IsWindows() guards; throws on other platforms (which use the shell fallback). -->
+  <ItemGroup Label="Printing (Windows)">
+    <PackageVersion Include="System.Drawing.Common" Version="9.0.2" />
+  </ItemGroup>
+
   <!-- MVVM + Generic Host for the app. -->
   <ItemGroup Label="App / MVVM / Hosting">
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />

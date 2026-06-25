@@ -319,7 +319,8 @@
                                             <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.SaveAs}" />
                                         </StackPanel>
                                     </Button>
-                                    <Button Classes="ribbon-small" Command="{Binding PrintCommand}" ToolTip.Tip="{loc:Tr Cmd.Print.Tooltip}">
+                                    <Button Classes="ribbon-small" Click="OnPrintClick" IsEnabled="{Binding IsDocumentLoaded}"
+                                            ToolTip.Tip="{loc:Tr Cmd.Print.Tooltip}">
                                         <StackPanel Orientation="Horizontal" Spacing="7">
                                             <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconPrint}" />
                                             <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Print}" />

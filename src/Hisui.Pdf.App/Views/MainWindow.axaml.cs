@@ -9,6 +9,7 @@ using Avalonia.Reactive;
 using Hisui.Pdf.App.Localization;
 using Hisui.Pdf.App.Services;
 using Hisui.Pdf.App.ViewModels;
+using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
 
 namespace Hisui.Pdf.App.Views;
@@ -17,12 +18,16 @@ public partial class MainWindow : Window
 {
     private Canvas? _annotCanvas;
     private readonly ISignatureService _signatures;
+    private readonly IPrintService _print;
+    private readonly IPdfRenderer _renderer;
 
-    public MainWindow(MainViewModel viewModel, ISignatureService signatures)
+    public MainWindow(MainViewModel viewModel, ISignatureService signatures, IPrintService print, IPdfRenderer renderer)
     {
         InitializeComponent();
         DataContext = viewModel;
         _signatures = signatures;
+        _print = print;
+        _renderer = renderer;
 
         // Lets the view model prompt for a password when opening an encrypted PDF.
         viewModel.RequestPasswordAsync = async () =>
@@ -92,6 +97,7 @@ public partial class MainWindow : Window
         var protectItem = new MenuItem { Header = loc["Menu.Protect"], IsEnabled = vm.IsDocumentLoaded };
         protectItem.Click += OnProtectClick;
         flyout.Items.Add(protectItem);
+        flyout.Items.Add(MakeItem(loc["Menu.RemovePassword"], vm.RemovePasswordCommand));
         flyout.Items.Add(new Separator());
 
         var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
@@ -209,6 +215,33 @@ public partial class MainWindow : Window
                 var ok = await dialog.ShowDialog<bool>(this);
                 return ok ? dialog.Result : null;
             });
+        }
+        catch (Exception ex)
+        {
+            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
+    // ── Print ─────────────────────────────────────────────────────────────────
+
+    private async void OnPrintClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.IsDocumentLoaded) return;
+        try
+        {
+            // No in-app print stack on this platform — hand off to the OS print path.
+            if (!_print.SupportsSystemDialog)
+            {
+                if (vm.PrintCommand.CanExecute(null)) vm.PrintCommand.Execute(null);
+                return;
+            }
+
+            var pdf = await vm.BuildCurrentDocumentAsync();
+            if (pdf is null) return;
+
+            var dialog = new PrintDialog(_print, _renderer, pdf, vm.Pages.Count, vm.CurrentPageIndex);
+            if (await dialog.ShowDialog<bool>(this) && dialog.Result is not null)
+                await vm.RunPrintJobAsync(pdf, dialog.Result);
         }
         catch (Exception ex)
         {

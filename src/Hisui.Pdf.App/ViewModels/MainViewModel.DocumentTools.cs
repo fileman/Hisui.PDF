@@ -69,6 +69,41 @@ public partial class MainViewModel
         });
     }
 
+    // ── Remove password (unlock) ──────────────────────────────────────────────
+
+    /// <summary>True when the open document came from an encrypted file, so "remove password" applies.</summary>
+    private bool _openedFromEncrypted;
+
+    /// <summary>Records whether the just-opened document was encrypted and refreshes the unlock command.</summary>
+    internal void SetOpenedFromEncrypted(bool value)
+    {
+        _openedFromEncrypted = value;
+        RemovePasswordCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanRemovePassword => HasDocument && _openedFromEncrypted;
+
+    /// <summary>
+    /// Saves an unprotected copy of the open document. The session already holds the decrypted bytes
+    /// (<see cref="OpenPathAsync"/> prompts for the password and decrypts on load), so rebuilding it
+    /// writes a copy with no encryption — the "remove password" operation.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRemovePassword))]
+    private async Task RemovePasswordAsync()
+    {
+        if (!CanRemovePassword) return;
+
+        var path = await _dialogs.SavePdfAsync("documento-sbloccato.pdf");
+        if (path is null) return;
+
+        await RunBusyAsync(_loc["Status.Unlocking"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+            await Task.Run(() => File.WriteAllBytes(path, current), ct);
+            StatusMessage = _loc.Format("Status.Unlocked", Path.GetFileName(path));
+        });
+    }
+
     // ── Password protect (encrypt) — view supplies the password ───────────────
 
     public async Task ProtectAsync(string password)

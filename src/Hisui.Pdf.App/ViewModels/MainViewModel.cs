@@ -164,15 +164,9 @@ public partial class MainViewModel : ObservableObject
     {
         await RunBusyAsync(_loc["Status.Opening"], async ct =>
         {
-            var bytes = await Task.Run(() => File.ReadAllBytes(path), ct);
-
-            // Encrypted PDFs need a password before any library can read them — prompt via the view.
-            if (_security.IsEncrypted(bytes))
-            {
-                var password = RequestPasswordAsync is null ? null : await RequestPasswordAsync();
-                if (password is null) { StatusMessage = _loc["Status.OpenCancelledEncrypted"]; return; }
-                bytes = await _security.DecryptAsync(bytes, password, ct);
-            }
+            var loaded = await ReadAndDecryptAsync(path, ct);
+            if (loaded is null) { StatusMessage = _loc["Status.OpenCancelledEncrypted"]; return; }
+            var (bytes, wasEncrypted) = loaded.Value;
 
             var count = await _pageService.GetPageCountAsync(bytes, ct);
 
@@ -182,6 +176,7 @@ public partial class MainViewModel : ObservableObject
             _previewCache.Clear();
 
             SyncPagesFromSession();
+            SetOpenedFromEncrypted(wasEncrypted); // enables "remove password" only for once-encrypted files
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
             _settings.AddRecentFile(path);
             RefreshRecentFilesMenu();
@@ -387,6 +382,11 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
+    /// <summary>
+    /// Fallback print command used where the in-app print dialog isn't available (non-Windows): hands
+    /// the document to the OS print path. On Windows the view shows the rich dialog and calls
+    /// <see cref="RunPrintJobAsync"/> instead.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(HasDocument))]
     private async Task PrintAsync()
     {
@@ -395,8 +395,38 @@ public partial class MainViewModel : ObservableObject
         await RunBusyAsync(_loc["Status.Printing"], async ct =>
         {
             var current = await _pageService.BuildFromSessionAsync(_session!, ct);
-            var launched = await _print.PrintAsync(current, ct);
+            var launched = await _print.PrintViaShellAsync(current, ct);
             StatusMessage = _loc[launched ? "Status.PrintSent" : "Status.PrintFailed"];
+        });
+    }
+
+    /// <summary>
+    /// Builds the current document (all edits applied) for the print dialog/preview. Runs under the busy
+    /// overlay so page-editing commands can't mutate the session on the UI thread while the background
+    /// build enumerates it. Returns null if nothing is loaded or another operation is in flight.
+    /// </summary>
+    public async Task<byte[]?> BuildCurrentDocumentAsync()
+    {
+        if (!HasDocument || IsBusy) return null;
+
+        byte[]? built = null;
+        await RunBusyAsync(_loc["Status.Printing"], async ct =>
+        {
+            built = await _pageService.BuildFromSessionAsync(_session!, ct);
+        });
+        return built;
+    }
+
+    /// <summary>Zero-based index of the page shown in the preview (used to seed the print dialog).</summary>
+    public int CurrentPageIndex => SelectedPage is null ? 0 : Math.Max(0, Pages.IndexOf(SelectedPage));
+
+    /// <summary>Runs a print job (resolved by the print dialog) through the busy overlay and reports the result.</summary>
+    public async Task RunPrintJobAsync(byte[] pdf, PrintJob job)
+    {
+        await RunBusyAsync(_loc["Status.Printing"], async ct =>
+        {
+            var ok = await _print.PrintAsync(pdf, job, ct);
+            StatusMessage = _loc[ok ? "Status.PrintSent" : "Status.PrintFailed"];
         });
     }
 
@@ -412,11 +442,24 @@ public partial class MainViewModel : ObservableObject
         {
             var current = await _pageService.BuildFromSessionAsync(_session!, ct);
             var compressed = await _optimizer.OptimizeAsync(current, options: null, ct);
-            await Task.Run(() => File.WriteAllBytes(path, compressed), ct);
 
-            var percent = current.Length > 0 ? (int)Math.Round(100.0 * compressed.Length / current.Length) : 100;
-            StatusMessage = _loc.Format("Status.Compressed",
-                Path.GetFileName(path), FormatSize(current.Length), FormatSize(compressed.Length), percent);
+            // Never hand back a file that isn't actually smaller: if there was nothing left to squeeze,
+            // save the original bytes and say so plainly instead of writing an identical-or-larger copy.
+            var gained = compressed.Length < current.Length;
+            var output = gained ? compressed : current;
+            await Task.Run(() => File.WriteAllBytes(path, output), ct);
+
+            if (gained)
+            {
+                var percent = (int)Math.Round(100.0 * compressed.Length / current.Length);
+                StatusMessage = _loc.Format("Status.Compressed",
+                    Path.GetFileName(path), FormatSize(current.Length), FormatSize(compressed.Length), percent);
+            }
+            else
+            {
+                StatusMessage = _loc.Format("Status.CompressedNoGain",
+                    Path.GetFileName(path), FormatSize(current.Length));
+            }
         });
     }
 
@@ -458,12 +501,35 @@ public partial class MainViewModel : ObservableObject
 
         await RunBusyAsync(_loc.Format("Status.Adding", Path.GetFileName(path)), async ct =>
         {
-            var bytes = await Task.Run(() => File.ReadAllBytes(path), ct);
+            var loaded = await ReadAndDecryptAsync(path, ct);
+            if (loaded is null) { StatusMessage = _loc["Status.OpenCancelledEncrypted"]; return; }
+            var (bytes, wasEncrypted) = loaded.Value;
+
             var count = await _pageService.GetPageCountAsync(bytes, ct);
             _session.AddSource(bytes, count);
+            if (wasEncrypted) SetOpenedFromEncrypted(true); // a merged encrypted source enables "remove password"
             SyncPagesFromSession();
             await RenderThumbnailsAsync(ct);
         });
+    }
+
+    /// <summary>
+    /// Reads a PDF and, if it is encrypted, prompts (via the view) for a password and decrypts it so any
+    /// library can read it. Returns the readable bytes plus whether the file was encrypted, or null if the
+    /// user cancelled the password prompt.
+    /// </summary>
+    private async Task<(byte[] Bytes, bool WasEncrypted)?> ReadAndDecryptAsync(string path, CancellationToken ct)
+    {
+        var bytes = await Task.Run(() => File.ReadAllBytes(path), ct);
+
+        var wasEncrypted = _security.IsEncrypted(bytes);
+        if (wasEncrypted)
+        {
+            var password = RequestPasswordAsync is null ? null : await RequestPasswordAsync();
+            if (password is null) return null;
+            bytes = await _security.DecryptAsync(bytes, password, ct);
+        }
+        return (bytes, wasEncrypted);
     }
 
     private void SyncPagesFromSession()

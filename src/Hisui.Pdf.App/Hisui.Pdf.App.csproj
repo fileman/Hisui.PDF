@@ -23,6 +23,9 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <!-- Windows print path (printer list, duplex, page ranges). Cross-platform builds keep compiling;
+         the API is only called behind OperatingSystem.IsWindows() guards. -->
+    <PackageReference Include="System.Drawing.Common" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
   </ItemGroup>

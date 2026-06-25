@@ -125,6 +125,43 @@ public static class PdfFixtureBuilder
         return ms.ToArray();
     }
 
+    /// <summary>
+    /// Creates a single-page A4 PDF that embeds a sizeable opaque PNG, which PDFsharp stores as a
+    /// Flate-encoded raster image — exercising the optimizer's <c>/FlateDecode</c> recompression path.
+    /// </summary>
+    public static byte[] CreateWithFlateImage(int sizePx = 1000)
+    {
+        // A high-frequency, low-redundancy pattern: Flate can barely compress it (so the stored image
+        // stays large), which is what a real photo / scan looks like — and what makes JPEG a clear win.
+        using var bmp = new SKBitmap(new SKImageInfo(sizePx, sizePx, SKColorType.Rgba8888, SKAlphaType.Opaque));
+        var pixels = new SKColor[sizePx * sizePx];
+        for (var y = 0; y < sizePx; y++)
+            for (var x = 0; x < sizePx; x++)
+                pixels[(y * sizePx) + x] = new SKColor(
+                    (byte)((x * 7) + (y * 13)),
+                    (byte)((x * 31) ^ (y * 17)),
+                    (byte)(((x + y) * 29) + (x * 3)));
+        bmp.Pixels = pixels;
+
+        using var skImage = SKImage.FromBitmap(bmp);
+        using var data = skImage.Encode(SKEncodedImageFormat.Png, 100);
+        var png = data.ToArray();
+
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+        using (var gfx = XGraphics.FromPdfPage(page))
+        using (var stream = new MemoryStream(png))
+        {
+            var image = XImage.FromStream(stream);
+            gfx.DrawImage(image, 0, 0, page.Width.Point, page.Height.Point);
+        }
+
+        using var ms = new MemoryStream();
+        document.Save(ms);
+        return ms.ToArray();
+    }
+
     // A minimal valid 1×1 opaque PNG (white pixel).
     private static readonly byte[] OnePixelPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");

@@ -58,6 +58,7 @@ public partial class MainViewModel
         CompressCommand.NotifyCanExecuteChanged();
         PrintCommand.NotifyCanExecuteChanged();
         ExtractImagesCommand.NotifyCanExecuteChanged();
+        RemovePasswordCommand.NotifyCanExecuteChanged();
         AddWatermarkCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         RotateLeftCommand.NotifyCanExecuteChanged();
