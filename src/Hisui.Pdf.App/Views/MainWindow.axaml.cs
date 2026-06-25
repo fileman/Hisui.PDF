@@ -41,6 +41,16 @@ public partial class MainWindow : Window
                 if (DataContext is MainViewModel vm) vm.UpdateSearchOverlaySize(b.Width, b.Height);
             }));
 
+        // Track the scroll viewport (for fit-width/height) and enable Ctrl+wheel zoom.
+        if (this.FindControl<ScrollViewer>("PreviewScroll") is { } scroll)
+        {
+            scroll.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b =>
+            {
+                if (DataContext is MainViewModel vm) vm.UpdateViewportSize(b.Width, b.Height);
+            }));
+            scroll.AddHandler(PointerWheelChangedEvent, OnPreviewWheel, RoutingStrategies.Tunnel);
+        }
+
         _annotCanvas = this.FindControl<Canvas>("AnnotationCanvas");
         if (_annotCanvas is null) return;
 
@@ -106,6 +116,17 @@ public partial class MainWindow : Window
 
         static MenuItem MakeItem(string header, ICommand command) =>
             new() { Header = header, Command = command };
+    }
+
+    // ── Zoom ──────────────────────────────────────────────────────────────────
+
+    private void OnPreviewWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return; // plain wheel scrolls as usual
+        if (e.Delta.Y > 0) vm.ZoomInCommand.Execute(null);
+        else if (e.Delta.Y < 0) vm.ZoomOutCommand.Execute(null);
+        e.Handled = true;
     }
 
     // ── Annotation pointer handlers ───────────────────────────────────────────

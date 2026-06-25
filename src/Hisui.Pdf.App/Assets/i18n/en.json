@@ -65,6 +65,12 @@
   "Search.Prev": "Previous match",
   "Search.Next": "Next match",
 
+  "Zoom.In": "Zoom in (Ctrl+Wheel)",
+  "Zoom.Out": "Zoom out (Ctrl+Wheel)",
+  "Zoom.Actual": "Actual size (100%)",
+  "Zoom.FitWidth": "Fit width",
+  "Zoom.FitHeight": "Fit height",
+
   "Busy.Cancel": "Cancel",
 
   "Status.Ready": "Ready",

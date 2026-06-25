@@ -220,6 +220,24 @@
         <Style Selector="MenuItem.backstage">
             <Setter Property="FontSize" Value="13" />
         </Style>
+
+        <!-- Status-bar zoom buttons -->
+        <Style Selector="Button.zoombtn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="MinWidth" Value="26" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+        </Style>
+        <Style Selector="Button.zoombtn /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.zoombtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
     </Window.Styles>
 
     <!-- Root: ribbon shell + modal busy overlay. -->
@@ -466,13 +484,30 @@
             <Border DockPanel.Dock="Bottom" Height="30"
                     Background="{DynamicResource RibbonStatusBrush}"
                     BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="0,1,0,0">
-                <Grid Margin="14,0" ColumnDefinitions="*,Auto">
+                <Grid Margin="14,0" ColumnDefinitions="*,Auto,Auto">
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <Ellipse Width="7" Height="7" Fill="{DynamicResource RibbonSuccessBrush}" />
                         <TextBlock Text="{Binding StatusMessage}" FontSize="12"
                                    Foreground="{DynamicResource RibbonSubtleTextBrush}" />
                     </StackPanel>
-                    <TextBlock Grid.Column="1" Text="{Binding PageInfo}" FontSize="12"
+
+                    <!-- Zoom controls -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center"
+                                Margin="0,0,14,0" IsEnabled="{Binding IsDocumentLoaded}">
+                        <Button Classes="zoombtn" Command="{Binding FitWidthCommand}" Content="↔"
+                                ToolTip.Tip="{loc:Tr Zoom.FitWidth}" />
+                        <Button Classes="zoombtn" Command="{Binding FitHeightCommand}" Content="↕"
+                                ToolTip.Tip="{loc:Tr Zoom.FitHeight}" />
+                        <Border Width="1" Background="{DynamicResource RibbonDividerBrush}" Margin="5,7" />
+                        <Button Classes="zoombtn" Command="{Binding ZoomOutCommand}" Content="−"
+                                ToolTip.Tip="{loc:Tr Zoom.Out}" />
+                        <Button Classes="zoombtn" Command="{Binding ZoomActualCommand}" Content="{Binding ZoomLabel}"
+                                MinWidth="48" ToolTip.Tip="{loc:Tr Zoom.Actual}" />
+                        <Button Classes="zoombtn" Command="{Binding ZoomInCommand}" Content="+"
+                                ToolTip.Tip="{loc:Tr Zoom.In}" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" Text="{Binding PageInfo}" FontSize="12"
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource RibbonSubtleTextBrush}" />
                 </Grid>
@@ -531,11 +566,13 @@
 
                 <!-- Page preview + annotation overlay -->
                 <Border Grid.Column="2" Background="{DynamicResource RibbonPreviewBrush}">
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer x:Name="PreviewScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <Grid Margin="16" HorizontalAlignment="Left" VerticalAlignment="Top">
                             <Image x:Name="PreviewImageControl"
                                    Source="{Binding PreviewImage}"
-                                   Stretch="None"
+                                   Stretch="Fill"
+                                   Width="{Binding PreviewDisplayWidth}"
+                                   Height="{Binding PreviewDisplayHeight}"
                                    HorizontalAlignment="Left" VerticalAlignment="Top"
                                    RenderTransformOrigin="50%,50%">
                                 <Image.RenderTransform>

@@ -65,6 +65,12 @@
   "Search.Prev": "Risultato precedente",
   "Search.Next": "Risultato successivo",
 
+  "Zoom.In": "Ingrandisci (Ctrl+Rotella)",
+  "Zoom.Out": "Riduci (Ctrl+Rotella)",
+  "Zoom.Actual": "Dimensione reale (100%)",
+  "Zoom.FitWidth": "Adatta larghezza",
+  "Zoom.FitHeight": "Adatta altezza",
+
   "Busy.Cancel": "Annulla",
 
   "Status.Ready": "Pronto",
