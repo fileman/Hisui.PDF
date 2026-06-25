@@ -26,6 +26,7 @@
         <StreamGeometry x:Key="IconExtract">M4 2h6l2.5 2.5V14H4z M8 7v4M6 9l2 2 2-2</StreamGeometry>
         <StreamGeometry x:Key="IconSplit">M8 2v12M3 5L1.5 8 3 11M13 5l1.5 3L13 11</StreamGeometry>
         <StreamGeometry x:Key="IconOcr">M4 2h6l2.5 2.5V14H4z M6 6h4 M6 8.5h4 M6 11h2.5</StreamGeometry>
+        <StreamGeometry x:Key="IconCompress">M3 6V3h3 M13 6V3h-3 M3 10v3h3 M13 10v3h-3 M6.5 6.5h3v3h-3z</StreamGeometry>
 
         <!-- Annotation tool glyphs (16-unit coordinate space, stroked, no fill) -->
         <StreamGeometry x:Key="IconHighlight">M5 11l6-6 3 3-6 6H5z M3 14h10</StreamGeometry>
@@ -402,6 +403,12 @@
                                     <StackPanel Spacing="5" HorizontalAlignment="Center">
                                         <Path Classes="glyph" Width="24" Height="24" Data="{StaticResource IconOcr}" />
                                         <TextBlock Classes="ribbon-label" Text="{loc:Tr Cmd.Ocr}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-large" Command="{Binding CompressCommand}" ToolTip.Tip="{loc:Tr Cmd.Compress.Tooltip}">
+                                    <StackPanel Spacing="5" HorizontalAlignment="Center">
+                                        <Path Classes="glyph" Width="24" Height="24" Data="{StaticResource IconCompress}" />
+                                        <TextBlock Classes="ribbon-label" Text="{loc:Tr Cmd.Compress}" />
                                     </StackPanel>
                                 </Button>
                             </StackPanel>

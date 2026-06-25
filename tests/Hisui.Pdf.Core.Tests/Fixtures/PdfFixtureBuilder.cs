@@ -2,6 +2,7 @@ using Hisui.Pdf.Core.Services;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf;
+using SkiaSharp;
 
 namespace Hisui.Pdf.Core.Tests.Fixtures;
 
@@ -81,6 +82,42 @@ public static class PdfFixtureBuilder
             var image = XImage.FromStream(imgStream);
             // Stretch the 1×1 image across most of the page so it reads as page content.
             gfx.DrawImage(image, 40, 40, page.Width.Point - 80, page.Height.Point - 80);
+        }
+
+        using var ms = new MemoryStream();
+        document.Save(ms);
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Creates a single-page A4 PDF that embeds a sizeable baseline-JPEG image, so the optimizer's
+    /// <c>/DCTDecode</c> recompression path has something real to shrink.
+    /// </summary>
+    public static byte[] CreateWithJpegImage(int sizePx = 1600, int jpegQuality = 92)
+    {
+        using var bmp = new SKBitmap(sizePx, sizePx);
+        using (var canvas = new SKCanvas(bmp))
+        using (var paint = new SKPaint())
+        {
+            canvas.Clear(SKColors.White);
+            for (var y = 0; y < sizePx; y += 5)
+            {
+                paint.Color = new SKColor((byte)(y % 256), (byte)((y * 3) % 256), (byte)((y * 7) % 256));
+                canvas.DrawLine(0, y, sizePx, y, paint);
+            }
+        }
+        using var skImage = SKImage.FromBitmap(bmp);
+        using var data = skImage.Encode(SKEncodedImageFormat.Jpeg, jpegQuality);
+        var jpeg = data.ToArray();
+
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+        using (var gfx = XGraphics.FromPdfPage(page))
+        using (var stream = new MemoryStream(jpeg))
+        {
+            var image = XImage.FromStream(stream);
+            gfx.DrawImage(image, 0, 0, page.Width.Point, page.Height.Point);
         }
 
         using var ms = new MemoryStream();

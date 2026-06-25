@@ -29,6 +29,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
+    private readonly IPdfOptimizer _optimizer;
     private readonly ILocalizer _loc;
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
@@ -46,6 +47,7 @@ public partial class MainViewModel : ObservableObject
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
+        IPdfOptimizer optimizer,
         ILocalizer localizer)
     {
         _pageService = pageService;
@@ -56,6 +58,7 @@ public partial class MainViewModel : ObservableObject
         _textEdit = textEdit;
         _textExtractor = textExtractor;
         _ocr = ocr;
+        _optimizer = optimizer;
         _loc = localizer;
 
         StatusMessage = _loc["Status.Ready"];
@@ -346,6 +349,31 @@ public partial class MainViewModel : ObservableObject
             }
         });
     }
+
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task CompressAsync()
+    {
+        if (!HasDocument) return;
+
+        var path = await _dialogs.SavePdfAsync("documento-compresso.pdf");
+        if (path is null) return;
+
+        await RunBusyAsync(_loc["Status.Compressing"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+            var compressed = await _optimizer.OptimizeAsync(current, options: null, ct);
+            await Task.Run(() => File.WriteAllBytes(path, compressed), ct);
+
+            var percent = current.Length > 0 ? (int)Math.Round(100.0 * compressed.Length / current.Length) : 100;
+            StatusMessage = _loc.Format("Status.Compressed",
+                Path.GetFileName(path), FormatSize(current.Length), FormatSize(compressed.Length), percent);
+        });
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024
+            ? $"{bytes / (1024.0 * 1024.0):0.#} MB"
+            : $"{bytes / 1024.0:0.#} KB";
 
     /// <summary>Languages offered in the backstage language submenu.</summary>
     public IReadOnlyList<LanguageOption> Languages => _loc.AvailableLanguages;

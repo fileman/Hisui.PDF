@@ -34,6 +34,8 @@
   "Cmd.Split.Tooltip": "Dividi in pagine singole",
   "Cmd.Ocr": "OCR",
   "Cmd.Ocr.Tooltip": "Riconosci il testo delle pagine scansionate e salva un PDF ricercabile",
+  "Cmd.Compress": "Comprimi",
+  "Cmd.Compress.Tooltip": "Riduci le dimensioni del file ricomprimendo le immagini",
 
   "Tool.Highlight": "Evidenzia",
   "Tool.Highlight.Tooltip": "Evidenzia un'area (trascina sulla pagina)",
@@ -87,6 +89,8 @@
   "Status.OcrNoScanned": "Nessuna pagina scansionata da elaborare",
   "Status.OcrUnavailable": "OCR non disponibile: {0}",
   "Status.Searching": "Ricerca in corso...",
+  "Status.Compressing": "Compressione in corso...",
+  "Status.Compressed": "Compresso {0}: {1} → {2} ({3}%)",
   "Status.Adding": "Aggiunta {0}...",
   "Status.Canceled": "Operazione annullata",
   "Status.Error": "Errore: {0}",
