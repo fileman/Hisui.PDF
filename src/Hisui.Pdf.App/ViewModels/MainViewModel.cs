@@ -30,6 +30,9 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
     private readonly IPdfOptimizer _optimizer;
+    private readonly IPdfImageExtractor _imageExtractor;
+    private readonly IPdfMetadataService _metadata;
+    private readonly IPdfSecurityService _security;
     private readonly IPrintService _print;
     private readonly IWindowService _windows;
     private readonly ILocalizer _loc;
@@ -50,6 +53,9 @@ public partial class MainViewModel : ObservableObject
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
         IPdfOptimizer optimizer,
+        IPdfImageExtractor imageExtractor,
+        IPdfMetadataService metadata,
+        IPdfSecurityService security,
         IPrintService print,
         IWindowService windows,
         ILocalizer localizer)
@@ -63,6 +69,9 @@ public partial class MainViewModel : ObservableObject
         _textExtractor = textExtractor;
         _ocr = ocr;
         _optimizer = optimizer;
+        _imageExtractor = imageExtractor;
+        _metadata = metadata;
+        _security = security;
         _print = print;
         _windows = windows;
         _loc = localizer;
@@ -156,6 +165,15 @@ public partial class MainViewModel : ObservableObject
         await RunBusyAsync(_loc["Status.Opening"], async ct =>
         {
             var bytes = await Task.Run(() => File.ReadAllBytes(path), ct);
+
+            // Encrypted PDFs need a password before any library can read them — prompt via the view.
+            if (_security.IsEncrypted(bytes))
+            {
+                var password = RequestPasswordAsync is null ? null : await RequestPasswordAsync();
+                if (password is null) { StatusMessage = _loc["Status.OpenCancelledEncrypted"]; return; }
+                bytes = await _security.DecryptAsync(bytes, password, ct);
+            }
+
             var count = await _pageService.GetPageCountAsync(bytes, ct);
 
             _session = new PdfDocumentSession();

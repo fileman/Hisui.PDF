@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
+        x:Class="Hisui.Pdf.App.Views.MetadataDialog"
+        Width="470" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
+        Background="{DynamicResource RibbonBarBrush}">
+    <Window.Styles>
+        <Style Selector="TextBlock.caption">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonCaptionBrush}" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+    </Window.Styles>
+    <StackPanel Margin="22" Spacing="12">
+        <StackPanel Spacing="3">
+            <TextBlock Classes="caption" Text="{loc:Tr Metadata.TitleField}" />
+            <TextBox x:Name="TitleBox" />
+        </StackPanel>
+        <StackPanel Spacing="3">
+            <TextBlock Classes="caption" Text="{loc:Tr Metadata.Author}" />
+            <TextBox x:Name="AuthorBox" />
+        </StackPanel>
+        <StackPanel Spacing="3">
+            <TextBlock Classes="caption" Text="{loc:Tr Metadata.Subject}" />
+            <TextBox x:Name="SubjectBox" />
+        </StackPanel>
+        <StackPanel Spacing="3">
+            <TextBlock Classes="caption" Text="{loc:Tr Metadata.Keywords}" />
+            <TextBox x:Name="KeywordsBox" />
+        </StackPanel>
+        <StackPanel Spacing="3">
+            <TextBlock Classes="caption" Text="{loc:Tr Metadata.Creator}" />
+            <TextBox x:Name="CreatorBox" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
+            <Button x:Name="CancelButton" Content="{loc:Tr Dialog.Cancel}" Padding="16,6" />
+            <Button x:Name="OkButton" Content="{loc:Tr Dialog.Apply}" Padding="16,6"
+                    Background="{DynamicResource RibbonAccentBrush}"
+                    Foreground="{DynamicResource RibbonOnAccentBrush}" />
+        </StackPanel>
+    </StackPanel>
+</Window>

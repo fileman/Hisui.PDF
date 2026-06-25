@@ -24,6 +24,13 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         _signatures = signatures;
 
+        // Lets the view model prompt for a password when opening an encrypted PDF.
+        viewModel.RequestPasswordAsync = async () =>
+        {
+            var dialog = new PasswordDialog("Password.EnterPrompt");
+            return await dialog.ShowDialog<bool>(this) ? dialog.Password : null;
+        };
+
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);
@@ -75,6 +82,16 @@ public partial class MainWindow : Window
         flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
         flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
         flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
+        flyout.Items.Add(new Separator());
+
+        // Document tools (Acrobat-parity)
+        flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
+        var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
+        propsItem.Click += OnDocumentPropertiesClick;
+        flyout.Items.Add(propsItem);
+        var protectItem = new MenuItem { Header = loc["Menu.Protect"], IsEnabled = vm.IsDocumentLoaded };
+        protectItem.Click += OnProtectClick;
+        flyout.Items.Add(protectItem);
         flyout.Items.Add(new Separator());
 
         var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
@@ -192,6 +209,40 @@ public partial class MainWindow : Window
                 var ok = await dialog.ShowDialog<bool>(this);
                 return ok ? dialog.Result : null;
             });
+        }
+        catch (Exception ex)
+        {
+            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
+    // ── Document tools ────────────────────────────────────────────────────────
+
+    private async void OnDocumentPropertiesClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        try
+        {
+            var metadata = await vm.ReadMetadataAsync();
+            if (metadata is null) return;
+            var dialog = new MetadataDialog(metadata);
+            if (await dialog.ShowDialog<bool>(this) && dialog.Result is not null)
+                await vm.ApplyMetadataAsync(dialog.Result);
+        }
+        catch (Exception ex)
+        {
+            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
+    private async void OnProtectClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        try
+        {
+            var dialog = new PasswordDialog("Password.SetPrompt");
+            if (await dialog.ShowDialog<bool>(this) && !string.IsNullOrEmpty(dialog.Password))
+                await vm.ProtectAsync(dialog.Password);
         }
         catch (Exception ex)
         {

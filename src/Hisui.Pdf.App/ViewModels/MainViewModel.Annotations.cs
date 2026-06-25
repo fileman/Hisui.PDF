@@ -57,6 +57,7 @@ public partial class MainViewModel
         MakeSearchableCommand.NotifyCanExecuteChanged();
         CompressCommand.NotifyCanExecuteChanged();
         PrintCommand.NotifyCanExecuteChanged();
+        ExtractImagesCommand.NotifyCanExecuteChanged();
         AddWatermarkCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         RotateLeftCommand.NotifyCanExecuteChanged();
