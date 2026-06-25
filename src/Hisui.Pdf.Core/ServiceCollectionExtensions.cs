@@ -23,6 +23,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPdfMetadataService, PdfMetadataService>();
         services.AddSingleton<IPdfOptimizer, PdfOptimizer>();
         services.AddSingleton<IPdfTextEditService, PdfTextEditService>();
+        services.AddSingleton<IOcrEngine, TesseractOcrEngine>();
+        services.AddSingleton<IPdfOcrService, PdfOcrService>();
         return services;
     }
 }

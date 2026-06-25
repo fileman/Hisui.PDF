@@ -68,6 +68,23 @@ Components
               Project); the embedded Inter font itself is licensed OFL-1.1.
               "Inter" is a Reserved Font Name under the OFL.
 
+10. Tesseract 5.2.0 (.NET wrapper for the Tesseract OCR engine)
+   License  : Apache-2.0  (managed binding)
+   Copyright: (c) Charles Weld and the Tesseract .NET contributors
+   Project  : https://github.com/charlesw/tesseract
+   Note     : Used for OCR of scanned PDFs. Bundles the native Tesseract OCR
+              engine (Copyright (c) Google Inc.; Apache-2.0) and uses the
+              Leptonica image library (Copyright (c) Dan Bloomberg), which is
+              licensed under the BSD-2-Clause License. On Linux/macOS the native
+              libtesseract/libleptonica libraries are provided by the system.
+
+11. Tesseract trained language models — English and Italian ("fast" variants)
+   License  : Apache-2.0
+   Copyright: (c) Google Inc.
+   Project  : https://github.com/tesseract-ocr/tessdata_fast
+   Note     : The 'eng.traineddata' / 'ita.traineddata' files bundled in the
+              'tessdata' folder next to the executable, used by the OCR feature.
+
 
 --------------------------------------------------------------------------------
 License texts
@@ -129,7 +146,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### Apache License 2.0
 
-Applies to: PdfPig and the PDFium binary packaging (bblanchon.PDFium).
+Applies to: PdfPig, the PDFium binary packaging (bblanchon.PDFium), the
+Tesseract .NET wrapper together with the bundled native Tesseract OCR engine,
+and the bundled Tesseract language models (eng/ita "fast" traineddata).
 
 The complete Apache License 2.0 text ships with this distribution as
 "licenses/LICENSE-2.0.txt" (canonical text: https://www.apache.org/licenses/LICENSE-2.0).

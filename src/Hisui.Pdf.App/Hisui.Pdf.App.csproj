@@ -23,6 +23,9 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <!-- Windows print path (printer list, duplex, page ranges). Cross-platform builds keep compiling;
+         the API is only called behind OperatingSystem.IsWindows() guards. -->
+    <PackageReference Include="System.Drawing.Common" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
   </ItemGroup>
@@ -34,6 +37,12 @@
   <ItemGroup>
     <!-- Localization dictionaries, loaded at runtime via AssetLoader (avares://). -->
     <AvaloniaResource Include="Assets\i18n\*.json" />
+  </ItemGroup>
+
+  <ItemGroup Label="OCR — ship Tesseract language data in a 'tessdata' folder next to the executable">
+    <!-- Resolved at runtime via AppContext.BaseDirectory/tessdata (see TesseractOcrEngine.ResolveTessData).
+         eng + ita are the 'tessdata_fast' variants matching the en/it UI; add more *.traineddata to bundle them. -->
+    <None Include="tessdata\*.traineddata" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup Label="Distribution — ship license + third-party notices next to the executable">

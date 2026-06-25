@@ -30,9 +30,12 @@ public partial class App : Application
             builder.Services.AddSingleton<IFileDialogService, FileDialogService>();
             builder.Services.AddSingleton<ISettingsService, SettingsService>();
             builder.Services.AddSingleton<ISignatureService, SignatureService>();
+            builder.Services.AddSingleton<IPrintService, PrintService>();
+            builder.Services.AddSingleton<IWindowService, WindowService>();
             builder.Services.AddSingleton<ILocalizer>(Localizer.Instance);
-            builder.Services.AddSingleton<MainViewModel>();
-            builder.Services.AddSingleton<MainWindow>();
+            // Transient so each window owns an independent view model + document session (multi-window).
+            builder.Services.AddTransient<MainViewModel>();
+            builder.Services.AddTransient<MainWindow>();
 
             builder.Logging.ClearProviders();
             builder.Logging.AddDebug();
@@ -51,12 +54,9 @@ public partial class App : Application
             var window = _host.Services.GetRequiredService<MainWindow>();
             desktop.MainWindow = window;
 
-            // Support "Open with" / command-line: open a file passed as the first arg.
-            if (desktop.Args?.Length > 0 && File.Exists(desktop.Args[0]))
-            {
-                var vm = _host.Services.GetRequiredService<MainViewModel>();
+            // Support "Open with" / command-line: open a file passed as the first arg into this window's VM.
+            if (desktop.Args?.Length > 0 && File.Exists(desktop.Args[0]) && window.DataContext is MainViewModel vm)
                 await vm.OpenPathAsync(desktop.Args[0]);
-            }
 
             desktop.Exit += async (_, _) =>
             {

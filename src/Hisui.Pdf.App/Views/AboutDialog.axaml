@@ -15,33 +15,33 @@
             <!-- App identity -->
             <TextBlock Text="Hisui PDF" FontSize="20" FontWeight="Bold" />
             <TextBlock Name="VersionText" Text="versione —"
-                       FontSize="12" Foreground="#888" Margin="0,2,0,16" />
+                       FontSize="12" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,2,0,16" />
 
             <TextBlock TextWrapping="Wrap" Margin="0,0,0,16"
                        Text="{loc:Tr About.Description}" />
 
-            <Border Height="1" Background="#E0E0E0" Margin="0,0,0,14" />
+            <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,0,0,14" />
 
             <!-- Autore -->
             <TextBlock Text="{loc:Tr About.Author}" FontSize="10" FontWeight="SemiBold"
-                       Foreground="#888" LetterSpacing="1.2" />
+                       Foreground="{DynamicResource RibbonSubtleTextBrush}" LetterSpacing="1.2" />
             <TextBlock Text="Emanuele Filardo" Margin="0,4,0,14" />
 
-            <Border Height="1" Background="#E0E0E0" Margin="0,0,0,14" />
+            <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,0,0,14" />
 
             <!-- AI -->
             <TextBlock Text="{loc:Tr About.Ai}" FontSize="10" FontWeight="SemiBold"
-                       Foreground="#888" LetterSpacing="1.2" />
+                       Foreground="{DynamicResource RibbonSubtleTextBrush}" LetterSpacing="1.2" />
             <TextBlock Margin="0,4,0,14">
                 <Run Text="Claude Sonnet 4.6" FontWeight="SemiBold" />
                 <Run Text=" — Anthropic" />
             </TextBlock>
 
-            <Border Height="1" Background="#E0E0E0" Margin="0,0,0,14" />
+            <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,0,0,14" />
 
             <!-- Librerie -->
             <TextBlock Text="{loc:Tr About.Libraries}" FontSize="10" FontWeight="SemiBold"
-                       Foreground="#888" LetterSpacing="1.2" Margin="0,0,0,8" />
+                       Foreground="{DynamicResource RibbonSubtleTextBrush}" LetterSpacing="1.2" Margin="0,0,0,8" />
 
             <Grid ColumnDefinitions="168,*">
                 <Grid.RowDefinitions>
@@ -54,35 +54,36 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="PDFsharp 6.2.4" />
-                <TextBlock Grid.Row="0" Grid.Column="1" Foreground="#888"
+                <TextBlock Grid.Row="0" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}"
                            Text="{loc:Tr About.Lib.PdfSharp}" />
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="PdfPig 0.1.14" Margin="0,4,0,0" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Foreground="#888" Margin="0,4,0,0"
+                <TextBlock Grid.Row="1" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.PdfPig}" />
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="PDFtoImage 5.2.1" Margin="0,4,0,0" />
-                <TextBlock Grid.Row="2" Grid.Column="1" Foreground="#888" Margin="0,4,0,0"
+                <TextBlock Grid.Row="2" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.PdfToImage}" />
 
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia 11.2.0" Margin="0,4,0,0" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Foreground="#888" Margin="0,4,0,0"
+                <TextBlock Grid.Row="3" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.Avalonia}" />
 
                 <TextBlock Grid.Row="4" Grid.Column="0" Text="CommunityToolkit.Mvvm" Margin="0,4,0,0" />
-                <TextBlock Grid.Row="4" Grid.Column="1" Foreground="#888" Margin="0,4,0,0"
+                <TextBlock Grid.Row="4" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.Mvvm}" />
 
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="SkiaSharp / PDFium" Margin="0,4,0,0" />
-                <TextBlock Grid.Row="5" Grid.Column="1" Foreground="#888" Margin="0,4,0,0"
+                <TextBlock Grid.Row="5" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.Skia}" />
             </Grid>
 
         </StackPanel>
 
         <!-- Footer -->
-        <Button Grid.Row="1" Name="CloseButton" Content="{loc:Tr About.Close}"
-                HorizontalAlignment="Right" Padding="20,6" Margin="0,18,0,0" />
+        <Button Grid.Row="1" Name="CloseButton" Content="{loc:Tr About.Close}" Classes="primary"
+                IsDefault="True" IsCancel="True"
+                HorizontalAlignment="Right" Margin="0,18,0,0" />
 
     </Grid>
 </Window>

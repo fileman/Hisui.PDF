@@ -19,6 +19,8 @@
     <PackageReference Include="PdfPig" />
     <!-- Page rendering to PNG (PDFium + SkiaSharp). -->
     <PackageReference Include="PDFtoImage" />
+    <!-- OCR engine for scanned-PDF conversion (Tesseract 5). -->
+    <PackageReference Include="Tesseract" />
     <!-- DI + logging abstractions only — Core stays UI/host agnostic. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />

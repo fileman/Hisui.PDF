@@ -4,6 +4,7 @@
         x:Class="Hisui.Pdf.App.Views.SignatureManagerDialog"
         Title="{loc:Tr SigManager.Title}"
         Width="560" Height="470"
+        CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
 
@@ -16,14 +17,14 @@
     <DockPanel Margin="20" LastChildFill="True">
 
         <TextBlock DockPanel.Dock="Top" Text="{loc:Tr SigManager.Title}"
-                   FontSize="18" FontWeight="Bold" Margin="0,0,0,12" />
+                   Classes="dialog-title" Margin="0,0,0,12" />
 
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,14,0,0">
             <Button Grid.Column="0" Content="{loc:Tr SigManager.New}" Name="NewButton" />
             <Button Grid.Column="2" Content="{loc:Tr Cmd.Delete}" Name="DeleteButton"
                     Margin="0,0,8,0" IsEnabled="False" />
             <Button Grid.Column="3" Content="{loc:Tr SigManager.Use}" Name="UseButton"
-                    Classes="accent" IsEnabled="False" />
+                    Classes="primary" IsEnabled="False" />
         </Grid>
 
         <Panel>
@@ -37,7 +38,8 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Width="156" Margin="4">
-                            <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1"
+                            <Border Background="{DynamicResource RibbonPageBrush}"
+                                    BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1"
                                     CornerRadius="4" Height="84" ClipToBounds="True">
                                 <Image Source="{Binding Image}" Stretch="Uniform" Margin="6" />
                             </Border>
@@ -48,7 +50,8 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <TextBlock Name="EmptyLabel" Text="{loc:Tr SigManager.Empty}" Foreground="#888888"
+            <TextBlock Name="EmptyLabel" Text="{loc:Tr SigManager.Empty}"
+                       Foreground="{DynamicResource RibbonSubtleTextBrush}"
                        FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"
                        IsVisible="False" />
         </Panel>

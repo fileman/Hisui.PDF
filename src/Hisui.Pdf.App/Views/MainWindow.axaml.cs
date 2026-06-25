@@ -1,12 +1,15 @@
 using System.IO;
 using System.Windows.Input;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Reactive;
 using Hisui.Pdf.App.Localization;
 using Hisui.Pdf.App.Services;
 using Hisui.Pdf.App.ViewModels;
+using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
 
 namespace Hisui.Pdf.App.Views;
@@ -15,16 +18,31 @@ public partial class MainWindow : Window
 {
     private Canvas? _annotCanvas;
     private readonly ISignatureService _signatures;
+    private readonly IPrintService _print;
+    private readonly IPdfRenderer _renderer;
 
-    public MainWindow(MainViewModel viewModel, ISignatureService signatures)
+    public MainWindow(MainViewModel viewModel, ISignatureService signatures, IPrintService print, IPdfRenderer renderer)
     {
         InitializeComponent();
         DataContext = viewModel;
         _signatures = signatures;
+        _print = print;
+        _renderer = renderer;
+
+        // Lets the view model prompt for a password when opening an encrypted PDF.
+        viewModel.RequestPasswordAsync = async () =>
+        {
+            var dialog = new PasswordDialog("Password.EnterPrompt");
+            return await dialog.ShowDialog<bool>(this) ? dialog.Password : null;
+        };
 
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);
+
+        // Keyboard shortcuts that target the view (not a VM command): print dialog, find, match nav, clear.
+        KeyDown += OnWindowKeyDown;
 
         // Wire annotation canvas pointer events after layout is complete.
         Loaded += OnLoaded;
@@ -32,6 +50,23 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
+        // Push the preview image's size to the VM so it can place search highlights in pixel space.
+        if (this.FindControl<Image>("PreviewImageControl") is { } preview)
+            preview.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b =>
+            {
+                if (DataContext is MainViewModel vm) vm.UpdateSearchOverlaySize(b.Width, b.Height);
+            }));
+
+        // Track the scroll viewport (for fit-width/height) and enable Ctrl+wheel zoom.
+        if (this.FindControl<ScrollViewer>("PreviewScroll") is { } scroll)
+        {
+            scroll.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b =>
+            {
+                if (DataContext is MainViewModel vm) vm.UpdateViewportSize(b.Width, b.Height);
+            }));
+            scroll.AddHandler(PointerWheelChangedEvent, OnPreviewWheel, RoutingStrategies.Tunnel);
+        }
+
         _annotCanvas = this.FindControl<Canvas>("AnnotationCanvas");
         if (_annotCanvas is null) return;
 
@@ -52,8 +87,21 @@ public partial class MainWindow : Window
         var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
 
         flyout.Items.Add(MakeItem(loc["Menu.Open"], vm.OpenCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.OpenInNewWindow"], vm.OpenInNewWindowCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
         flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
         flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
+        flyout.Items.Add(new Separator());
+
+        // Document tools (Acrobat-parity)
+        flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
+        var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
+        propsItem.Click += OnDocumentPropertiesClick;
+        flyout.Items.Add(propsItem);
+        var protectItem = new MenuItem { Header = loc["Menu.Protect"], IsEnabled = vm.IsDocumentLoaded };
+        protectItem.Click += OnProtectClick;
+        flyout.Items.Add(protectItem);
+        flyout.Items.Add(MakeItem(loc["Menu.RemovePassword"], vm.RemovePasswordCommand));
         flyout.Items.Add(new Separator());
 
         var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
@@ -112,6 +160,47 @@ public partial class MainWindow : Window
 
         static MenuItem MakeItem(string header, ICommand command) =>
             new() { Header = header, Command = command };
+    }
+
+    // ── Keyboard shortcuts (view-targeted) ────────────────────────────────────
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        switch (e.Key)
+        {
+            case Key.P when ctrl:
+                OnPrintClick(this, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+            case Key.F when ctrl:
+                this.FindControl<TextBox>("SearchBox")?.Focus();
+                e.Handled = true;
+                break;
+            case Key.F3:
+                var prev = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+                var cmd = prev ? vm.PrevMatchCommand : vm.NextMatchCommand;
+                if (cmd.CanExecute(null)) cmd.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Escape when !string.IsNullOrEmpty(vm.SearchQuery):
+                vm.SearchQuery = string.Empty;
+                e.Handled = true;
+                break;
+        }
+    }
+
+    // ── Zoom ──────────────────────────────────────────────────────────────────
+
+    private void OnPreviewWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return; // plain wheel scrolls as usual
+        if (e.Delta.Y > 0) vm.ZoomInCommand.Execute(null);
+        else if (e.Delta.Y < 0) vm.ZoomOutCommand.Execute(null);
+        e.Handled = true;
     }
 
     // ── Annotation pointer handlers ───────────────────────────────────────────
@@ -182,6 +271,67 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── Print ─────────────────────────────────────────────────────────────────
+
+    private async void OnPrintClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.IsDocumentLoaded) return;
+        try
+        {
+            // No in-app print stack on this platform — hand off to the OS print path.
+            if (!_print.SupportsSystemDialog)
+            {
+                if (vm.PrintCommand.CanExecute(null)) vm.PrintCommand.Execute(null);
+                return;
+            }
+
+            var pdf = await vm.BuildCurrentDocumentAsync();
+            if (pdf is null) return;
+
+            var dialog = new PrintDialog(_print, _renderer, pdf, vm.Pages.Count, vm.CurrentPageIndex);
+            if (await dialog.ShowDialog<bool>(this) && dialog.Result is not null)
+                await vm.RunPrintJobAsync(pdf, dialog.Result);
+        }
+        catch (Exception ex)
+        {
+            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
+    // ── Document tools ────────────────────────────────────────────────────────
+
+    private async void OnDocumentPropertiesClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        try
+        {
+            var metadata = await vm.ReadMetadataAsync();
+            if (metadata is null) return;
+            var dialog = new MetadataDialog(metadata);
+            if (await dialog.ShowDialog<bool>(this) && dialog.Result is not null)
+                await vm.ApplyMetadataAsync(dialog.Result);
+        }
+        catch (Exception ex)
+        {
+            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
+    private async void OnProtectClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        try
+        {
+            var dialog = new PasswordDialog("Password.SetPrompt");
+            if (await dialog.ShowDialog<bool>(this) && !string.IsNullOrEmpty(dialog.Password))
+                await vm.ProtectAsync(dialog.Password);
+        }
+        catch (Exception ex)
+        {
+            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
     // ── About dialog ─────────────────────────────────────────────────────────
 
     private async void OnAboutClick(object? sender, RoutedEventArgs e)
@@ -198,16 +348,22 @@ public partial class MainWindow : Window
 
     // ── Drag-drop ────────────────────────────────────────────────────────────
 
-    private static void OnDragEnter(object? sender, DragEventArgs e)
+    private void OnDragEnter(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.Data.Contains(DataFormats.Files)
-            ? DragDropEffects.Copy
-            : DragDropEffects.None;
+        var hasFiles = e.Data.Contains(DataFormats.Files);
+        e.DragEffects = hasFiles ? DragDropEffects.Copy : DragDropEffects.None;
+        if (hasFiles && DataContext is MainViewModel vm) vm.IsDragOver = true;
         e.Handled = true;
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.IsDragOver = false;
     }
 
     private async void OnDrop(object? sender, DragEventArgs e)
     {
+        if (DataContext is MainViewModel dropVm) dropVm.IsDragOver = false;
         if (!e.Data.Contains(DataFormats.Files)) return;
         if (DataContext is not MainViewModel vm) return;
 

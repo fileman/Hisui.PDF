@@ -29,6 +29,13 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfAnnotationService _annotations;
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
+    private readonly IPdfOcrService _ocr;
+    private readonly IPdfOptimizer _optimizer;
+    private readonly IPdfImageExtractor _imageExtractor;
+    private readonly IPdfMetadataService _metadata;
+    private readonly IPdfSecurityService _security;
+    private readonly IPrintService _print;
+    private readonly IWindowService _windows;
     private readonly ILocalizer _loc;
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
@@ -45,6 +52,13 @@ public partial class MainViewModel : ObservableObject
         IPdfAnnotationService annotations,
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
+        IPdfOcrService ocr,
+        IPdfOptimizer optimizer,
+        IPdfImageExtractor imageExtractor,
+        IPdfMetadataService metadata,
+        IPdfSecurityService security,
+        IPrintService print,
+        IWindowService windows,
         ILocalizer localizer)
     {
         _pageService = pageService;
@@ -54,6 +68,13 @@ public partial class MainViewModel : ObservableObject
         _annotations = annotations;
         _textEdit = textEdit;
         _textExtractor = textExtractor;
+        _ocr = ocr;
+        _optimizer = optimizer;
+        _imageExtractor = imageExtractor;
+        _metadata = metadata;
+        _security = security;
+        _print = print;
+        _windows = windows;
         _loc = localizer;
 
         StatusMessage = _loc["Status.Ready"];
@@ -68,7 +89,7 @@ public partial class MainViewModel : ObservableObject
             if (!IsBusy) StatusMessage = _loc["Status.Ready"];
         };
 
-        Pages.CollectionChanged += (_, _) => RaisePageInfoChanged();
+        Pages.CollectionChanged += (_, _) => { RaisePageInfoChanged(); InvalidateSearch(); };
         RefreshRecentFilesMenu();
     }
 
@@ -83,9 +104,18 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _previewRotationAngle;
     [ObservableProperty] private PageItemViewModel? _selectedPage;
 
+    /// <summary>True while a file is being dragged over the window — drives the drop-target highlight.</summary>
+    [ObservableProperty] private bool _isDragOver;
+
     public bool HasRecentFiles => RecentFiles.Count > 0;
 
     private bool HasDocument => _session is not null && Pages.Count > 0;
+
+    /// <summary>Public mirror of <see cref="HasDocument"/> for view bindings (e.g. enabling the find bar).</summary>
+    public bool IsDocumentLoaded => HasDocument;
+
+    /// <summary>True when no document is open — drives the empty-state / onboarding panel.</summary>
+    public bool ShowEmptyState => !HasDocument;
     private bool CanEditSelected => HasDocument && SelectedPage is not null;
     private bool CanUndo => _session?.CanUndo ?? false;
     private bool CanRedo => _session?.CanRedo ?? false;
@@ -94,6 +124,7 @@ public partial class MainViewModel : ObservableObject
     {
         RaisePageInfoChanged();
         _ = UpdatePreviewAsync(value);
+        RecomputeHighlights(); // refreshed again by the preview-size push once the new page lays out
     }
 
     // ── Commands ────────────────────────────────────────────────────────────
@@ -104,6 +135,19 @@ public partial class MainViewModel : ObservableObject
         var path = await _dialogs.OpenPdfAsync();
         if (path is null) return;
         await OpenPathAsync(path);
+    }
+
+    /// <summary>Opens a new, empty document window (multi-window).</summary>
+    [RelayCommand]
+    private void NewWindow() => _windows.OpenWindow();
+
+    /// <summary>Picks a PDF and opens it in its own new window, leaving the current document untouched.</summary>
+    [RelayCommand]
+    private async Task OpenInNewWindowAsync()
+    {
+        var path = await _dialogs.OpenPdfAsync();
+        if (path is null) return;
+        _windows.OpenWindow(path);
     }
 
     [RelayCommand]
@@ -127,7 +171,10 @@ public partial class MainViewModel : ObservableObject
     {
         await RunBusyAsync(_loc["Status.Opening"], async ct =>
         {
-            var bytes = await Task.Run(() => File.ReadAllBytes(path), ct);
+            var loaded = await ReadAndDecryptAsync(path, ct);
+            if (loaded is null) { StatusMessage = _loc["Status.OpenCancelledEncrypted"]; return; }
+            var (bytes, wasEncrypted) = loaded.Value;
+
             var count = await _pageService.GetPageCountAsync(bytes, ct);
 
             _session = new PdfDocumentSession();
@@ -136,6 +183,7 @@ public partial class MainViewModel : ObservableObject
             _previewCache.Clear();
 
             SyncPagesFromSession();
+            SetOpenedFromEncrypted(wasEncrypted); // enables "remove password" only for once-encrypted files
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
             _settings.AddRecentFile(path);
             RefreshRecentFilesMenu();
@@ -307,6 +355,126 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task MakeSearchableAsync()
+    {
+        if (!HasDocument) return;
+
+        var path = await _dialogs.SavePdfAsync("documento-ocr.pdf");
+        if (path is null) return;
+
+        await RunBusyAsync(_loc["Status.Ocr"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+
+            // Detect first so we can give a clear message instead of silently producing an identical file.
+            var scanned = await _ocr.DetectScannedPagesAsync(current, ct);
+            if (scanned.Count == 0)
+            {
+                StatusMessage = _loc["Status.OcrNoScanned"];
+                return;
+            }
+
+            try
+            {
+                var searchable = await _ocr.MakeSearchableAsync(current, options: null, ct);
+                await Task.Run(() => File.WriteAllBytes(path, searchable), ct);
+                StatusMessage = _loc.Format("Status.OcrSaved", scanned.Count, Path.GetFileName(path));
+            }
+            catch (OcrUnavailableException ex)
+            {
+                // Missing native engine / language data is a configuration issue, not a crash — explain it.
+                StatusMessage = _loc.Format("Status.OcrUnavailable", ex.Message);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Fallback print command used where the in-app print dialog isn't available (non-Windows): hands
+    /// the document to the OS print path. On Windows the view shows the rich dialog and calls
+    /// <see cref="RunPrintJobAsync"/> instead.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task PrintAsync()
+    {
+        if (!HasDocument) return;
+
+        await RunBusyAsync(_loc["Status.Printing"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+            var launched = await _print.PrintViaShellAsync(current, ct);
+            StatusMessage = _loc[launched ? "Status.PrintSent" : "Status.PrintFailed"];
+        });
+    }
+
+    /// <summary>
+    /// Builds the current document (all edits applied) for the print dialog/preview. Runs under the busy
+    /// overlay so page-editing commands can't mutate the session on the UI thread while the background
+    /// build enumerates it. Returns null if nothing is loaded or another operation is in flight.
+    /// </summary>
+    public async Task<byte[]?> BuildCurrentDocumentAsync()
+    {
+        if (!HasDocument || IsBusy) return null;
+
+        byte[]? built = null;
+        await RunBusyAsync(_loc["Status.Printing"], async ct =>
+        {
+            built = await _pageService.BuildFromSessionAsync(_session!, ct);
+        });
+        return built;
+    }
+
+    /// <summary>Zero-based index of the page shown in the preview (used to seed the print dialog).</summary>
+    public int CurrentPageIndex => SelectedPage is null ? 0 : Math.Max(0, Pages.IndexOf(SelectedPage));
+
+    /// <summary>Runs a print job (resolved by the print dialog) through the busy overlay and reports the result.</summary>
+    public async Task RunPrintJobAsync(byte[] pdf, PrintJob job)
+    {
+        await RunBusyAsync(_loc["Status.Printing"], async ct =>
+        {
+            var ok = await _print.PrintAsync(pdf, job, ct);
+            StatusMessage = _loc[ok ? "Status.PrintSent" : "Status.PrintFailed"];
+        });
+    }
+
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task CompressAsync()
+    {
+        if (!HasDocument) return;
+
+        var path = await _dialogs.SavePdfAsync("documento-compresso.pdf");
+        if (path is null) return;
+
+        await RunBusyAsync(_loc["Status.Compressing"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+            var compressed = await _optimizer.OptimizeAsync(current, options: null, ct);
+
+            // Never hand back a file that isn't actually smaller: if there was nothing left to squeeze,
+            // save the original bytes and say so plainly instead of writing an identical-or-larger copy.
+            var gained = compressed.Length < current.Length;
+            var output = gained ? compressed : current;
+            await Task.Run(() => File.WriteAllBytes(path, output), ct);
+
+            if (gained)
+            {
+                var percent = (int)Math.Round(100.0 * compressed.Length / current.Length);
+                StatusMessage = _loc.Format("Status.Compressed",
+                    Path.GetFileName(path), FormatSize(current.Length), FormatSize(compressed.Length), percent);
+            }
+            else
+            {
+                StatusMessage = _loc.Format("Status.CompressedNoGain",
+                    Path.GetFileName(path), FormatSize(current.Length));
+            }
+        });
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024
+            ? $"{bytes / (1024.0 * 1024.0):0.#} MB"
+            : $"{bytes / 1024.0:0.#} KB";
+
     /// <summary>Languages offered in the backstage language submenu.</summary>
     public IReadOnlyList<LanguageOption> Languages => _loc.AvailableLanguages;
 
@@ -355,12 +523,35 @@ public partial class MainViewModel : ObservableObject
 
         await RunBusyAsync(_loc.Format("Status.Adding", Path.GetFileName(path)), async ct =>
         {
-            var bytes = await Task.Run(() => File.ReadAllBytes(path), ct);
+            var loaded = await ReadAndDecryptAsync(path, ct);
+            if (loaded is null) { StatusMessage = _loc["Status.OpenCancelledEncrypted"]; return; }
+            var (bytes, wasEncrypted) = loaded.Value;
+
             var count = await _pageService.GetPageCountAsync(bytes, ct);
             _session.AddSource(bytes, count);
+            if (wasEncrypted) SetOpenedFromEncrypted(true); // a merged encrypted source enables "remove password"
             SyncPagesFromSession();
             await RenderThumbnailsAsync(ct);
         });
+    }
+
+    /// <summary>
+    /// Reads a PDF and, if it is encrypted, prompts (via the view) for a password and decrypts it so any
+    /// library can read it. Returns the readable bytes plus whether the file was encrypted, or null if the
+    /// user cancelled the password prompt.
+    /// </summary>
+    private async Task<(byte[] Bytes, bool WasEncrypted)?> ReadAndDecryptAsync(string path, CancellationToken ct)
+    {
+        var bytes = await Task.Run(() => File.ReadAllBytes(path), ct);
+
+        var wasEncrypted = _security.IsEncrypted(bytes);
+        if (wasEncrypted)
+        {
+            var password = RequestPasswordAsync is null ? null : await RequestPasswordAsync();
+            if (password is null) return null;
+            bytes = await _security.DecryptAsync(bytes, password, ct);
+        }
+        return (bytes, wasEncrypted);
     }
 
     private void SyncPagesFromSession()

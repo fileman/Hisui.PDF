@@ -20,6 +20,9 @@ single Avalonia desktop app that runs on Windows, Linux and macOS.
 - **Security & metadata** — AES-256 encryption/decryption, document metadata
   editing.
 - **Extraction** — pull out text (with coordinates) and embedded images.
+- **OCR** — turn scanned (image-only) PDFs into searchable PDFs by adding an
+  invisible, selectable text layer (Tesseract). Scanned pages are detected
+  automatically.
 - **Localization** — English and Italian UI, switchable at runtime.
 
 ## Tech stack
@@ -29,6 +32,7 @@ single Avalonia desktop app that runs on Windows, Linux and macOS.
 - **[PDFsharp](https://docs.pdfsharp.net/)** — structural & write operations
 - **[PdfPig](https://github.com/UglyToad/PdfPig)** — text/image extraction
 - **[PDFtoImage](https://github.com/sungaila/PDFtoImage)** (PDFium) — page rendering
+- **[Tesseract](https://github.com/charlesw/tesseract)** — OCR for scanned PDFs
 - **[SkiaSharp](https://github.com/mono/SkiaSharp)** — raster compositing
 - **CommunityToolkit.Mvvm** + **Microsoft.Extensions.Hosting** — MVVM & DI
 
@@ -52,6 +56,23 @@ dotnet run --project src/Hisui.Pdf.App
 # Run the tests (xUnit v3 on Microsoft Testing Platform — run the test exe)
 dotnet test Hisui.Pdf.slnx
 ```
+
+### OCR setup
+
+OCR works out of the box. The **English and Italian** language data
+(`eng`/`ita`, the `tessdata_fast` models) ships in a `tessdata` folder next to
+the executable, and the native engine binaries are bundled on Windows via the
+`Tesseract` package.
+
+- **More languages** — drop extra `*.traineddata` files into the `tessdata`
+  folder next to the app (or point the `TESSDATA_PREFIX` environment variable at
+  them) and pass the language code. Grab them from
+  [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast).
+- **Native libraries on Linux/macOS** — install the system Tesseract/Leptonica:
+  on Linux `libtesseract`/`libleptonica`, on macOS `brew install tesseract leptonica`.
+
+If a language or native library is missing the app reports a clear message
+instead of failing — the rest of the editor keeps working.
 
 ## License
 

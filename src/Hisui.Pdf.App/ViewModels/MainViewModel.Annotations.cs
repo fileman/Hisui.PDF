@@ -54,6 +54,11 @@ public partial class MainViewModel
     {
         SaveAsCommand.NotifyCanExecuteChanged();
         SplitToSinglePagesCommand.NotifyCanExecuteChanged();
+        MakeSearchableCommand.NotifyCanExecuteChanged();
+        CompressCommand.NotifyCanExecuteChanged();
+        PrintCommand.NotifyCanExecuteChanged();
+        ExtractImagesCommand.NotifyCanExecuteChanged();
+        RemovePasswordCommand.NotifyCanExecuteChanged();
         AddWatermarkCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         RotateLeftCommand.NotifyCanExecuteChanged();
@@ -63,6 +68,9 @@ public partial class MainViewModel
         ExtractSelectedCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
+        SearchCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(IsDocumentLoaded));
+        OnPropertyChanged(nameof(ShowEmptyState));
     }
 
     public bool IsAnnotationActive => ActiveTool != AnnotationTool.None;
@@ -88,6 +96,7 @@ public partial class MainViewModel
     {
         OnPropertyChanged(nameof(CanAnnotate));
         OnPropertyChanged(nameof(ShowRotationHint));
+        RecomputeHighlights(); // search highlights only render at 0°
     }
 
     [RelayCommand]
