@@ -30,6 +30,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
     private readonly IPdfOptimizer _optimizer;
+    private readonly IPrintService _print;
     private readonly ILocalizer _loc;
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
@@ -48,6 +49,7 @@ public partial class MainViewModel : ObservableObject
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
         IPdfOptimizer optimizer,
+        IPrintService print,
         ILocalizer localizer)
     {
         _pageService = pageService;
@@ -59,6 +61,7 @@ public partial class MainViewModel : ObservableObject
         _textExtractor = textExtractor;
         _ocr = ocr;
         _optimizer = optimizer;
+        _print = print;
         _loc = localizer;
 
         StatusMessage = _loc["Status.Ready"];
@@ -347,6 +350,19 @@ public partial class MainViewModel : ObservableObject
                 // Missing native engine / language data is a configuration issue, not a crash — explain it.
                 StatusMessage = _loc.Format("Status.OcrUnavailable", ex.Message);
             }
+        });
+    }
+
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task PrintAsync()
+    {
+        if (!HasDocument) return;
+
+        await RunBusyAsync(_loc["Status.Printing"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+            var launched = await _print.PrintAsync(current, ct);
+            StatusMessage = _loc[launched ? "Status.PrintSent" : "Status.PrintFailed"];
         });
     }
 

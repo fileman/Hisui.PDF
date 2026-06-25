@@ -30,6 +30,7 @@ public partial class App : Application
             builder.Services.AddSingleton<IFileDialogService, FileDialogService>();
             builder.Services.AddSingleton<ISettingsService, SettingsService>();
             builder.Services.AddSingleton<ISignatureService, SignatureService>();
+            builder.Services.AddSingleton<IPrintService, PrintService>();
             builder.Services.AddSingleton<ILocalizer>(Localizer.Instance);
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddSingleton<MainWindow>();

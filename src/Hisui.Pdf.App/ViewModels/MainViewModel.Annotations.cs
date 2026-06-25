@@ -56,6 +56,7 @@ public partial class MainViewModel
         SplitToSinglePagesCommand.NotifyCanExecuteChanged();
         MakeSearchableCommand.NotifyCanExecuteChanged();
         CompressCommand.NotifyCanExecuteChanged();
+        PrintCommand.NotifyCanExecuteChanged();
         AddWatermarkCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         RotateLeftCommand.NotifyCanExecuteChanged();
