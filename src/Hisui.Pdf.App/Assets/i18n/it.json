@@ -107,6 +107,8 @@
   "Status.PageCount": "Pagine · {0}",
 
   "Menu.Open": "Apri...",
+  "Menu.OpenInNewWindow": "Apri in una nuova finestra...",
+  "Menu.NewWindow": "Nuova finestra",
   "Menu.AddFiles": "Aggiungi file...",
   "Menu.SaveAs": "Salva con nome...",
   "Menu.Recent": "Recenti",

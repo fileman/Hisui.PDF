@@ -71,6 +71,8 @@ public partial class MainWindow : Window
         var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
 
         flyout.Items.Add(MakeItem(loc["Menu.Open"], vm.OpenCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.OpenInNewWindow"], vm.OpenInNewWindowCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
         flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
         flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
         flyout.Items.Add(new Separator());

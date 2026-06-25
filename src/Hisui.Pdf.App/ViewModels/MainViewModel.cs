@@ -31,6 +31,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfOcrService _ocr;
     private readonly IPdfOptimizer _optimizer;
     private readonly IPrintService _print;
+    private readonly IWindowService _windows;
     private readonly ILocalizer _loc;
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
@@ -50,6 +51,7 @@ public partial class MainViewModel : ObservableObject
         IPdfOcrService ocr,
         IPdfOptimizer optimizer,
         IPrintService print,
+        IWindowService windows,
         ILocalizer localizer)
     {
         _pageService = pageService;
@@ -62,6 +64,7 @@ public partial class MainViewModel : ObservableObject
         _ocr = ocr;
         _optimizer = optimizer;
         _print = print;
+        _windows = windows;
         _loc = localizer;
 
         StatusMessage = _loc["Status.Ready"];
@@ -116,6 +119,19 @@ public partial class MainViewModel : ObservableObject
         var path = await _dialogs.OpenPdfAsync();
         if (path is null) return;
         await OpenPathAsync(path);
+    }
+
+    /// <summary>Opens a new, empty document window (multi-window).</summary>
+    [RelayCommand]
+    private void NewWindow() => _windows.OpenWindow();
+
+    /// <summary>Picks a PDF and opens it in its own new window, leaving the current document untouched.</summary>
+    [RelayCommand]
+    private async Task OpenInNewWindowAsync()
+    {
+        var path = await _dialogs.OpenPdfAsync();
+        if (path is null) return;
+        _windows.OpenWindow(path);
     }
 
     [RelayCommand]
