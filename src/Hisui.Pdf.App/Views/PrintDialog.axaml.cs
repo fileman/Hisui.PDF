@@ -56,8 +56,13 @@ public partial class PrintDialog : Window
         NextButton.Click += (_, _) => StepPreview(+1);
         CancelButton.Click += (_, _) => Close(false);
         PrintButton.Click += (_, _) => OnPrint();
+        this.WireAcceptCancel(OnPrint, () => Close(false));
 
-        Opened += (_, _) => _ = ShowPreviewAsync();
+        Opened += (_, _) =>
+        {
+            PrinterCombo.Focus();
+            _ = ShowPreviewAsync();
+        };
 
         // Preview bitmaps are native-backed IDisposable — release them when the dialog closes
         // (same convention as SignatureManagerDialog).

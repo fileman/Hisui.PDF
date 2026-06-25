@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
 using Hisui.Pdf.App.Localization;
 
 namespace Hisui.Pdf.App.Views;
@@ -24,7 +23,7 @@ public partial class PasswordDialog : Window
         RevealBox.IsCheckedChanged += (_, _) => PasswordBox.PasswordChar = RevealBox.IsChecked == true ? '\0' : '●';
         OkButton.Click += (_, _) => OnOk();
         CancelButton.Click += (_, _) => Close(false);
-        PasswordBox.KeyDown += (_, e) => { if (e.Key == Key.Enter) OnOk(); };
+        this.WireAcceptCancel(OnOk, () => Close(false));
         Opened += (_, _) => PasswordBox.Focus();
     }
 

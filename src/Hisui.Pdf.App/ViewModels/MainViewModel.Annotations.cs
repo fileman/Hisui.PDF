@@ -70,6 +70,7 @@ public partial class MainViewModel
         RedoCommand.NotifyCanExecuteChanged();
         SearchCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsDocumentLoaded));
+        OnPropertyChanged(nameof(ShowEmptyState));
     }
 
     public bool IsAnnotationActive => ActiveTool != AnnotationTool.None;

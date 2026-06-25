@@ -10,12 +10,6 @@
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
         Background="{DynamicResource RibbonBarBrush}">
     <Window.Styles>
-        <Style Selector="TextBlock.caption">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource RibbonCaptionBrush}" />
-            <Setter Property="Margin" Value="0,0,0,3" />
-        </Style>
         <Style Selector="Button.navbtn">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -48,7 +42,8 @@
 
             <Border Background="{DynamicResource RibbonPreviewBrush}" CornerRadius="4"
                     BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" Padding="14">
-                <Border Background="{DynamicResource RibbonPageBrush}" BorderBrush="#22000000" BorderThickness="1">
+                <Border Background="{DynamicResource RibbonPageBrush}"
+                        BorderBrush="{DynamicResource RibbonPageBorderBrush}" BorderThickness="1">
                     <Image x:Name="PreviewImage" Stretch="Uniform" />
                 </Border>
             </Border>
@@ -60,10 +55,8 @@
             <!-- Buttons pinned to the bottom -->
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
                         Spacing="8" Margin="0,12,0,0">
-                <Button x:Name="CancelButton" Content="{loc:Tr Dialog.Cancel}" Padding="16,6" />
-                <Button x:Name="PrintButton" Content="{loc:Tr Print.Ok}" Padding="18,6"
-                        Background="{DynamicResource RibbonAccentBrush}"
-                        Foreground="{DynamicResource RibbonOnAccentBrush}" />
+                <Button x:Name="CancelButton" Content="{loc:Tr Dialog.Cancel}" Padding="16,6" IsCancel="True" />
+                <Button x:Name="PrintButton" Content="{loc:Tr Print.Ok}" Classes="primary" IsDefault="True" />
             </StackPanel>
 
             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -73,7 +66,7 @@
                         <TextBlock Classes="caption" Text="{loc:Tr Print.Printer}" />
                         <ComboBox x:Name="PrinterCombo" HorizontalAlignment="Stretch" />
                         <TextBlock x:Name="NoPrintersLabel" Text="{loc:Tr Print.NoPrinters}" IsVisible="False"
-                                   Foreground="#E81123" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                   Classes="error-text" Margin="0,3,0,0" />
                     </StackPanel>
 
                     <StackPanel Spacing="3">
@@ -101,8 +94,7 @@
                                  Margin="22,0,0,0" />
                     </StackPanel>
 
-                    <TextBlock x:Name="ErrorLabel" Foreground="#E81123" FontSize="12" TextWrapping="Wrap"
-                               IsVisible="False" />
+                    <TextBlock x:Name="ErrorLabel" Classes="error-text" IsVisible="False" />
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>

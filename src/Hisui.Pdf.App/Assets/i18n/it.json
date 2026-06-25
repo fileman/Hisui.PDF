@@ -8,6 +8,7 @@
   "Group.Pages": "Pagine",
   "Group.Edit": "Modifica",
   "Group.Export": "Esporta",
+  "Group.Document": "Documento",
 
   "Cmd.Open": "Apri",
   "Cmd.Open.Tooltip": "Apri un PDF",
@@ -38,6 +39,9 @@
   "Cmd.Ocr.Tooltip": "Riconosci il testo delle pagine scansionate e salva un PDF ricercabile",
   "Cmd.Compress": "Comprimi",
   "Cmd.Compress.Tooltip": "Riduci le dimensioni del file ricomprimendo le immagini",
+  "Cmd.Properties": "Proprietà",
+  "Cmd.Protect": "Proteggi",
+  "Cmd.ExtractImages": "Immagini",
 
   "Tool.Highlight": "Evidenzia",
   "Tool.Highlight.Tooltip": "Evidenzia un'area (trascina sulla pagina)",
@@ -74,6 +78,13 @@
   "Zoom.Actual": "Dimensione reale (100%)",
   "Zoom.FitWidth": "Adatta larghezza",
   "Zoom.FitHeight": "Adatta altezza",
+  "Zoom.Presets": "Livello di zoom",
+
+  "Empty.Title": "Apri un documento PDF",
+  "Empty.Subtitle": "Trascina qui un PDF, oppure aprilo con il pulsante.",
+  "Empty.OpenButton": "Apri PDF",
+  "Empty.Recent": "RECENTI",
+  "Empty.DropOverlay": "Rilascia per aprire",
 
   "Print.Title": "Stampa",
   "Print.Printer": "STAMPANTE",

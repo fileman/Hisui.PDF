@@ -8,15 +8,7 @@
         ShowInTaskbar="False"
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
         Background="{DynamicResource RibbonBarBrush}">
-    <Window.Styles>
-        <Style Selector="TextBlock.caption">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource RibbonCaptionBrush}" />
-            <Setter Property="Margin" Value="0,0,0,2" />
-        </Style>
-    </Window.Styles>
-    <StackPanel Margin="22" Spacing="12">
+    <StackPanel Margin="24,20,24,18" Spacing="12">
         <StackPanel Spacing="3">
             <TextBlock Classes="caption" Text="{loc:Tr Metadata.TitleField}" />
             <TextBox x:Name="TitleBox" />
@@ -38,10 +30,8 @@
             <TextBox x:Name="CreatorBox" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
-            <Button x:Name="CancelButton" Content="{loc:Tr Dialog.Cancel}" Padding="16,6" />
-            <Button x:Name="OkButton" Content="{loc:Tr Dialog.Apply}" Padding="16,6"
-                    Background="{DynamicResource RibbonAccentBrush}"
-                    Foreground="{DynamicResource RibbonOnAccentBrush}" />
+            <Button x:Name="CancelButton" Content="{loc:Tr Dialog.Cancel}" Padding="16,6" IsCancel="True" />
+            <Button x:Name="OkButton" Content="{loc:Tr Dialog.Apply}" Classes="primary" IsDefault="True" />
         </StackPanel>
     </StackPanel>
 </Window>

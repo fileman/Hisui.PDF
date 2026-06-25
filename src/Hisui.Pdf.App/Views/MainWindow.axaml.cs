@@ -37,8 +37,12 @@ public partial class MainWindow : Window
         };
 
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);
+
+        // Keyboard shortcuts that target the view (not a VM command): print dialog, find, match nav, clear.
+        KeyDown += OnWindowKeyDown;
 
         // Wire annotation canvas pointer events after layout is complete.
         Loaded += OnLoaded;
@@ -141,6 +145,36 @@ public partial class MainWindow : Window
 
         static MenuItem MakeItem(string header, ICommand command) =>
             new() { Header = header, Command = command };
+    }
+
+    // ── Keyboard shortcuts (view-targeted) ────────────────────────────────────
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        switch (e.Key)
+        {
+            case Key.P when ctrl:
+                OnPrintClick(this, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+            case Key.F when ctrl:
+                this.FindControl<TextBox>("SearchBox")?.Focus();
+                e.Handled = true;
+                break;
+            case Key.F3:
+                var prev = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+                var cmd = prev ? vm.PrevMatchCommand : vm.NextMatchCommand;
+                if (cmd.CanExecute(null)) cmd.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Escape when !string.IsNullOrEmpty(vm.SearchQuery):
+                vm.SearchQuery = string.Empty;
+                e.Handled = true;
+                break;
+        }
     }
 
     // ── Zoom ──────────────────────────────────────────────────────────────────
@@ -299,16 +333,22 @@ public partial class MainWindow : Window
 
     // ── Drag-drop ────────────────────────────────────────────────────────────
 
-    private static void OnDragEnter(object? sender, DragEventArgs e)
+    private void OnDragEnter(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.Data.Contains(DataFormats.Files)
-            ? DragDropEffects.Copy
-            : DragDropEffects.None;
+        var hasFiles = e.Data.Contains(DataFormats.Files);
+        e.DragEffects = hasFiles ? DragDropEffects.Copy : DragDropEffects.None;
+        if (hasFiles && DataContext is MainViewModel vm) vm.IsDragOver = true;
         e.Handled = true;
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.IsDragOver = false;
     }
 
     private async void OnDrop(object? sender, DragEventArgs e)
     {
+        if (DataContext is MainViewModel dropVm) dropVm.IsDragOver = false;
         if (!e.Data.Contains(DataFormats.Files)) return;
         if (DataContext is not MainViewModel vm) return;
 

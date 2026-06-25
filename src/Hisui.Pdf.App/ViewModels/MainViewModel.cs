@@ -103,12 +103,18 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _previewRotationAngle;
     [ObservableProperty] private PageItemViewModel? _selectedPage;
 
+    /// <summary>True while a file is being dragged over the window — drives the drop-target highlight.</summary>
+    [ObservableProperty] private bool _isDragOver;
+
     public bool HasRecentFiles => RecentFiles.Count > 0;
 
     private bool HasDocument => _session is not null && Pages.Count > 0;
 
     /// <summary>Public mirror of <see cref="HasDocument"/> for view bindings (e.g. enabling the find bar).</summary>
     public bool IsDocumentLoaded => HasDocument;
+
+    /// <summary>True when no document is open — drives the empty-state / onboarding panel.</summary>
+    public bool ShowEmptyState => !HasDocument;
     private bool CanEditSelected => HasDocument && SelectedPage is not null;
     private bool CanUndo => _session?.CanUndo ?? false;
     private bool CanRedo => _session?.CanRedo ?? false;

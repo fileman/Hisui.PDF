@@ -10,12 +10,6 @@
         WindowStartupLocation="CenterOwner">
 
     <Window.Styles>
-        <Style Selector="TextBlock.caption">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="#888888" />
-            <Setter Property="Margin" Value="0,0,0,4" />
-        </Style>
         <Style Selector="Button">
             <Setter Property="Padding" Value="16,6" />
         </Style>
@@ -27,7 +21,7 @@
     <DockPanel Margin="24,20,24,18" LastChildFill="True">
 
         <StackPanel DockPanel.Dock="Top" Spacing="3" Margin="0,0,0,14">
-            <TextBlock Text="{loc:Tr SigCreate.Title}" FontSize="18" FontWeight="Bold" />
+            <TextBlock Text="{loc:Tr SigCreate.Title}" Classes="dialog-title" />
         </StackPanel>
 
         <!-- Mode selector -->
@@ -45,7 +39,7 @@
             <Button Grid.Column="1" Content="{loc:Tr Dialog.Cancel}" Name="CancelButton"
                     IsCancel="True" Margin="0,0,8,0" />
             <Button Grid.Column="2" Content="{loc:Tr SigCreate.Save}" Name="SaveButton"
-                    Classes="accent" IsDefault="True" />
+                    Classes="primary" IsDefault="True" />
         </Grid>
 
         <!-- Name field -->
@@ -57,15 +51,14 @@
         <!-- Content -->
         <StackPanel Spacing="12">
 
-            <Border Name="ErrorBanner" IsVisible="False" Background="#FDECEA"
-                    BorderBrush="#F5C6CB" BorderThickness="1" CornerRadius="4" Padding="10,7">
-                <TextBlock Name="ErrorLabel" Foreground="#C62828" FontSize="12" TextWrapping="Wrap" />
+            <Border Name="ErrorBanner" Classes="error-banner" IsVisible="False">
+                <TextBlock Name="ErrorLabel" Classes="error-text" />
             </Border>
 
             <!-- Draw -->
             <StackPanel Name="DrawPanel" Spacing="8">
                 <TextBlock Classes="caption" Text="{loc:Tr SigCreate.DrawHint}" />
-                <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4"
+                <Border Background="{DynamicResource RibbonPageBrush}" BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" CornerRadius="4"
                         Height="180" ClipToBounds="True">
                     <ctrl:SignaturePad Name="Pad" />
                 </Border>
@@ -80,7 +73,7 @@
                     <Button Grid.Column="1" Content="{loc:Tr Field.Browse}" Name="BrowseButton"
                             Margin="8,0,0,0" />
                 </Grid>
-                <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4"
+                <Border Background="{DynamicResource RibbonPageBrush}" BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" CornerRadius="4"
                         Height="180" ClipToBounds="True">
                     <Image Name="ImagePreview" Stretch="Uniform" Margin="6" />
                 </Border>
@@ -90,7 +83,7 @@
             <StackPanel Name="TextPanel" Spacing="8" IsVisible="False">
                 <TextBlock Classes="caption" Text="{loc:Tr SigCreate.TextHint}" />
                 <TextBox Name="TextInput" Watermark="{loc:Tr SigCreate.TextWatermark}" Padding="8,5" />
-                <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4"
+                <Border Background="{DynamicResource RibbonPageBrush}" BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" CornerRadius="4"
                         Height="110" ClipToBounds="True">
                     <TextBlock Name="TextPreview" Text="{Binding #TextInput.Text}"
                                FontFamily="Segoe Script, Brush Script MT" FontStyle="Italic"

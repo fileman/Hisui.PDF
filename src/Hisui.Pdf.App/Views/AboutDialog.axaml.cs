@@ -17,5 +17,7 @@ public partial class AboutDialog : Window
         var closeButton = this.FindControl<Button>("CloseButton");
         if (closeButton is not null)
             closeButton.Click += (_, _) => Close();
+
+        this.WireAcceptCancel(() => Close(), () => Close()); // Enter or Esc both dismiss the About box
     }
 }

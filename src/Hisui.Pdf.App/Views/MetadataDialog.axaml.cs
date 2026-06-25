@@ -27,6 +27,8 @@ public partial class MetadataDialog : Window
 
         OkButton.Click += (_, _) => OnOk();
         CancelButton.Click += (_, _) => Close(false);
+        this.WireAcceptCancel(OnOk, () => Close(false));
+        Opened += (_, _) => TitleBox.Focus();
     }
 
     private void OnOk()

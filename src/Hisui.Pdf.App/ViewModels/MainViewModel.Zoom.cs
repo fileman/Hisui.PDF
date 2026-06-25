@@ -37,6 +37,15 @@ public partial class MainViewModel
     [RelayCommand] private void ZoomOut() => SetZoom(ZoomLevel / ZoomStep);
     [RelayCommand] private void ZoomActual() => SetZoom(1.0);
 
+    /// <summary>Jumps to a preset zoom percentage (from the status-bar zoom dropdown).</summary>
+    [RelayCommand]
+    private void SetZoomPercent(string? percent)
+    {
+        if (double.TryParse(percent, System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture, out var p) && p > 0)
+            SetZoom(p / 100.0);
+    }
+
     [RelayCommand]
     private void FitWidth()
     {
