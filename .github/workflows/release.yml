@@ -1,0 +1,131 @@
+name: Release
+
+# Builds self-contained, single-file executables for Windows, Linux and macOS
+# and publishes them as downloadable assets on a GitHub Release.
+#
+# Trigger: push a version tag, e.g.
+#   git tag v1.0.0 && git push origin v1.0.0
+# Or run manually from the Actions tab (workflow_dispatch) with a version input.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to release (e.g. v1.0.0)'
+        required: true
+
+env:
+  PROJECT: src/Hisui.Pdf.App/Hisui.Pdf.App.csproj
+  VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,   os: windows-latest, archive: zip }
+          - { rid: linux-x64, os: ubuntu-latest,  archive: targz }
+          - { rid: osx-x64,   os: macos-latest,   archive: targz }
+          - { rid: osx-arm64, os: macos-latest,   archive: targz }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Publish (self-contained, single-file)
+        shell: bash
+        run: |
+          dotnet publish "$PROJECT" \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none \
+            -p:DebugSymbols=false \
+            -o "publish/${{ matrix.rid }}"
+          # Drop native symbol files (e.g. libSkiaSharp.pdb ~80 MB) — not needed by users.
+          find "publish/${{ matrix.rid }}" -name '*.pdb' -delete
+
+      - name: Archive (tar.gz)
+        if: matrix.archive == 'targz'
+        shell: bash
+        run: |
+          name="Hisui.Pdf-${VERSION}-${{ matrix.rid }}"
+          chmod +x "publish/${{ matrix.rid }}/Hisui.Pdf.App"
+          tar -czf "${name}.tar.gz" -C "publish/${{ matrix.rid }}" .
+          echo "ASSET=${name}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Archive (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $name = "Hisui.Pdf-$env:VERSION-${{ matrix.rid }}"
+          Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath "$name.zip"
+          "ASSET=$name.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: ${{ env.ASSET }}
+          retention-days: 5
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write release notes
+        run: |
+          cat > notes.md <<'EOF'
+          Cross-platform desktop PDF editor. Self-contained builds — **no .NET install required**.
+
+          ### Downloads
+          | Platform | File |
+          |---|---|
+          | Windows x64 | `Hisui.Pdf-__VERSION__-win-x64.zip` |
+          | Linux x64 | `Hisui.Pdf-__VERSION__-linux-x64.tar.gz` |
+          | macOS (Intel) | `Hisui.Pdf-__VERSION__-osx-x64.tar.gz` |
+          | macOS (Apple Silicon) | `Hisui.Pdf-__VERSION__-osx-arm64.tar.gz` |
+
+          Unpack the archive and run `Hisui.Pdf.App` (`.exe` on Windows).
+
+          > **macOS:** the binary is unsigned — on first launch right-click -> *Open*, or run
+          > `xattr -dr com.apple.quarantine Hisui.Pdf.App` to clear Gatekeeper quarantine.
+          >
+          > **Linux/macOS OCR:** the scanned-PDF OCR feature needs a system Tesseract library
+          > (`apt install libtesseract5` / `brew install tesseract`). All other features work standalone.
+          EOF
+          sed -i "s/__VERSION__/${VERSION}/g" notes.md
+
+      - name: Create / update release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$VERSION" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Hisui PDF $VERSION" \
+              --notes-file notes.md
+          fi
