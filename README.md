@@ -5,6 +5,23 @@ A cross-platform desktop PDF editor built on a fully free/MIT-licensed stack.
 Hisui PDF lets you reorganise, annotate, redact and protect PDF documents from a
 single Avalonia desktop app that runs on Windows, Linux and macOS.
 
+## Download
+
+Grab a ready-to-run build from the
+[**Releases**](https://github.com/fileman/Hisui.PDF/releases/latest) page — the
+binaries are self-contained, so **no .NET install is required**.
+
+| Platform | Asset |
+|---|---|
+| Windows x64 | `Hisui.Pdf-vX.Y.Z-win-x64.zip` |
+| Linux x64 | `Hisui.Pdf-vX.Y.Z-linux-x64.tar.gz` |
+| macOS (Intel) | `Hisui.Pdf-vX.Y.Z-osx-x64.tar.gz` |
+| macOS (Apple Silicon) | `Hisui.Pdf-vX.Y.Z-osx-arm64.tar.gz` |
+
+Unpack the archive and run `Hisui.Pdf.App` (`.exe` on Windows). On macOS the
+binary is unsigned, so on first launch right-click → *Open* (or run
+`xattr -dr com.apple.quarantine Hisui.Pdf.App`).
+
 ## Features
 
 - **Pages** — merge, split, extract, reorder, rotate and delete pages, with
