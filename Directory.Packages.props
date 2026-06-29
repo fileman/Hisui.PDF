@@ -39,6 +39,11 @@
     <PackageVersion Include="Avalonia.Diagnostics" Version="11.2.0" />
   </ItemGroup>
 
+  <!-- WiX v4 extensions for the MSI installer project. -->
+  <ItemGroup Label="Installer (WiX)">
+    <PackageVersion Include="WixToolset.UI.wixext" Version="4.0.5" />
+  </ItemGroup>
+
   <!-- Test stack: xUnit v3 on Microsoft Testing Platform (NOT VSTest), Moq. -->
   <ItemGroup Label="Tests">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />

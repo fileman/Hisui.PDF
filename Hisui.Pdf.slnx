@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Hisui.Pdf.Core/Hisui.Pdf.Core.csproj" />
     <Project Path="src/Hisui.Pdf.App/Hisui.Pdf.App.csproj" />
+    <Project Path="src/Hisui.Pdf.Installer.Win/Hisui.Pdf.Installer.Win.wixproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hisui.Pdf.Core.Tests/Hisui.Pdf.Core.Tests.csproj" />
