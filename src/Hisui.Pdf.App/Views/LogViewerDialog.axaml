@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
+        x:Class="Hisui.Pdf.App.Views.LogViewerDialog"
+        Title="{loc:Tr Log.Title}"
+        Width="860" Height="560" MinWidth="500" MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource RibbonBarBrush}">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+            <Button Name="CopyButton" Content="{loc:Tr Log.Copy}" />
+            <Button Name="FolderButton" Content="{loc:Tr Log.OpenFolder}" />
+            <Button Name="RefreshButton" Content="{loc:Tr Log.Refresh}" />
+            <Button Name="CloseButton" Content="{loc:Tr Dialog.Close}" Classes="primary" IsCancel="True" />
+        </StackPanel>
+        <CheckBox DockPanel.Dock="Top" Name="ErrorsOnlyBox" Content="{loc:Tr Log.ErrorsOnly}" Margin="0,0,0,8" IsChecked="True" />
+        <TextBox Name="LogText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                 FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="12"
+                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
+    </DockPanel>
+</Window>
