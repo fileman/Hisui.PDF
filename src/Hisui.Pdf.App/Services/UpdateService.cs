@@ -36,12 +36,15 @@ internal sealed class UpdateService : IUpdateService
 
             var tag = root.GetProperty("tag_name").GetString();
             var url = root.GetProperty("html_url").GetString();
-            if (!TryParseVersion(tag, out var latest) || url is null || !url.StartsWith("https://", StringComparison.Ordinal))
+            var msi = FindMsi(root);
+            // MSI name (HisuiPDF-X.Y.<commits>-win-x64.msi) carries the real version; the tag only has X.Y.Z
+            var versionSource = msi is { } m ? m.Name[(m.Name.IndexOf('-') + 1)..] : tag;
+            if (!TryParseVersion(versionSource, out var latest) || url is null || !url.StartsWith("https://", StringComparison.Ordinal))
                 return null;
             if (latest <= CurrentVersion) return null;
 
             var notes = root.TryGetProperty("body", out var body) ? body.GetString() : null;
-            return new UpdateInfo(latest, tag!, url, notes, FindMsiUrl(root));
+            return new UpdateInfo(latest, tag!, url, notes, msi?.Url);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -69,7 +72,7 @@ internal sealed class UpdateService : IUpdateService
         }
     }
 
-    private static string? FindMsiUrl(JsonElement release)
+    private static (string Name, string Url)? FindMsi(JsonElement release)
     {
         if (!release.TryGetProperty("assets", out var assets)) return null;
         foreach (var a in assets.EnumerateArray())
@@ -78,7 +81,7 @@ internal sealed class UpdateService : IUpdateService
             var url = a.GetProperty("browser_download_url").GetString();
             if (name is not null && url is not null && name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
                 && url.StartsWith("https://", StringComparison.Ordinal))
-                return url;
+                return (name, url);
         }
         return null;
     }

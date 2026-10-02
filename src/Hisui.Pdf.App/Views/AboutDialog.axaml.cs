@@ -12,7 +12,7 @@ public partial class AboutDialog : Window
         var version = typeof(AboutDialog).Assembly.GetName().Version;
         var versionText = this.FindControl<TextBlock>("VersionText");
         if (versionText is not null)
-            versionText.Text = Localizer.Instance.Format("About.Version", version?.ToString(4) ?? "1.0.0.0");
+            versionText.Text = Localizer.Instance.Format("About.Version", version?.ToString(3) ?? "1.0.0");
 
         var closeButton = this.FindControl<Button>("CloseButton");
         if (closeButton is not null)

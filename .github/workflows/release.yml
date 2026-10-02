@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history: the 4th version part is the commit count
+          fetch-depth: 0 # full history: the 3rd version part is the commit count
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -46,7 +46,7 @@ jobs:
       - name: Publish (self-contained, single-file)
         shell: bash
         run: |
-          base="${VERSION#v}"; base="${base%%-*}"
+          base="${VERSION#v}"; base="${base%%-*}"; base="${base%.*}" # X.Y from the tag
           rev="$base.$(git rev-list --count HEAD)"
           dotnet publish "$PROJECT" \
             -c Release \
@@ -86,9 +86,10 @@ jobs:
         shell: pwsh
         run: |
           # MSI versions are numeric x.y.z: drop any -beta suffix
-          $v = ($env:VERSION.TrimStart('v') -split '-')[0]
-          $rev = "$v.$(git rev-list --count HEAD)"
-          dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v" -p:AssemblyVersion="$rev" -p:FileVersion="$rev"
+          # X.Y from the tag, 3rd part = commit count (the updater reads it from the MSI name)
+          $xy = (($env:VERSION.TrimStart('v') -split '-')[0] -split '\.')[0..1] -join '.'
+          $v = "$xy.$(git rev-list --count HEAD)"
+          dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v"
           dotnet build src/Hisui.Pdf.Installer.Win/Hisui.Pdf.Installer.Win.wixproj -c Release -p:Version="$v"
           # copy to the root so upload-artifact doesn't keep the bin/installer/ directory structure
           Copy-Item "bin/installer/HisuiPDF-$v-win-x64.msi" .
