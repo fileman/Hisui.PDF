@@ -35,6 +35,8 @@ jobs:
           - { rid: osx-arm64, os: macos-latest,   archive: targz }
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: the 4th version part is the commit count
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -44,6 +46,8 @@ jobs:
       - name: Publish (self-contained, single-file)
         shell: bash
         run: |
+          base="${VERSION#v}"; base="${base%%-*}"
+          rev="$base.$(git rev-list --count HEAD)"
           dotnet publish "$PROJECT" \
             -c Release \
             -r ${{ matrix.rid }} \
@@ -52,6 +56,7 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:EnableCompressionInSingleFile=true \
             -p:Version="${VERSION#v}" \
+            -p:AssemblyVersion="$rev" -p:FileVersion="$rev" \
             -p:DebugType=none \
             -p:DebugSymbols=false \
             -o "publish/${{ matrix.rid }}"
@@ -82,7 +87,8 @@ jobs:
         run: |
           # MSI versions are numeric x.y.z: drop any -beta suffix
           $v = ($env:VERSION.TrimStart('v') -split '-')[0]
-          dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v"
+          $rev = "$v.$(git rev-list --count HEAD)"
+          dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v" -p:AssemblyVersion="$rev" -p:FileVersion="$rev"
           dotnet build src/Hisui.Pdf.Installer.Win/Hisui.Pdf.Installer.Win.wixproj -c Release -p:Version="$v"
           # copy to the root so upload-artifact doesn't keep the bin/installer/ directory structure
           Copy-Item "bin/installer/HisuiPDF-$v-win-x64.msi" .
