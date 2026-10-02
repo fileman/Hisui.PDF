@@ -350,7 +350,7 @@ public partial class MainWindow : Window
 
     private void OnDragEnter(object? sender, DragEventArgs e)
     {
-        var hasFiles = e.Data.Contains(DataFormats.Files);
+        var hasFiles = e.DataTransfer.Contains(DataFormat.File);
         e.DragEffects = hasFiles ? DragDropEffects.Copy : DragDropEffects.None;
         if (hasFiles && DataContext is MainViewModel vm) vm.IsDragOver = true;
         e.Handled = true;
@@ -364,10 +364,10 @@ public partial class MainWindow : Window
     private async void OnDrop(object? sender, DragEventArgs e)
     {
         if (DataContext is MainViewModel dropVm) dropVm.IsDragOver = false;
-        if (!e.Data.Contains(DataFormats.Files)) return;
+        if (!e.DataTransfer.Contains(DataFormat.File)) return;
         if (DataContext is not MainViewModel vm) return;
 
-        var files = e.Data.GetFiles()?.OfType<IStorageFile>() ?? [];
+        var files = e.DataTransfer.TryGetFiles()?.OfType<IStorageFile>() ?? [];
         var pdfs = files
             .Select(f => f.TryGetLocalPath())
             .Where(p => p is not null &&

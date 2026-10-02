@@ -11,4 +11,5 @@ public enum AnnotationTool
     ImageOverlay,
     Signature,
     Watermark,
+    OcrSelection,
 }

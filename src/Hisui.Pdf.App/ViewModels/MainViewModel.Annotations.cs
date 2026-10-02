@@ -1,7 +1,9 @@
 using Avalonia;
+using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Hisui.Pdf.App.Views;
+using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
 
 namespace Hisui.Pdf.App.ViewModels;
@@ -157,10 +159,38 @@ public partial class MainViewModel
         if (ActiveTool == AnnotationTool.StickyNote)
             normRect = PdfRect.FromLTWH(C(_dragStart.X / w), C(_dragStart.Y / h), 0, 0);
 
+        if (ActiveTool == AnnotationTool.OcrSelection)
+        {
+            await OcrSelectionAsync(normRect);
+            return;
+        }
+
         var model = await getInput(ActiveTool);
         if (model is null) return;
 
         await ApplyAnnotationAsync(model with { Rect = normRect });
+    }
+
+    // ── OCR on a selected area: recognized text goes to the clipboard ───────
+
+    private async Task OcrSelectionAsync(PdfRect region)
+    {
+        var pageIndex = Pages.IndexOf(SelectedPage!);
+        await RunBusyAsync(_loc["Status.Ocr"], async ct =>
+        {
+            try
+            {
+                var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+                var text = await _ocr.RecognizeRegionAsync(current, pageIndex, region, options: null, ct);
+                if (text.Length == 0) { StatusMessage = _loc["Status.OcrSelectionEmpty"]; return; }
+                if (GetMainWindow()?.Clipboard is { } cb) await cb.SetTextAsync(text);
+                StatusMessage = _loc.Format("Status.OcrSelectionCopied", text.Length);
+            }
+            catch (OcrUnavailableException ex)
+            {
+                StatusMessage = _loc.Format("Status.OcrUnavailable", ex.Message);
+            }
+        });
     }
 
     // ── Watermark ─────────────────────────────────────────────────────────────

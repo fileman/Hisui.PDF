@@ -22,6 +22,12 @@ public interface IPdfOcrService
     Task<OcrDocumentResult> RecognizeAsync(byte[] pdf, OcrOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
+    /// Runs OCR on one rectangular region of a page (normalized coordinates) and returns the recognized text.
+    /// </summary>
+    /// <exception cref="OcrUnavailableException">The OCR engine or language data is not available.</exception>
+    Task<string> RecognizeRegionAsync(byte[] pdf, int pageIndex, PdfRect region, OcrOptions? options = null, CancellationToken ct = default);
+
+    /// <summary>
     /// Produces a searchable copy of <paramref name="pdf"/>: the visible page content is unchanged,
     /// but an invisible text layer from OCR is added so the text can be selected, searched and copied.
     /// Pages that already have a text layer are left untouched (unless

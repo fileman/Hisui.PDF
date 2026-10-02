@@ -90,7 +90,7 @@
                                      Content="{loc:Tr Print.Range.All}" />
                         <RadioButton x:Name="CurrentRadio" GroupName="Range" Content="{loc:Tr Print.Range.Current}" />
                         <RadioButton x:Name="RangeRadio" GroupName="Range" Content="{loc:Tr Print.Range.Custom}" />
-                        <TextBox x:Name="RangeBox" Watermark="{loc:Tr Print.Range.Hint}" IsEnabled="False"
+                        <TextBox x:Name="RangeBox" PlaceholderText="{loc:Tr Print.Range.Hint}" IsEnabled="False"
                                  Margin="22,0,0,0" />
                     </StackPanel>
 

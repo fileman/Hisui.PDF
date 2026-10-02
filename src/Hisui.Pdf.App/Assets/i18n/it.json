@@ -45,6 +45,10 @@
 
   "Tool.Highlight": "Evidenzia",
   "Tool.Highlight.Tooltip": "Evidenzia un'area (trascina sulla pagina)",
+  "Tool.OcrSelection": "OCR selezione",
+  "Tool.OcrSelection.Tooltip": "Trascina un'area sulla pagina: il testo riconosciuto viene copiato negli appunti",
+  "Status.OcrSelectionEmpty": "Nessun testo riconosciuto nella selezione",
+  "Status.OcrSelectionCopied": "Testo selezionato copiato ({0} caratteri)",
   "Tool.Rectangle": "Rettangolo",
   "Tool.Rectangle.Tooltip": "Disegna un rettangolo (trascina sulla pagina)",
   "Tool.FreeText": "Testo libero",

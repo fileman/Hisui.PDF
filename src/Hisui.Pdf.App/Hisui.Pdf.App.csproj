@@ -7,6 +7,10 @@
     <RootNamespace>Hisui.Pdf.App</RootNamespace>
     <AssemblyName>Hisui.Pdf.App</AssemblyName>
     <Version>1.0.0</Version>
+    <ApplicationIcon>Assets\HisuiPDF.ico</ApplicationIcon>
+    <Product>Hisui PDF</Product>
+    <AssemblyTitle>Hisui PDF</AssemblyTitle>
+    <Description>Hisui PDF</Description>
     <Authors>Emanuele Filardo</Authors>
     <Copyright>Copyright (c) 2026 Emanuele Filardo</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -14,6 +18,8 @@
     <!-- NU1903: Tmds.DBus.Protocol 0.20.0 vulnerability — Linux-only D-Bus transitive dep of Avalonia,
          not reachable on Windows. Suppress until Avalonia ships a patched transitive version. -->
     <NoWarn>NU1903</NoWarn>
+    <!-- Avalonia 12 compiles bindings by default; this app uses reflection bindings on untyped DataContexts. -->
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,7 +27,6 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
-    <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <!-- Windows print path (printer list, duplex, page ranges). Cross-platform builds keep compiling;
          the API is only called behind OperatingSystem.IsWindows() guards. -->
@@ -37,6 +42,7 @@
   <ItemGroup>
     <!-- Localization dictionaries, loaded at runtime via AssetLoader (avares://). -->
     <AvaloniaResource Include="Assets\i18n\*.json" />
+    <AvaloniaResource Include="Assets\HisuiPDF.ico" />
   </ItemGroup>
 
   <ItemGroup Label="OCR — ship Tesseract language data in a 'tessdata' folder next to the executable">
