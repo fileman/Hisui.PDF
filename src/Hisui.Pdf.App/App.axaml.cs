@@ -45,6 +45,11 @@ public partial class App : Application
             _host = builder.Build();
             await _host.StartAsync();
 
+            // Make crashes and fire-and-forget failures visible in the log viewer.
+            var crashLog = _host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Unhandled");
+            AppDomain.CurrentDomain.UnhandledException += (_, e) => crashLog.LogCritical(e.ExceptionObject as Exception, "Unhandled exception");
+            TaskScheduler.UnobservedTaskException += (_, e) => crashLog.LogError(e.Exception, "Unobserved task exception");
+
             // Apply the saved language before any view is built so the first render is localized.
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             Localizer.Instance.SetLanguage(settings.Settings.Language ?? Localizer.BaseLanguage);

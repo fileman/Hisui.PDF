@@ -160,6 +160,10 @@ public partial class MainWindow : Window
         updates.Click += async (_, _) => await CheckForUpdatesAsync(manual: true);
         flyout.Items.Add(updates);
 
+        var log = new MenuItem { Header = loc["Menu.ViewLog"] };
+        log.Click += async (_, _) => await new LogViewerDialog().ShowDialog(this);
+        flyout.Items.Add(log);
+
         var info = new MenuItem { Header = loc["Menu.About"] };
         info.Click += OnAboutClick;
         flyout.Items.Add(info);

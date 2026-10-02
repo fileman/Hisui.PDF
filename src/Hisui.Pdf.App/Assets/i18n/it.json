@@ -172,6 +172,7 @@
   "Dialog.Title": "Parametri annotazione",
   "Dialog.Cancel": "Annulla",
   "Dialog.Apply": "Applica",
+  "Dialog.Close": "Chiudi",
   "Dialog.Ok": "OK",
 
   "Password.Title": "Password",
@@ -269,5 +270,12 @@
   "Update.Later": "Più tardi",
   "Update.Skip": "Salta questa versione",
   "Update.UpToDate": "Hisui PDF è aggiornato.",
-  "Update.CheckFailed": "Impossibile verificare gli aggiornamenti."
+  "Update.CheckFailed": "Impossibile verificare gli aggiornamenti.",
+  "Menu.ViewLog": "Visualizza log...",
+  "Log.Title": "Log",
+  "Log.ErrorsOnly": "Solo avvisi ed errori",
+  "Log.Copy": "Copia",
+  "Log.OpenFolder": "Apri cartella",
+  "Log.Refresh": "Aggiorna",
+  "Log.Empty": "(nessuna voce)"
 }
