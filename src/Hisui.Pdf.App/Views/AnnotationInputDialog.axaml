@@ -63,7 +63,7 @@
                     <Border Grid.Column="0" Width="28" Height="28" CornerRadius="3"
                             BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" Margin="0,0,8,0"
                             Background="{Binding #ColorInput.Text, Converter={StaticResource HexToBrush}}" />
-                    <TextBox Grid.Column="1" Name="ColorInput" Watermark="#RRGGBB" />
+                    <TextBox Grid.Column="1" Name="ColorInput" PlaceholderText="#RRGGBB" />
                 </Grid>
             </StackPanel>
 
@@ -81,7 +81,7 @@
                     <Border Grid.Column="0" Width="28" Height="28" CornerRadius="3"
                             BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" Margin="0,0,8,0"
                             Background="{Binding #FillInput.Text, Converter={StaticResource HexToBrush}}" />
-                    <TextBox Grid.Column="1" Name="FillInput" Watermark="#RRGGBB" />
+                    <TextBox Grid.Column="1" Name="FillInput" PlaceholderText="#RRGGBB" />
                 </Grid>
             </StackPanel>
 
@@ -97,7 +97,7 @@
                 <TextBlock Classes="caption" Text="{loc:Tr Field.Image}" />
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBox Grid.Column="0" Name="ImagePathBox" IsReadOnly="True"
-                             Watermark="{loc:Tr Field.Image.None}" />
+                             PlaceholderText="{loc:Tr Field.Image.None}" />
                     <Button Grid.Column="1" Content="{loc:Tr Field.Browse}" Name="BrowseImageButton"
                             Margin="8,0,0,0" />
                 </Grid>

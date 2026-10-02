@@ -24,6 +24,7 @@
       <Directory Id="INSTALLFOLDER" Name="Hisui PDF">
         <!-- licenses\ subdirectory -->
         <Directory Id="LicensesFolder" Name="licenses" />
+        <Directory Id="TessdataFolder" Name="tessdata" />
       </Directory>
     </StandardDirectory>
 
@@ -32,9 +33,14 @@
       <Directory Id="AppMenuFolder" Name="Hisui PDF" />
     </StandardDirectory>
 
+    <Icon Id="AppIcon.ico" SourceFile="..\Hisui.Pdf.App\Assets\HisuiPDF.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
     <Feature Id="MainFeature" Title="Hisui PDF" Level="1">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentGroupRef Id="LicenseFiles" />
+      <ComponentGroupRef Id="TessdataFiles" />
+      <ComponentRef Id="OpenWithPdf" />
       <ComponentRef Id="StartMenuShortcut" />
     </Feature>
 
@@ -45,13 +51,32 @@
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
 
       <Component Id="MainExe" Guid="*">
-        <!-- tessdata is bundled inside the single-file EXE and extracted at first run -->
+        <!-- tessdata is NOT inside the single-file EXE; installed beside it (see TessdataFiles) -->
         <File Id="HisuiExe"
               Source="..\..\bin\publish\win-x64\Hisui.Pdf.App.exe"
               KeyPath="yes" />
       </Component>
 
     </ComponentGroup>
+  </Fragment>
+
+  <!-- ─── OCR language data (tessdata\*.traineddata next to the EXE) ─────── -->
+  <Fragment>
+    <ComponentGroup Id="TessdataFiles" Directory="TessdataFolder">
+      <Component Id="TessEng" Guid="*"><File Source="../../bin/publish/win-x64/tessdata/eng.traineddata" /></Component>
+      <Component Id="TessIta" Guid="*"><File Source="../../bin/publish/win-x64/tessdata/ita.traineddata" /></Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- ─── "Open with" entry for .pdf (does not take over the default app) ─ -->
+  <Fragment>
+    <Component Id="OpenWithPdf" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue Root="HKLM" Key="Software\Classes\.pdf\OpenWithProgids" Name="HisuiPDF.Document" Type="string" Value="" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document" Type="string" Value="PDF Document" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\DefaultIcon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\shell\open" Name="FriendlyAppName" Type="string" Value="Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; &quot;%1&quot;" KeyPath="yes" />
+    </Component>
   </Fragment>
 
   <!-- ─── License files ──────────────────────────────────────────────────── -->
@@ -84,7 +109,8 @@
                 Name="Hisui PDF"
                 Description="PDF editor: merge, split, annotate, redact, sign"
                 Target="[INSTALLFOLDER]Hisui.Pdf.App.exe"
-                WorkingDirectory="INSTALLFOLDER" />
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon.ico" />
       <!-- Clean up the Start Menu folder on uninstall -->
       <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
       <!-- Registry key used as the component's KeyPath (required for shortcut components) -->

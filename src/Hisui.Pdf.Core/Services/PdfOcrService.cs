@@ -104,6 +104,29 @@ internal sealed class PdfOcrService : IPdfOcrService
         }, ct).ConfigureAwait(false);
     }
 
+    public async Task<string> RecognizeRegionAsync(byte[] pdf, int pageIndex, PdfRect region, OcrOptions? options = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        options ??= new OcrOptions();
+
+        var png = await _renderer.RenderPageToPngAsync(pdf, pageIndex, options.Dpi, ct).ConfigureAwait(false);
+        var crop = await Task.Run(() =>
+        {
+            using var bmp = SkiaSharp.SKBitmap.Decode(png);
+            var r = SkiaSharp.SKRectI.Create(
+                (int)(region.Left * bmp.Width), (int)(region.Top * bmp.Height),
+                Math.Max(1, (int)(region.Width * bmp.Width)), Math.Max(1, (int)(region.Height * bmp.Height)));
+            r.Intersect(SkiaSharp.SKRectI.Create(bmp.Width, bmp.Height));
+            using var sub = new SkiaSharp.SKBitmap();
+            if (r.IsEmpty || !bmp.ExtractSubset(sub, r)) return png;
+            using var img = SkiaSharp.SKImage.FromBitmap(sub);
+            return img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100).ToArray();
+        }, ct).ConfigureAwait(false);
+
+        var result = await _engine.RecognizeAsync(crop, pageIndex, options, ct).ConfigureAwait(false);
+        return result.Text.Trim();
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private async Task<IReadOnlyList<int>> ResolveTargetPagesAsync(byte[] pdf, OcrOptions options, CancellationToken ct)

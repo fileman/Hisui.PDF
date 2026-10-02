@@ -4,6 +4,7 @@
         xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
         x:Class="Hisui.Pdf.App.Views.MainWindow"
         Title="{Binding Title}"
+        Icon="avares://Hisui.Pdf.App/Assets/HisuiPDF.ico"
         Height="760" Width="1180"
         WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
@@ -295,7 +296,7 @@
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center"
                                 IsEnabled="{Binding IsDocumentLoaded}">
                         <TextBox x:Name="SearchBox" Width="190" Height="27" Padding="8,2" VerticalContentAlignment="Center"
-                                 Watermark="{loc:Tr Search.Placeholder}" Text="{Binding SearchQuery}">
+                                 PlaceholderText="{loc:Tr Search.Placeholder}" Text="{Binding SearchQuery}">
                             <TextBox.KeyBindings>
                                 <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
                             </TextBox.KeyBindings>
@@ -502,6 +503,13 @@
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconHighlight}" />
                                 <TextBlock Text="{loc:Tr Tool.Highlight}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.OcrSelection.Tooltip}"
+                                     IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=OcrSelection, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconOcr}" />
+                                <TextBlock Text="{loc:Tr Tool.OcrSelection}" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
                         <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Rectangle.Tooltip}"

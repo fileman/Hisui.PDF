@@ -45,7 +45,7 @@
         <!-- Name field -->
         <StackPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
             <TextBlock Classes="caption" Text="{loc:Tr SigCreate.Name}" />
-            <TextBox Name="NameInput" Watermark="{loc:Tr SigCreate.NameWatermark}" Padding="8,5" />
+            <TextBox Name="NameInput" PlaceholderText="{loc:Tr SigCreate.NameWatermark}" Padding="8,5" />
         </StackPanel>
 
         <!-- Content -->
@@ -69,7 +69,7 @@
             <StackPanel Name="ImagePanel" Spacing="8" IsVisible="False">
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBox Grid.Column="0" Name="ImagePathBox" IsReadOnly="True" Padding="8,5"
-                             Watermark="{loc:Tr Field.Image.None}" />
+                             PlaceholderText="{loc:Tr Field.Image.None}" />
                     <Button Grid.Column="1" Content="{loc:Tr Field.Browse}" Name="BrowseButton"
                             Margin="8,0,0,0" />
                 </Grid>
@@ -82,7 +82,7 @@
             <!-- Text -->
             <StackPanel Name="TextPanel" Spacing="8" IsVisible="False">
                 <TextBlock Classes="caption" Text="{loc:Tr SigCreate.TextHint}" />
-                <TextBox Name="TextInput" Watermark="{loc:Tr SigCreate.TextWatermark}" Padding="8,5" />
+                <TextBox Name="TextInput" PlaceholderText="{loc:Tr SigCreate.TextWatermark}" Padding="8,5" />
                 <Border Background="{DynamicResource RibbonPageBrush}" BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" CornerRadius="4"
                         Height="110" ClipToBounds="True">
                     <TextBlock Name="TextPreview" Text="{Binding #TextInput.Text}"

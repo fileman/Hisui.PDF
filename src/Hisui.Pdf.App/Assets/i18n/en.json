@@ -45,6 +45,10 @@
 
   "Tool.Highlight": "Highlight",
   "Tool.Highlight.Tooltip": "Highlight an area (drag on the page)",
+  "Tool.OcrSelection": "OCR selection",
+  "Tool.OcrSelection.Tooltip": "Drag an area on the page: recognized text is copied to the clipboard",
+  "Status.OcrSelectionEmpty": "No text recognized in the selection",
+  "Status.OcrSelectionCopied": "Selected text copied ({0} characters)",
   "Tool.Rectangle": "Rectangle",
   "Tool.Rectangle.Tooltip": "Draw a rectangle (drag on the page)",
   "Tool.FreeText": "Free text",
