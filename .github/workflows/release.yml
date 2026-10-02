@@ -84,7 +84,9 @@ jobs:
           $v = ($env:VERSION.TrimStart('v') -split '-')[0]
           dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v"
           dotnet build src/Hisui.Pdf.Installer.Win/Hisui.Pdf.Installer.Win.wixproj -c Release -p:Version="$v"
-          "MSI=bin/installer/HisuiPDF-$v-win-x64.msi" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # copy to the root so upload-artifact doesn't keep the bin/installer/ directory structure
+          Copy-Item "bin/installer/HisuiPDF-$v-win-x64.msi" .
+          "MSI=HisuiPDF-$v-win-x64.msi" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
