@@ -22,9 +22,26 @@ env:
   VERSION: ${{ github.event.inputs.version || github.ref_name }}
 
 jobs:
+  # Every artifact (app, MSI, archives) is versioned X.Y.<commit count>, X.Y taken from the tag.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      ver: ${{ steps.v.outputs.ver }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for the commit count
+      - id: v
+        run: |
+          xy="${VERSION#v}"; xy="${xy%%-*}"; xy="${xy%.*}"
+          echo "ver=$xy.$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.rid }}
+    needs: version
     runs-on: ${{ matrix.os }}
+    env:
+      BUILD_VERSION: ${{ needs.version.outputs.ver }}
     strategy:
       fail-fast: false
       matrix:
@@ -51,7 +68,7 @@ jobs:
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:EnableCompressionInSingleFile=true \
-            -p:Version="${VERSION#v}" \
+            -p:Version="$BUILD_VERSION" \
             -p:DebugType=none \
             -p:DebugSymbols=false \
             -o "publish/${{ matrix.rid }}"
@@ -62,7 +79,7 @@ jobs:
         if: matrix.archive == 'targz'
         shell: bash
         run: |
-          name="Hisui.Pdf-${VERSION}-${{ matrix.rid }}"
+          name="Hisui.Pdf-v${BUILD_VERSION}-${{ matrix.rid }}"
           chmod +x "publish/${{ matrix.rid }}/Hisui.Pdf.App"
           tar -czf "${name}.tar.gz" -C "publish/${{ matrix.rid }}" .
           echo "ASSET=${name}.tar.gz" >> "$GITHUB_ENV"
@@ -71,7 +88,7 @@ jobs:
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          $name = "Hisui.Pdf-$env:VERSION-${{ matrix.rid }}"
+          $name = "Hisui.Pdf-v$env:BUILD_VERSION-${{ matrix.rid }}"
           Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath "$name.zip"
           "ASSET=$name.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -81,7 +98,8 @@ jobs:
         shell: pwsh
         run: |
           # MSI versions are numeric x.y.z: drop any -beta suffix
-          $v = ($env:VERSION.TrimStart('v') -split '-')[0]
+          # the updater reads the version from the MSI name
+          $v = $env:BUILD_VERSION
           dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v"
           dotnet build src/Hisui.Pdf.Installer.Win/Hisui.Pdf.Installer.Win.wixproj -c Release -p:Version="$v"
           # copy to the root so upload-artifact doesn't keep the bin/installer/ directory structure
@@ -99,7 +117,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -118,10 +136,10 @@ jobs:
           ### Downloads
           | Platform | File |
           |---|---|
-          | Windows x64 | `Hisui.Pdf-__VERSION__-win-x64.zip` or installer `HisuiPDF-__VERSION__-win-x64.msi` (needed by in-app updates) |
-          | Linux x64 | `Hisui.Pdf-__VERSION__-linux-x64.tar.gz` |
-          | macOS (Intel) | `Hisui.Pdf-__VERSION__-osx-x64.tar.gz` |
-          | macOS (Apple Silicon) | `Hisui.Pdf-__VERSION__-osx-arm64.tar.gz` |
+          | Windows x64 | `Hisui.Pdf-v__VERSION__-win-x64.zip` or installer `HisuiPDF-__VERSION__-win-x64.msi` (needed by in-app updates) |
+          | Linux x64 | `Hisui.Pdf-v__VERSION__-linux-x64.tar.gz` |
+          | macOS (Intel) | `Hisui.Pdf-v__VERSION__-osx-x64.tar.gz` |
+          | macOS (Apple Silicon) | `Hisui.Pdf-v__VERSION__-osx-arm64.tar.gz` |
 
           Unpack the archive and run `Hisui.Pdf.App` (`.exe` on Windows).
 
@@ -131,7 +149,7 @@ jobs:
           > **Linux/macOS OCR:** the scanned-PDF OCR feature needs a system Tesseract library
           > (`apt install libtesseract5` / `brew install tesseract`). All other features work standalone.
           EOF
-          sed -i "s/__VERSION__/${VERSION}/g" notes.md
+          sed -i "s/__VERSION__/${{ needs.version.outputs.ver }}/g" notes.md
 
       - name: Create / update release and upload assets
         env:

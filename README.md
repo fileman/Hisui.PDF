@@ -13,11 +13,13 @@ binaries are self-contained, so **no .NET install is required**.
 
 | Platform | Asset |
 |---|---|
-| Windows x64 (installer) | `HisuiPDF-X.Y.Z-win-x64.msi` |
-| Windows x64 (portable) | `Hisui.Pdf-vX.Y.Z-win-x64.zip` |
-| Linux x64 | `Hisui.Pdf-vX.Y.Z-linux-x64.tar.gz` |
-| macOS (Intel) | `Hisui.Pdf-vX.Y.Z-osx-x64.tar.gz` |
-| macOS (Apple Silicon) | `Hisui.Pdf-vX.Y.Z-osx-arm64.tar.gz` |
+| Windows x64 (installer) | `HisuiPDF-X.Y.N-win-x64.msi` |
+| Windows x64 (portable) | `Hisui.Pdf-vX.Y.N-win-x64.zip` |
+| Linux x64 | `Hisui.Pdf-vX.Y.N-linux-x64.tar.gz` |
+| macOS (Intel) | `Hisui.Pdf-vX.Y.N-osx-x64.tar.gz` |
+| macOS (Apple Silicon) | `Hisui.Pdf-vX.Y.N-osx-arm64.tar.gz` |
+
+`X.Y` comes from the release tag, `N` is the commit count of the tagged build.
 
 On Windows run the MSI (it is unsigned, so SmartScreen/UAC will warn), or unpack
 the zip. On Linux/macOS unpack the archive and run `Hisui.Pdf.App`. On macOS the
