@@ -29,8 +29,8 @@ pre-releases.
 
 ### Updates
 
-Hisui PDF checks GitHub for a newer stable release at startup (disable it in the
-settings) and from the main menu → *Check for updates…*. On Windows, accepting
+Hisui PDF checks GitHub for a newer stable release at startup (disable with `"CheckForUpdates": false` in
+`%APPDATA%\Hisui.PDF\settings.json`) and from the main menu → *Check for updates…*. On Windows, accepting
 downloads the MSI and runs it as an in-place upgrade; on other platforms it opens
 the release page. Pre-releases are never offered.
 
