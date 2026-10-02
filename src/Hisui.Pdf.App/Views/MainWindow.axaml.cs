@@ -368,7 +368,15 @@ public partial class MainWindow : Window
             switch (choice)
             {
                 case UpdateChoice.Download:
-                    Process.Start(new ProcessStartInfo(update.Url) { UseShellExecute = true });
+                    // Windows: fetch the MSI and hand it to Windows Installer (MajorUpgrade replaces this build).
+                    if (OperatingSystem.IsWindows() && update.MsiUrl is not null
+                        && await _updates.DownloadInstallerAsync(update) is { } msi)
+                    {
+                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\"") { UseShellExecute = true });
+                        Close();
+                    }
+                    else
+                        Process.Start(new ProcessStartInfo(update.Url) { UseShellExecute = true });
                     break;
                 case UpdateChoice.Skip:
                     settings.Settings.SkippedUpdateTag = update.Tag;
