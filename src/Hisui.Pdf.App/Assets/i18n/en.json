@@ -260,5 +260,14 @@
   "About.Lib.PdfToImage": "MIT · page rendering via PDFium",
   "About.Lib.Avalonia": "MIT · cross-platform UI (Win / Linux / macOS)",
   "About.Lib.Mvvm": "MIT · MVVM helpers",
-  "About.Lib.Skia": "BSD / Apache 2.0 · rendering engine"
+  "About.Lib.Skia": "BSD / Apache 2.0 · rendering engine",
+  "Menu.CheckUpdates": "Check for updates...",
+  "Update.Title": "Update available",
+  "Update.Heading": "A new version is available",
+  "Update.Message": "Hisui PDF {0} is available (you have {1}). Download it from the releases page?",
+  "Update.Download": "Download",
+  "Update.Later": "Later",
+  "Update.Skip": "Skip this version",
+  "Update.UpToDate": "Hisui PDF is up to date.",
+  "Update.CheckFailed": "Could not check for updates."
 }

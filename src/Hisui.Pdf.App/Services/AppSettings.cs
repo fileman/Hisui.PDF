@@ -9,6 +9,12 @@ public sealed class AppSettings
     /// <summary>UI language code (e.g. "it", "en"). Null = use the base language.</summary>
     public string? Language { get; set; }
 
+    /// <summary>Check GitHub for a newer release at startup.</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>Release tag the user chose to skip; not offered again at startup.</summary>
+    public string? SkippedUpdateTag { get; set; }
+
     /// <summary>UI theme code: "System" (follow the OS), "Light" or "Dark".</summary>
     public string Theme { get; set; } = "System";
 }

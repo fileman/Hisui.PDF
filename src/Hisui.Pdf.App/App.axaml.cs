@@ -32,6 +32,7 @@ public partial class App : Application
             builder.Services.AddSingleton<ISignatureService, SignatureService>();
             builder.Services.AddSingleton<IPrintService, PrintService>();
             builder.Services.AddSingleton<IWindowService, WindowService>();
+            builder.Services.AddSingleton<IUpdateService, UpdateService>();
             builder.Services.AddSingleton<ILocalizer>(Localizer.Instance);
             // Transient so each window owns an independent view model + document session (multi-window).
             builder.Services.AddTransient<MainViewModel>();
@@ -53,6 +54,10 @@ public partial class App : Application
 
             var window = _host.Services.GetRequiredService<MainWindow>();
             desktop.MainWindow = window;
+
+            // Silent startup check (first window only); only prompts if a newer, non-skipped release exists.
+            if (settings.Settings.CheckForUpdates)
+                window.Opened += (_, _) => _ = window.CheckForUpdatesAsync(manual: false);
 
             // Support "Open with" / command-line: open a file passed as the first arg into this window's VM.
             if (desktop.Args?.Length > 0 && File.Exists(desktop.Args[0]) && window.DataContext is MainViewModel vm)

@@ -51,6 +51,7 @@ jobs:
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:EnableCompressionInSingleFile=true \
+            -p:Version="${VERSION#v}" \
             -p:DebugType=none \
             -p:DebugSymbols=false \
             -o "publish/${{ matrix.rid }}"
