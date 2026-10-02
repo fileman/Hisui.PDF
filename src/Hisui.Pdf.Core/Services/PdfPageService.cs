@@ -1,6 +1,7 @@
 using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
 using PdfSharp.Pdf;
+using PdfSharp.Pdf.Advanced;
 using PdfSharp.Pdf.IO;
 
 namespace Hisui.Pdf.Core.Services;
@@ -36,7 +37,7 @@ internal sealed class PdfPageService : IPdfPageService
                     cancellationToken.ThrowIfCancellationRequested();
                     using var input = OpenImport(bytes);
                     for (var i = 0; i < input.PageCount; i++)
-                        output.AddPage(input.Pages[i]);
+                        AddPageSafe(output, input.Pages[i]);
                 }
 
                 return Save(output);
@@ -59,7 +60,7 @@ internal sealed class PdfPageService : IPdfPageService
                     if (index < 0 || index >= input.PageCount)
                         throw new ArgumentOutOfRangeException(
                             nameof(pageIndices), $"Page index {index} is out of range (0..{input.PageCount - 1}).");
-                    output.AddPage(input.Pages[index]);
+                    AddPageSafe(output, input.Pages[index]);
                 }
 
                 return Save(output);
@@ -82,7 +83,7 @@ internal sealed class PdfPageService : IPdfPageService
                     using var output = new PdfDocument();
                     var end = Math.Min(start + pagesPerChunk, input.PageCount);
                     for (var i = start; i < end; i++)
-                        output.AddPage(input.Pages[i]);
+                        AddPageSafe(output, input.Pages[i]);
                     chunks.Add(Save(output));
                 }
 
@@ -111,7 +112,7 @@ internal sealed class PdfPageService : IPdfPageService
                             importers[pageRef.SourceDocumentId] = source;
                         }
 
-                        var added = output.AddPage(source.Pages[pageRef.SourcePageIndex]);
+                        var added = AddPageSafe(output, source.Pages[pageRef.SourcePageIndex]);
                         if (pageRef.Rotation != PageRotation.None)
                             added.Rotate = (added.Rotate + (int)pageRef.Rotation) % 360;
                     }
@@ -125,6 +126,26 @@ internal sealed class PdfPageService : IPdfPageService
                 }
             },
             cancellationToken);
+    }
+
+    // PDFsharp's closure walk throws NullReferenceException when a page key (e.g. /Rotate) is an
+    // indirect non-container object. Inline those values on the page before importing it.
+    private static PdfPage AddPageSafe(PdfDocument output, PdfPage page)
+    {
+        foreach (var key in page.Elements.Keys.ToList())
+        {
+            if (page.Elements[key] is not PdfReference { Value: { } target } || target is PdfDictionary or PdfArray)
+                continue;
+            switch (target)
+            {
+                case PdfIntegerObject i: page.Elements[key] = new PdfInteger(i.Value); break;
+                case PdfRealObject r: page.Elements[key] = new PdfReal(r.Value); break;
+                case PdfBooleanObject b: page.Elements[key] = new PdfBoolean(b.Value); break;
+                default: page.Elements.Remove(key); break;
+            }
+        }
+
+        return output.AddPage(page);
     }
 
     private static PdfDocument OpenImport(byte[] bytes)

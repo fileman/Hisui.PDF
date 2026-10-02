@@ -19,6 +19,36 @@ public class PdfPageServiceTests
     }
 
     [Fact]
+    public async Task Merge_HandlesIndirectNonContainerPageKey()
+    {
+        // /Rotate points at an indirect integer object, which PDFsharp's closure walk can't handle natively.
+        string[] objs =
+        [
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Rotate 4 0 R >>",
+            "90",
+        ];
+        var sb = new System.Text.StringBuilder("%PDF-1.4\n");
+        var offsets = new List<int>();
+        for (var n = 0; n < objs.Length; n++)
+        {
+            offsets.Add(sb.Length);
+            sb.Append($"{n + 1} 0 obj\n{objs[n]}\nendobj\n");
+        }
+
+        var xref = sb.Length;
+        sb.Append($"xref\n0 {objs.Length + 1}\n0000000000 65535 f \n");
+        foreach (var o in offsets)
+            sb.Append($"{o:D10} 00000 n \n");
+        sb.Append($"trailer\n<< /Size {objs.Length + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n");
+
+        var merged = await _sut.MergeAsync([System.Text.Encoding.ASCII.GetBytes(sb.ToString())]);
+
+        Assert.Equal(1, await _sut.GetPageCountAsync(merged));
+    }
+
+    [Fact]
     public async Task Merge_ConcatenatesAllPages()
     {
         var a = PdfFixtureBuilder.Create(2);
