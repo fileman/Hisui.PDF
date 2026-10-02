@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
 using Avalonia;
@@ -20,14 +21,19 @@ public partial class MainWindow : Window
     private readonly ISignatureService _signatures;
     private readonly IPrintService _print;
     private readonly IPdfRenderer _renderer;
+    private readonly IUpdateService _updates;
+    private readonly ISettingsService _settings;
 
-    public MainWindow(MainViewModel viewModel, ISignatureService signatures, IPrintService print, IPdfRenderer renderer)
+    public MainWindow(MainViewModel viewModel, ISignatureService signatures, IPrintService print, IPdfRenderer renderer,
+        IUpdateService updates, ISettingsService settings)
     {
         InitializeComponent();
         DataContext = viewModel;
         _signatures = signatures;
         _print = print;
         _renderer = renderer;
+        _updates = updates;
+        _settings = settings;
 
         // Lets the view model prompt for a password when opening an encrypted PDF.
         viewModel.RequestPasswordAsync = async () =>
@@ -149,6 +155,10 @@ public partial class MainWindow : Window
         }
         flyout.Items.Add(theme);
         flyout.Items.Add(new Separator());
+
+        var updates = new MenuItem { Header = loc["Menu.CheckUpdates"] };
+        updates.Click += async (_, _) => await CheckForUpdatesAsync(manual: true);
+        flyout.Items.Add(updates);
 
         var info = new MenuItem { Header = loc["Menu.About"] };
         info.Click += OnAboutClick;
@@ -329,6 +339,54 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
+    // ── Updates ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Asks GitHub for the latest release and, if it is newer, offers to open its download page.
+    /// A startup check stays silent unless there is something new; a manual check always reports.
+    /// </summary>
+    public async Task CheckForUpdatesAsync(bool manual)
+    {
+        try
+        {
+            if (DataContext is not MainViewModel vm) return;
+
+            var update = await _updates.CheckForUpdateAsync();
+            if (update is null)
+            {
+                if (manual) vm.StatusMessage = Localizer.Instance["Update.UpToDate"];
+                return;
+            }
+
+            var settings = _settings;
+            if (!manual && settings.Settings.SkippedUpdateTag == update.Tag) return;
+
+            var choice = await new UpdateDialog(update, _updates.CurrentVersion).ShowDialog<UpdateChoice>(this);
+            switch (choice)
+            {
+                case UpdateChoice.Download:
+                    // Windows: fetch the MSI and hand it to Windows Installer (MajorUpgrade replaces this build).
+                    if (OperatingSystem.IsWindows() && update.MsiUrl is not null
+                        && await _updates.DownloadInstallerAsync(update) is { } msi)
+                    {
+                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\"") { UseShellExecute = true });
+                        Close();
+                    }
+                    else
+                        Process.Start(new ProcessStartInfo(update.Url) { UseShellExecute = true });
+                    break;
+                case UpdateChoice.Skip:
+                    settings.Settings.SkippedUpdateTag = update.Tag;
+                    settings.Save();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (manual && DataContext is MainViewModel vm) vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
         }
     }
 

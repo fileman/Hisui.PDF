@@ -51,6 +51,7 @@ jobs:
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:EnableCompressionInSingleFile=true \
+            -p:Version="${VERSION#v}" \
             -p:DebugType=none \
             -p:DebugSymbols=false \
             -o "publish/${{ matrix.rid }}"
@@ -74,11 +75,24 @@ jobs:
           Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath "$name.zip"
           "ASSET=$name.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      # Unsigned MSI: the in-app updater downloads and runs it (MajorUpgrade replaces the old build).
+      - name: Build MSI
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          # MSI versions are numeric x.y.z: drop any -beta suffix
+          $v = ($env:VERSION.TrimStart('v') -split '-')[0]
+          dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v"
+          dotnet build src/Hisui.Pdf.Installer.Win/Hisui.Pdf.Installer.Win.wixproj -c Release -p:Version="$v"
+          "MSI=bin/installer/HisuiPDF-$v-win-x64.msi" | Out-File -FilePath $env:GITHUB_ENV -Append
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.rid }}
-          path: ${{ env.ASSET }}
+          path: |
+            ${{ env.ASSET }}
+            ${{ env.MSI }}
           retention-days: 5
 
   release:
@@ -102,7 +116,7 @@ jobs:
           ### Downloads
           | Platform | File |
           |---|---|
-          | Windows x64 | `Hisui.Pdf-__VERSION__-win-x64.zip` |
+          | Windows x64 | `Hisui.Pdf-__VERSION__-win-x64.zip` or installer `HisuiPDF-__VERSION__-win-x64.msi` (needed by in-app updates) |
           | Linux x64 | `Hisui.Pdf-__VERSION__-linux-x64.tar.gz` |
           | macOS (Intel) | `Hisui.Pdf-__VERSION__-osx-x64.tar.gz` |
           | macOS (Apple Silicon) | `Hisui.Pdf-__VERSION__-osx-arm64.tar.gz` |
@@ -124,7 +138,8 @@ jobs:
           if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$VERSION" dist/* \
+            pre=""; [[ "$VERSION" == *-* ]] && pre="--prerelease"
+            gh release create "$VERSION" dist/* $pre \
               --repo "$GITHUB_REPOSITORY" \
               --title "Hisui PDF $VERSION" \
               --notes-file notes.md
