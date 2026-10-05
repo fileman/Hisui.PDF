@@ -164,3 +164,22 @@ jobs:
               --title "Hisui PDF $VERSION" \
               --notes-file notes.md
           fi
+
+  # Submits stable releases to winget. Enable after the package's first manual submission:
+  #   wingetcreate new <MSI release URL>   (id Fileman.HisuiPDF)
+  # then set repo variable WINGET_ENABLED=true and secret WINGET_TOKEN (classic PAT, public_repo).
+  winget:
+    name: Submit to winget
+    needs: [version, release]
+    if: ${{ vars.WINGET_ENABLED == 'true' && !contains(github.event.inputs.version || github.ref_name, '-') }}
+    runs-on: windows-latest
+    steps:
+      - name: wingetcreate update
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          BUILD_VERSION: ${{ needs.version.outputs.ver }}
+        run: |
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:VERSION/HisuiPDF-$env:BUILD_VERSION-win-x64.msi"
+          ./wingetcreate.exe update Fileman.HisuiPDF --version $env:BUILD_VERSION --urls $url --submit --token $env:WINGET_TOKEN
