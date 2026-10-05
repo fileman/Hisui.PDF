@@ -92,8 +92,7 @@ jobs:
           Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath "$name.zip"
           "ASSET=$name.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      # The in-app updater downloads and runs the MSI (MajorUpgrade replaces the old build).
-      # Signed via SignPath when SIGNPATH_* are configured, otherwise left unsigned.
+      # Unsigned MSI: the in-app updater downloads and runs it (MajorUpgrade replaces the old build).
       - name: Build MSI
         if: matrix.rid == 'win-x64'
         shell: pwsh
@@ -106,32 +105,6 @@ jobs:
           # copy to the root so upload-artifact doesn't keep the bin/installer/ directory structure
           Copy-Item "bin/installer/HisuiPDF-$v-win-x64.msi" .
           "MSI=HisuiPDF-$v-win-x64.msi" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Upload unsigned MSI for signing
-        id: unsigned
-        if: matrix.rid == 'win-x64' && vars.SIGNPATH_ORGANIZATION_ID != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-msi
-          path: ${{ env.MSI }}
-          retention-days: 1
-
-      - name: Sign MSI (SignPath Foundation)
-        if: steps.unsigned.outcome == 'success'
-        uses: signpath/github-action-submit-signing-request@v1
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: hisui-pdf
-          signing-policy-slug: release-signing
-          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: signed
-
-      - name: Use signed MSI
-        if: steps.unsigned.outcome == 'success'
-        shell: pwsh
-        run: Copy-Item (Get-ChildItem signed -Recurse -Filter *.msi | Select-Object -First 1).FullName $env:MSI -Force
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -191,3 +164,22 @@ jobs:
               --title "Hisui PDF $VERSION" \
               --notes-file notes.md
           fi
+
+  # Submits stable releases to winget. Enable after the package's first manual submission:
+  #   wingetcreate new <MSI release URL>   (id Fileman.HisuiPDF)
+  # then set repo variable WINGET_ENABLED=true and secret WINGET_TOKEN (classic PAT, public_repo).
+  winget:
+    name: Submit to winget
+    needs: [version, release]
+    if: ${{ vars.WINGET_ENABLED == 'true' && !contains(github.event.inputs.version || github.ref_name, '-') }}
+    runs-on: windows-latest
+    steps:
+      - name: wingetcreate update
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          BUILD_VERSION: ${{ needs.version.outputs.ver }}
+        run: |
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:VERSION/HisuiPDF-$env:BUILD_VERSION-win-x64.msi"
+          ./wingetcreate.exe update Fileman.HisuiPDF --version $env:BUILD_VERSION --urls $url --submit --token $env:WINGET_TOKEN

@@ -21,7 +21,7 @@ binaries are self-contained, so **no .NET install is required**.
 
 `X.Y` comes from the release tag, `N` is the commit count of the tagged build.
 
-On Windows run the MSI (once SignPath signing is active it is signed; unsigned builds make SmartScreen/UAC warn), or unpack
+On Windows run the MSI (it is unsigned, so SmartScreen/UAC will warn), or unpack
 the zip. On Linux/macOS unpack the archive and run `Hisui.Pdf.App`. On macOS the
 binary is unsigned, so on first launch right-click → *Open* (or run
 `xattr -dr com.apple.quarantine Hisui.Pdf.App`).
@@ -128,12 +128,3 @@ Hisui PDF is released under the [MIT License](LICENSE).
 It bundles third-party components under permissive licenses (MIT, Apache-2.0,
 BSD-3-Clause) and the Inter font (SIL OFL 1.1). See
 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) for the full attributions.
-
-### Code signing policy
-
-Windows installers are signed with a certificate provided by
-[SignPath.io](https://signpath.io), certificate by
-[SignPath Foundation](https://signpath.org). Signing happens only in the GitHub
-Actions *Release* workflow, on builds from this repository's `v*` tags.
-This program does not transmit any information to other networked systems
-except the update check against GitHub Releases.
