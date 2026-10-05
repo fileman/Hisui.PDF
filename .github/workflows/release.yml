@@ -3,26 +3,26 @@ name: Release
 # Builds self-contained, single-file executables for Windows, Linux and macOS
 # and publishes them as downloadable assets on a GitHub Release.
 #
-# Trigger: push a version tag, e.g.
-#   git tag v1.0.0 && git push origin v1.0.0
-# Or run manually from the Actions tab (workflow_dispatch) with a version input.
+# Trigger: run manually from the Actions tab (workflow_dispatch) on the branch to release,
+# giving X.Y (e.g. 0.1). The workflow computes X.Y.<commit count> and creates the
+# tag vX.Y.<commit count> on that commit when it publishes the release.
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag to release (e.g. v1.0.0)'
+        description: 'Major.minor to release (e.g. 0.1); the patch number is the commit count'
         required: true
+      prerelease:
+        description: 'Publish as pre-release (not offered by the updater, not sent to winget)'
+        type: boolean
+        default: false
 
 env:
   PROJECT: src/Hisui.Pdf.App/Hisui.Pdf.App.csproj
-  VERSION: ${{ github.event.inputs.version || github.ref_name }}
 
 jobs:
-  # Every artifact (app, MSI, archives) is versioned X.Y.<commit count>, X.Y taken from the tag.
+  # Every artifact (app, MSI, archives) and the tag are versioned X.Y.<commit count>.
   version:
     runs-on: ubuntu-latest
     outputs:
@@ -32,9 +32,11 @@ jobs:
         with:
           fetch-depth: 0 # full history for the commit count
       - id: v
+        env:
+          XY: ${{ github.event.inputs.version }}
         run: |
-          xy="${VERSION#v}"; xy="${xy%%-*}"; xy="${xy%.*}"
-          echo "ver=$xy.$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          [[ "$XY" =~ ^[0-9]+\.[0-9]+$ ]] || { echo "version input must be X.Y"; exit 1; }
+          echo "ver=$XY.$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.rid }}
@@ -155,13 +157,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          tag="v${{ needs.version.outputs.ver }}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            pre=""; [[ "$VERSION" == *-* ]] && pre="--prerelease"
-            gh release create "$VERSION" dist/* $pre \
+            pre=""; [[ "${{ github.event.inputs.prerelease }}" == "true" ]] && pre="--prerelease"
+            gh release create "$tag" dist/* $pre --target "$GITHUB_SHA" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "Hisui PDF $VERSION" \
+              --title "Hisui PDF $tag" \
               --notes-file notes.md
           fi
 
@@ -171,7 +174,7 @@ jobs:
   winget:
     name: Submit to winget
     needs: [version, release]
-    if: ${{ vars.WINGET_ENABLED == 'true' && !contains(github.event.inputs.version || github.ref_name, '-') }}
+    if: ${{ vars.WINGET_ENABLED == 'true' && github.event.inputs.prerelease != 'true' }}
     runs-on: windows-latest
     steps:
       - name: wingetcreate update
@@ -181,5 +184,5 @@ jobs:
           BUILD_VERSION: ${{ needs.version.outputs.ver }}
         run: |
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:VERSION/HisuiPDF-$env:BUILD_VERSION-win-x64.msi"
+          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$env:BUILD_VERSION/HisuiPDF-$env:BUILD_VERSION-win-x64.msi"
           ./wingetcreate.exe update Fileman.HisuiPDF --version $env:BUILD_VERSION --urls $url --submit --token $env:WINGET_TOKEN

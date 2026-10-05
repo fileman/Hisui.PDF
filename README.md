@@ -19,15 +19,14 @@ binaries are self-contained, so **no .NET install is required**.
 | macOS (Intel) | `Hisui.Pdf-vX.Y.N-osx-x64.tar.gz` |
 | macOS (Apple Silicon) | `Hisui.Pdf-vX.Y.N-osx-arm64.tar.gz` |
 
-`X.Y` comes from the release tag, `N` is the commit count of the tagged build.
+The release tag is `vX.Y.N`: `X.Y` is chosen when releasing, `N` is the commit count of the released build.
 
 On Windows run the MSI (it is unsigned, so SmartScreen/UAC will warn), or unpack
 the zip. On Linux/macOS unpack the archive and run `Hisui.Pdf.App`. On macOS the
 binary is unsigned, so on first launch right-click → *Open* (or run
 `xattr -dr com.apple.quarantine Hisui.Pdf.App`).
 
-Releases whose tag has a suffix (e.g. `v0.1.0-beta4`) are published as
-pre-releases.
+Releases started with the *prerelease* option are published as pre-releases.
 
 ### Updates
 
@@ -98,11 +97,8 @@ dotnet test Hisui.Pdf.slnx
 
 Installer/package scripts live in `build/`: `package-msi.ps1` (signed MSI via
 WiX), `package-win.ps1`, `package-linux.sh`, `package-osx.sh`. Releases are built
-by the GitHub Actions *Release* workflow when a `v*` tag is pushed:
-
-```bash
-git tag v0.1.0 && git push origin v0.1.0
-```
+by the GitHub Actions *Release* workflow, started manually from the Actions tab
+(or `gh workflow run release.yml -f version=0.1`). It creates the `vX.Y.N` tag itself.
 
 ### OCR setup
 
