@@ -75,6 +75,28 @@ public partial class AnnotationInputDialog : Window
                 if (initialText is not null) SetText("AnnotTextBox", initialText);
                 break;
 
+            case AnnotationTool.FormText:
+            case AnnotationTool.FormCheckBox:
+                Show("FieldNameSection");
+                break;
+
+            case AnnotationTool.FormSignature:
+                Show("FieldNameSection");
+                break;
+
+            case AnnotationTool.FormRadio:
+                Show("FieldNameSection");
+                Show("TextSection");
+                SetText("TextLabel", Localizer.Instance["Label.RadioChoice"]);
+                break;
+
+            case AnnotationTool.FormComboBox:
+            case AnnotationTool.FormListBox:
+                Show("FieldNameSection");
+                Show("TextSection");
+                SetText("TextLabel", Localizer.Instance["Label.ComboOptions"]);
+                break;
+
             case AnnotationTool.ImageOverlay:
                 Show("ImageSection");
                 break;
@@ -146,6 +168,7 @@ public partial class AnnotationInputDialog : Window
         {
             Tool = _tool,
             Text = text,
+            FieldName = GetText("FieldNameBox"),
             ColorHex = colorHex,
             FillHex = fillHex,
             Opacity = opacity,
@@ -159,7 +182,8 @@ public partial class AnnotationInputDialog : Window
 
     private static bool RequiresText(AnnotationTool tool) => tool is
         AnnotationTool.FreeText or AnnotationTool.StickyNote or
-        AnnotationTool.TextEdit or AnnotationTool.Watermark;
+        AnnotationTool.TextEdit or AnnotationTool.Watermark or
+        AnnotationTool.FormComboBox or AnnotationTool.FormListBox;
 
     private void ShowError(string message)
     {
@@ -241,6 +265,12 @@ public partial class AnnotationInputDialog : Window
         AnnotationTool.TextEdit     => "DialogTool.TextEdit",
         AnnotationTool.ImageOverlay => "DialogTool.ImageOverlay",
         AnnotationTool.Watermark    => "DialogTool.Watermark",
+        AnnotationTool.FormText     => "DialogTool.FormText",
+        AnnotationTool.FormCheckBox => "DialogTool.FormCheckBox",
+        AnnotationTool.FormComboBox => "DialogTool.FormComboBox",
+        AnnotationTool.FormRadio    => "DialogTool.FormRadio",
+        AnnotationTool.FormListBox  => "DialogTool.FormListBox",
+        AnnotationTool.FormSignature => "DialogTool.FormSignature",
         _                           => "DialogTool.Default",
     }];
 
@@ -253,6 +283,9 @@ public partial class AnnotationInputDialog : Window
         AnnotationTool.TextEdit     => Localizer.Instance["Hint.TextEdit"],
         AnnotationTool.ImageOverlay => Localizer.Instance["Hint.ImageOverlay"],
         AnnotationTool.Watermark    => Localizer.Instance["Hint.Watermark"],
+        AnnotationTool.FormText or AnnotationTool.FormCheckBox or AnnotationTool.FormComboBox or
+        AnnotationTool.FormRadio or AnnotationTool.FormListBox or AnnotationTool.FormSignature
+                                    => Localizer.Instance["Hint.FormField"],
         _                           => string.Empty,
     };
 }

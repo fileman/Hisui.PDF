@@ -27,6 +27,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly ISettingsService _settings;
     private readonly IPdfAnnotationService _annotations;
+    private readonly IPdfFormService _forms;
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
@@ -50,6 +51,7 @@ public partial class MainViewModel : ObservableObject
         IFileDialogService dialogs,
         ISettingsService settings,
         IPdfAnnotationService annotations,
+        IPdfFormService forms,
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
@@ -66,6 +68,7 @@ public partial class MainViewModel : ObservableObject
         _dialogs = dialogs;
         _settings = settings;
         _annotations = annotations;
+        _forms = forms;
         _textEdit = textEdit;
         _textExtractor = textExtractor;
         _ocr = ocr;

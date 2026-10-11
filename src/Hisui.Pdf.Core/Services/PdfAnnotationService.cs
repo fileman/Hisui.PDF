@@ -28,11 +28,12 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyAllPages(pdf, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             var color = ColorWithAlpha(options.ColorHex, options.Opacity);
             var font = new XFont("Arial", options.FontSizePoints);
             var brush = new XSolidBrush(color);
-            var center = new XPoint(page.Width.Point / 2, page.Height.Point / 2);
+            var (vw, vh) = PageGeometry.VisualSize(page);
+            var center = new XPoint(vw / 2, vh / 2);
 
             gfx.Save();
             gfx.RotateAtTransform(options.RotationDegrees, center);
@@ -47,7 +48,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             var brush = new XSolidBrush(ColorWithAlpha(colorHex, opacity));
             gfx.DrawRectangle(brush, ToXRect(rect, page));
         }), ct);
@@ -59,7 +60,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             var pen = new XPen(ParseColor(strokeHex), lineWidthPoints);
             var xRect = ToXRect(rect, page);
 
@@ -77,7 +78,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             var xRect = ToXRect(rect, page);
             var font = new XFont("Arial", fontSizePoints);
             var brush = new XSolidBrush(ParseColor(colorHex));
@@ -103,12 +104,13 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
 
-            var noteW = page.Width.Point * 0.18;
-            var noteH = page.Height.Point * 0.10;
-            var noteX = normalizedX * page.Width.Point - noteW / 2;
-            var noteY = normalizedY * page.Height.Point - noteH / 2;
+            var (vw, vh) = PageGeometry.VisualSize(page);
+            var noteW = vw * 0.18;
+            var noteH = vh * 0.10;
+            var noteX = normalizedX * vw - noteW / 2;
+            var noteY = normalizedY * vh - noteH / 2;
             var noteRect = new XRect(noteX, noteY, noteW, noteH);
 
             gfx.DrawRectangle(
@@ -130,7 +132,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             using var imgStream = new MemoryStream(imageBytes);
             var xImg = XImage.FromStream(imgStream);
             try
@@ -175,8 +177,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
     private static XRect ToXRect(PdfRect rect, PdfPage page)
     {
-        var w = page.Width.Point;
-        var h = page.Height.Point;
+        var (w, h) = PageGeometry.VisualSize(page);
         return new XRect(rect.Left * w, rect.Top * h, rect.Width * w, rect.Height * h);
     }
 

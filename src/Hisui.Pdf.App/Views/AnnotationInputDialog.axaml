@@ -49,6 +49,12 @@
                 <TextBlock Name="ErrorLabel" Classes="error-text" />
             </Border>
 
+            <!-- Field name — form tools -->
+            <StackPanel Name="FieldNameSection" IsVisible="False">
+                <TextBlock Classes="caption" Text="{loc:Tr Label.FieldName}" />
+                <TextBox Name="FieldNameBox" PlaceholderText="{loc:Tr Label.FieldName.Auto}" />
+            </StackPanel>
+
             <!-- Text input — FreeText, StickyNote, Watermark, TextEdit -->
             <StackPanel Name="TextSection" IsVisible="False">
                 <TextBlock Name="TextLabel" Classes="caption" Text="{loc:Tr Label.Text}" />

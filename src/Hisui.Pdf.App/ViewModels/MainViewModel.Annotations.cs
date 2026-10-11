@@ -25,9 +25,8 @@ public partial class MainViewModel
 
     partial void OnRibbonTabChanged(RibbonTab value)
     {
-        // The annotation overlay only belongs on the Annota tab.
-        if (value != RibbonTab.Annota)
-            ActiveTool = AnnotationTool.None;
+        // Each tab has its own tool set; never carry a tool over.
+        ActiveTool = AnnotationTool.None;
     }
 
     /// <summary>Header for the thumbnail panel, e.g. "Pagine · 6".</summary>
@@ -78,26 +77,25 @@ public partial class MainViewModel
     public bool IsAnnotationActive => ActiveTool != AnnotationTool.None;
 
     /// <summary>
-    /// True when a tool is active and the page is shown unrotated. The annotation canvas is not
-    /// rotated with the preview, so coordinates only map to PDF space at 0°.
+    /// True when a tool is active and can be used on the page as shown. The annotation canvas is rotated
+    /// together with the preview, so its local coordinates always address the page as rendered.
     /// </summary>
-    public bool CanAnnotate => IsAnnotationActive && PreviewRotationAngle == 0;
+    /// <summary>The selected page's on-screen (session) rotation in clockwise degrees: 0/90/180/270.</summary>
+    private int PageTurns => ((int)PreviewRotationAngle % 360 + 360) % 360;
 
-    /// <summary>True when a tool is active but the page is rotated — annotation is blocked.</summary>
-    public bool ShowRotationHint => IsAnnotationActive && PreviewRotationAngle != 0;
+    public bool CanAnnotate => IsAnnotationActive;
 
     partial void OnActiveToolChanged(AnnotationTool value)
     {
         IsDragging = false;
         DragRect = default;
+        OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
-        OnPropertyChanged(nameof(ShowRotationHint));
     }
 
     partial void OnPreviewRotationAngleChanged(double value)
     {
         OnPropertyChanged(nameof(CanAnnotate));
-        OnPropertyChanged(nameof(ShowRotationHint));
         RecomputeHighlights(); // search highlights only render at 0°
     }
 
@@ -181,7 +179,8 @@ public partial class MainViewModel
             try
             {
                 var current = await _pageService.BuildFromSessionAsync(_session!, ct);
-                var text = await _ocr.RecognizeRegionAsync(current, pageIndex, region, options: null, ct);
+                // The region is in the unrotated-preview space; the built document has the page rotation baked in.
+                var text = await _ocr.RecognizeRegionAsync(current, pageIndex, region.RotateClockwise(PageTurns), options: null, ct);
                 if (text.Length == 0) { StatusMessage = _loc["Status.OcrSelectionEmpty"]; return; }
                 if (GetMainWindow()?.Clipboard is { } cb) await cb.SetTextAsync(text);
                 StatusMessage = _loc.Format("Status.OcrSelectionCopied", text.Length);
@@ -282,6 +281,27 @@ public partial class MainViewModel
                 AnnotationTool.Signature when model.ImageBytes is not null =>
                     await _annotations.AddImageOverlayAsync(source, srcIdx,
                         model.ImageBytes, model.Rect, ct),
+
+                AnnotationTool.FormText =>
+                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.Text, model.FieldName, null, ct),
+
+                AnnotationTool.FormCheckBox =>
+                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.CheckBox, model.FieldName, null, ct),
+
+                AnnotationTool.FormComboBox =>
+                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.ComboBox, model.FieldName,
+                        model.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), ct),
+
+                AnnotationTool.FormRadio =>
+                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.RadioButton, model.FieldName,
+                        string.IsNullOrWhiteSpace(model.Text) ? null : [model.Text], ct),
+
+                AnnotationTool.FormListBox =>
+                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.ListBox, model.FieldName,
+                        model.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), ct),
+
+                AnnotationTool.FormSignature =>
+                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.Signature, model.FieldName, null, ct),
 
                 _ => source, // Watermark is handled by AddWatermarkAsync (document-wide).
             };

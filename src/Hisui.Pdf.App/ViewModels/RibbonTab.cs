@@ -5,4 +5,5 @@ public enum RibbonTab
 {
     Home,
     Annota,
+    Forms,
 }
