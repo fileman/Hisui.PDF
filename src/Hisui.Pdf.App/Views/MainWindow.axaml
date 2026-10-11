@@ -14,7 +14,8 @@
          are handled in code-behind (they target the view, not a VM command). -->
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
-        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveAsCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
         <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
         <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
         <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding ZoomInCommand}" />
@@ -50,6 +51,12 @@
         <StreamGeometry x:Key="IconHighlight">M5 11l6-6 3 3-6 6H5z M3 14h10</StreamGeometry>
         <StreamGeometry x:Key="IconRectangle">M3 4h10v8H3z</StreamGeometry>
         <StreamGeometry x:Key="IconFreeText">M4 4h8 M8 4v9</StreamGeometry>
+        <StreamGeometry x:Key="IconFormText">M2 4h12v8H2z M5 6v4</StreamGeometry>
+        <StreamGeometry x:Key="IconFormCheckBox">M3 3h10v10H3z M5.5 8l2 2l3.5-4</StreamGeometry>
+        <StreamGeometry x:Key="IconFormComboBox">M2 4h12v8H2z M9.5 7l2 2l2-2</StreamGeometry>
+        <StreamGeometry x:Key="IconDetectFields">M2 5V2h3 M11 2h3v3 M14 11v3h-3 M5 14H2v-3 M5 8h6</StreamGeometry>
+        <StreamGeometry x:Key="IconFormRadio">M8 2.5a5.5 5.5 0 1 0 .01 0z M8 6a2 2 0 1 0 .01 0z</StreamGeometry>
+        <StreamGeometry x:Key="IconFormListBox">M2.5 2.5h11v11h-11z M5 5.5h6 M5 8h6 M5 10.5h6</StreamGeometry>
         <StreamGeometry x:Key="IconStickyNote">M3 3h7l3 3v7H3z M10 3v3h3</StreamGeometry>
         <StreamGeometry x:Key="IconTextEdit">M3 13h6 M12 3l1.5 1.5-7 7-2 .5 .5-2z</StreamGeometry>
         <StreamGeometry x:Key="IconImage">M2.5 4h11v8h-11z M5 10l2.5-2.5 2 2 3-3 1 1 M6 7a.8 .8 0 1 0 .01 0</StreamGeometry>
@@ -224,6 +231,8 @@
             <Setter Property="Padding" Value="0" />
         </Style>
         <Style Selector="ListBox.thumbs ListBoxItem">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Top" />
             <Setter Property="Padding" Value="5" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="CornerRadius" Value="5" />
@@ -290,6 +299,8 @@
                                      IsChecked="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Home, Mode=TwoWay}" />
                         <RadioButton Classes="ribbon-tab" GroupName="RibbonTabs" Content="{loc:Tr Ribbon.Tab.Annotate}"
                                      IsChecked="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Annota, Mode=TwoWay}" />
+                        <RadioButton Classes="ribbon-tab" GroupName="RibbonTabs" Content="{loc:Tr Ribbon.Tab.Forms}"
+                                     IsChecked="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Forms, Mode=TwoWay}" />
                     </StackPanel>
 
                     <!-- Find-in-document bar -->
@@ -352,10 +363,10 @@
                                             <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
                                         </StackPanel>
                                     </Button>
-                                    <Button Classes="ribbon-small" Command="{Binding SaveAsCommand}" ToolTip.Tip="{loc:Tr Cmd.SaveAs.Tooltip}">
+                                    <Button Classes="ribbon-small" Command="{Binding SaveCommand}" ToolTip.Tip="{loc:Tr Cmd.Save.Tooltip}">
                                         <StackPanel Orientation="Horizontal" Spacing="7">
                                             <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconSave}" />
-                                            <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.SaveAs}" />
+                                            <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Save}" />
                                         </StackPanel>
                                     </Button>
                                     <Button Classes="ribbon-small" Click="OnPrintClick" IsEnabled="{Binding IsDocumentLoaded}"
@@ -493,6 +504,68 @@
                             </StackPanel>
                         </DockPanel>
 
+                    </StackPanel>
+
+                    <!-- FORMS -->
+                    <StackPanel Orientation="Horizontal" Margin="12,0" VerticalAlignment="Center" Spacing="2"
+                                IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Forms}">
+                        <Button Classes="ribbon-small" Command="{Binding DetectFormFieldsCommand}" ToolTip.Tip="{loc:Tr Tool.DetectFields.Tooltip}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDetectFields}" />
+                                <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.DetectFields}" />
+                            </StackPanel>
+                        </Button>
+                        <Border Width="1" Background="{DynamicResource RibbonDividerBrush}" Margin="8,6" />
+                        <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormText.Tooltip}"
+                                     IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormText, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormText}" />
+                                <TextBlock Text="{loc:Tr Tool.FormText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormCheckBox.Tooltip}"
+                                     IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormCheckBox, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormCheckBox}" />
+                                <TextBlock Text="{loc:Tr Tool.FormCheckBox}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormRadio.Tooltip}"
+                                     IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormRadio, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormRadio}" />
+                                <TextBlock Text="{loc:Tr Tool.FormRadio}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormComboBox.Tooltip}"
+                                     IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormComboBox, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormComboBox}" />
+                                <TextBlock Text="{loc:Tr Tool.FormComboBox}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormListBox.Tooltip}"
+                                     IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormListBox, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormListBox}" />
+                                <TextBlock Text="{loc:Tr Tool.FormListBox}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormSignature.Tooltip}"
+                                     IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormSignature, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconSignature}" />
+                                <TextBlock Text="{loc:Tr Tool.FormSignature}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <Border Width="1" Background="{DynamicResource RibbonDividerBrush}" Margin="8,6" />
+                        <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
+                                IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="glyph" Width="13" Height="13" Data="M1 1l9 9M10 1l-9 9" />
+                                <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Clear}" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
                     <!-- ANNOTA -->
@@ -644,7 +717,7 @@
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="2" />
+                                    <WrapPanel Orientation="Horizontal" />
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
@@ -696,7 +769,11 @@
                             <ItemsControl x:Name="HighlightLayer" ItemsSource="{Binding Highlights}"
                                           HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False"
                                           Width="{Binding #PreviewImageControl.Bounds.Width}"
-                                          Height="{Binding #PreviewImageControl.Bounds.Height}">
+                                          Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                          RenderTransformOrigin="50%,50%">
+                                <ItemsControl.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </ItemsControl.RenderTransform>
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <Canvas />
@@ -725,7 +802,11 @@
                                     Height="{Binding #PreviewImageControl.Bounds.Height}"
                                     IsVisible="{Binding CanAnnotate}"
                                     IsEnabled="{Binding CanAnnotate}"
+                                    RenderTransformOrigin="50%,50%"
                                     ToolTip.Tip="{loc:Tr Annotate.CanvasTooltip}">
+                                <Canvas.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </Canvas.RenderTransform>
                                 <Rectangle IsVisible="{Binding IsDragging}"
                                            Canvas.Left="{Binding DragRect.X}"
                                            Canvas.Top="{Binding DragRect.Y}"
@@ -735,14 +816,6 @@
                                            StrokeDashArray="4,4" Fill="{DynamicResource RibbonAccentSoftBrush}" />
                             </Canvas>
 
-                            <Border IsVisible="{Binding ShowRotationHint}"
-                                    VerticalAlignment="Top" HorizontalAlignment="Center"
-                                    Background="#E6263238" CornerRadius="4"
-                                    Padding="14,8" Margin="0,12,0,0">
-                                <TextBlock Foreground="White" FontSize="12" TextWrapping="Wrap"
-                                           MaxWidth="380" TextAlignment="Center"
-                                           Text="{loc:Tr Annotate.RotationHint}" />
-                            </Border>
                         </Grid>
                     </ScrollViewer>
 

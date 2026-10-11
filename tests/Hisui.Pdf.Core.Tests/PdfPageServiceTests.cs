@@ -141,4 +141,28 @@ public class PdfPageServiceTests
         using var doc = PdfReader.Open(new MemoryStream(pdf), PdfDocumentOpenMode.Import);
         return [.. Enumerable.Range(0, doc.PageCount).Select(i => doc.Pages[i].Rotate)];
     }
+
+    [Fact]
+    public async Task BuildFromSession_NamesTheAppAsProducerAndKeepsDescriptiveMetadata()
+    {
+        byte[] source;
+        using (var doc = new PdfSharp.Pdf.PdfDocument())
+        {
+            doc.AddPage();
+            doc.Info.Title = "Contratto";
+            doc.Info.Author = "Ada";
+            doc.Info.Creator = "Word";
+            using var ms = new MemoryStream();
+            doc.Save(ms);
+            source = ms.ToArray();
+        }
+        var session = new PdfDocumentSession();
+        session.AddSource(source, 1);
+
+        var built = await new PdfPageService().BuildFromSessionAsync(session);
+
+        using var read = PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(built), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+        Assert.Contains("Hisui PDF", read.Info.Producer);
+        Assert.Equal(("Contratto", "Ada", "Word"), (read.Info.Title, read.Info.Author, read.Info.Creator));
+    }
 }

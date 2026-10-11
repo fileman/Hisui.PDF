@@ -27,6 +27,8 @@ public partial class MainViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly ISettingsService _settings;
     private readonly IPdfAnnotationService _annotations;
+    private readonly IPdfFormService _forms;
+    private readonly IPdfFormDetector _formDetector;
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
@@ -50,6 +52,8 @@ public partial class MainViewModel : ObservableObject
         IFileDialogService dialogs,
         ISettingsService settings,
         IPdfAnnotationService annotations,
+        IPdfFormService forms,
+        IPdfFormDetector formDetector,
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
@@ -66,6 +70,8 @@ public partial class MainViewModel : ObservableObject
         _dialogs = dialogs;
         _settings = settings;
         _annotations = annotations;
+        _forms = forms;
+        _formDetector = formDetector;
         _textEdit = textEdit;
         _textExtractor = textExtractor;
         _ocr = ocr;
@@ -185,6 +191,7 @@ public partial class MainViewModel : ObservableObject
             SyncPagesFromSession();
             SetOpenedFromEncrypted(wasEncrypted); // enables "remove password" only for once-encrypted files
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
+            _currentPath = path;
             _settings.AddRecentFile(path);
             RefreshRecentFilesMenu();
             await RenderThumbnailsAsync(ct);
@@ -224,18 +231,55 @@ public partial class MainViewModel : ObservableObject
         await AddExistingPathAsync(path);
     }
 
+    /// <summary>Path of the file the document was opened from or last saved to; null for a new/merged document.</summary>
+    private string? _currentPath;
+
+    /// <summary>Saves over the current file. Falls back to Save As when there is no file yet, or when the
+    /// original was password-protected (overwriting it would silently strip the protection).</summary>
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task SaveAsync()
+    {
+        if (!HasDocument) return;
+        if (_currentPath is null || _openedFromEncrypted)
+        {
+            await SaveAsAsync();
+            return;
+        }
+        await SaveToAsync(_currentPath);
+    }
+
     [RelayCommand(CanExecute = nameof(HasDocument))]
     private async Task SaveAsAsync()
     {
         if (!HasDocument) return;
 
-        var path = await _dialogs.SavePdfAsync("documento.pdf");
+        var path = await _dialogs.SavePdfAsync(_currentPath is null ? "documento.pdf" : Path.GetFileName(_currentPath));
         if (path is null) return;
+        await SaveToAsync(path);
+    }
 
+    private async Task SaveToAsync(string path)
+    {
         await RunBusyAsync(_loc["Status.Saving"], async ct =>
         {
             var bytes = await _pageService.BuildFromSessionAsync(_session!, ct);
-            await Task.Run(() => File.WriteAllBytes(path, bytes), ct);
+            // Write beside the target and swap, so a failure mid-write never leaves a truncated original.
+            await Task.Run(() =>
+            {
+                var temp = path + ".tmp";
+                try
+                {
+                    File.WriteAllBytes(temp, bytes);
+                    File.Move(temp, path, overwrite: true);
+                }
+                finally
+                {
+                    if (File.Exists(temp)) File.Delete(temp);
+                }
+            }, ct);
+
+            _currentPath = path;
+            Title = $"Hisui PDF — {Path.GetFileName(path)}";
             StatusMessage = _loc.Format("Status.Saved", Path.GetFileName(path));
         });
     }

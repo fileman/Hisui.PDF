@@ -36,6 +36,7 @@ internal sealed class PdfPageService : IPdfPageService
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     using var input = OpenImport(bytes);
+                    if (output.PageCount == 0) output.Info.CopyFrom(input.Info);
                     for (var i = 0; i < input.PageCount; i++)
                         AddPageSafe(output, input.Pages[i]);
                 }
@@ -54,6 +55,7 @@ internal sealed class PdfPageService : IPdfPageService
             {
                 using var input = OpenImport(pdf);
                 using var output = new PdfDocument();
+                output.Info.CopyFrom(input.Info);
                 foreach (var index in pageIndices)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -81,6 +83,7 @@ internal sealed class PdfPageService : IPdfPageService
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     using var output = new PdfDocument();
+                    output.Info.CopyFrom(input.Info);
                     var end = Math.Min(start + pagesPerChunk, input.PageCount);
                     for (var i = start; i < end; i++)
                         AddPageSafe(output, input.Pages[i]);
@@ -112,6 +115,7 @@ internal sealed class PdfPageService : IPdfPageService
                             importers[pageRef.SourceDocumentId] = source;
                         }
 
+                        if (output.PageCount == 0) output.Info.CopyFrom(source.Info); // metadata of the first page's document
                         var added = AddPageSafe(output, source.Pages[pageRef.SourcePageIndex]);
                         if (pageRef.Rotation != PageRotation.None)
                             added.Rotate = (added.Rotate + (int)pageRef.Rotation) % 360;
@@ -157,8 +161,9 @@ internal sealed class PdfPageService : IPdfPageService
 
     private static byte[] Save(PdfDocument document)
     {
+        AcroFormRestorer.Restore(document); // page import drops /AcroForm; keep imported widgets fillable
         using var stream = new MemoryStream();
-        document.Save(stream);
+        document.SaveStamped(stream);
         return stream.ToArray();
     }
 }

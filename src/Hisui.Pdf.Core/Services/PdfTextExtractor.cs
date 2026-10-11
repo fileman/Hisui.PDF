@@ -36,10 +36,12 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
         ArgumentNullException.ThrowIfNull(pdf);
         return Task.Run<IReadOnlyList<TextWord>>(() =>
         {
-            using var doc = PdfDocument.Open(pdf);
+            var (flat, rotations) = PageGeometry.Unrotate(pdf);
+            using var doc = PdfDocument.Open(flat);
             ValidatePage(pageIndex, doc.NumberOfPages);
 
             var page = doc.GetPage(pageIndex + 1);
+            var turn = RotationOf(rotations, pageIndex);
             var result = new List<TextWord>();
             foreach (var word in page.GetWords())
             {
@@ -48,7 +50,7 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
                 {
                     Text = word.Text,
                     PageIndex = pageIndex,
-                    BoundingBox = ToBoundingBox(word.BoundingBox, page.Width, page.Height),
+                    BoundingBox = ToBoundingBox(word.BoundingBox, page.Width, page.Height).RotateClockwise(turn),
                     FontSizePoints = word.Letters.FirstOrDefault()?.FontSize ?? 12,
                 });
             }
@@ -68,15 +70,17 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
 
         return Task.Run<IReadOnlyList<TextSearchResult>>(() =>
         {
-            using var doc = PdfDocument.Open(pdf);
+            var (flat, rotations) = PageGeometry.Unrotate(pdf);
+            using var doc = PdfDocument.Open(flat);
             var results = new List<TextSearchResult>();
 
             foreach (var page in doc.GetPages())
             {
                 ct.ThrowIfCancellationRequested();
+                var turn = RotationOf(rotations, page.Number - 1);
                 var words = page.GetWords()
                     .Where(w => !string.IsNullOrEmpty(w.Text))
-                    .Select(w => (w.Text, Box: ToBoundingBox(w.BoundingBox, page.Width, page.Height)))
+                    .Select(w => (w.Text, Box: ToBoundingBox(w.BoundingBox, page.Width, page.Height).RotateClockwise(turn)))
                     .ToList();
                 results.AddRange(FindMatches(words, page.Number - 1, needle, options));
             }
@@ -85,6 +89,9 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    private static int RotationOf(int[] rotations, int pageIndex) =>
+        (uint)pageIndex < (uint)rotations.Length ? rotations[pageIndex] : 0;
 
     /// <summary>
     /// Phrase-aware match over a page's words. The words are joined with single spaces into one searchable

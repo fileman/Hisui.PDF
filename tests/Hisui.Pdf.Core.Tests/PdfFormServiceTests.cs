@@ -1,3 +1,4 @@
+using Hisui.Pdf.Core.Model;
 using Hisui.Pdf.Core.Services;
 using Hisui.Pdf.Core.Tests.Fixtures;
 using PdfSharp.Pdf.IO;
@@ -8,6 +9,73 @@ namespace Hisui.Pdf.Core.Tests;
 public class PdfFormServiceTests
 {
     private readonly PdfFormService _sut = new(new PdfiumRenderer());
+
+    [Fact]
+    public async Task AddField_CreatesReadableFieldsOfEachType()
+    {
+        var pdf = PdfFixtureBuilder.Create(2);
+        var r = new PdfRect(0.1, 0.1, 0.5, 0.15);
+        pdf = await _sut.AddFieldAsync(pdf, 0, r, PdfFormFieldType.Text, "Name");
+        pdf = await _sut.AddFieldAsync(pdf, 1, r, PdfFormFieldType.CheckBox);
+        pdf = await _sut.AddFieldAsync(pdf, 1, r, PdfFormFieldType.ComboBox, "Pick", ["a", "b"]);
+
+        var fields = await _sut.ReadFieldsAsync(pdf);
+        Assert.Equal(["Name", "CheckBox1", "Pick"], fields.Select(f => f.Name));
+        Assert.Equal([PdfFormFieldType.Text, PdfFormFieldType.CheckBox, PdfFormFieldType.ComboBox], fields.Select(f => f.Type));
+        Assert.Equal(["a", "b"], fields[2].Options);
+
+        // Created fields are fillable and the document still renders.
+        var filled = await _sut.FillFieldsAsync(pdf, new Dictionary<string, string> { ["Name"] = "Ada", ["CheckBox1"] = "true" });
+        var read = await _sut.ReadFieldsAsync(filled);
+        Assert.Equal("Ada", read.First(f => f.Name == "Name").Value);
+        Assert.Equal("true", read.First(f => f.Name == "CheckBox1").Value);
+        Assert.NotEmpty(await new PdfiumRenderer().RenderPageToPngAsync(filled, 0, 72));
+    }
+
+    [Fact]
+    public async Task AddField_RadioGroupSharesNameAndGainsChoices()
+    {
+        var pdf = PdfFixtureBuilder.Create(1);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.1, 0.1, 0.15, 0.13), PdfFormFieldType.RadioButton, "Size", ["Small"]);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.1, 0.2, 0.15, 0.23), PdfFormFieldType.RadioButton, "Size", ["Large"]);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.5, 0.1, 0.9, 0.15), PdfFormFieldType.ListBox, "L", ["x", "y"]);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.5, 0.3, 0.9, 0.4), PdfFormFieldType.Signature);
+
+        var fields = await _sut.ReadFieldsAsync(pdf);
+        Assert.Equal(["Size", "L", "Signature1"], fields.Select(f => f.Name));
+        Assert.Equal(PdfFormFieldType.RadioButton, fields[0].Type);
+        Assert.Equal(PdfFormFieldType.ListBox, fields[1].Type);
+        Assert.Equal(["x", "y"], fields[1].Options);
+
+        // Same choice twice in a group is rejected.
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _sut.AddFieldAsync(pdf, 0, new PdfRect(0.1, 0.5, 0.15, 0.53), PdfFormFieldType.RadioButton, "Size", ["Small"]));
+        Assert.NotEmpty(await new PdfiumRenderer().RenderPageToPngAsync(pdf, 0, 72));
+    }
+
+    [Fact]
+    public async Task Fields_SurviveRebuildThroughSession_IncludingRadioGroups()
+    {
+        var pdf = PdfFixtureBuilder.Create(2);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.1, 0.1, 0.4, 0.15), PdfFormFieldType.Text, "A");
+        pdf = await _sut.AddFieldAsync(pdf, 1, new PdfRect(0.1, 0.1, 0.15, 0.13), PdfFormFieldType.RadioButton, "R", ["x"]);
+        pdf = await _sut.AddFieldAsync(pdf, 1, new PdfRect(0.1, 0.2, 0.15, 0.23), PdfFormFieldType.RadioButton, "R", ["y"]);
+
+        var session = new PdfDocumentSession();
+        session.AddSource(pdf, 2);
+        var built = await new PdfPageService().BuildFromSessionAsync(session);
+
+        var fields = await _sut.ReadFieldsAsync(built);
+        Assert.Equal(["A", "R"], fields.Select(f => f.Name));
+    }
+
+    [Fact]
+    public async Task AddField_DuplicateName_Throws()
+    {
+        var pdf = await _sut.AddFieldAsync(PdfFixtureBuilder.Create(1), 0, new PdfRect(0, 0, 0.3, 0.1), PdfFormFieldType.Text, "X");
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _sut.AddFieldAsync(pdf, 0, new PdfRect(0, 0.2, 0.3, 0.3), PdfFormFieldType.Text, "X"));
+    }
 
     [Fact]
     public async Task ReadFields_OnNonFormPdf_ReturnsEmptyList()

@@ -34,7 +34,7 @@ internal sealed class PdfTextEditService : IPdfTextEditService
                     $"Page {pageIndex} does not exist (count = {doc.PageCount}).");
 
             var page = doc.Pages[pageIndex];
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
 
             var xRect = ToXRect(wordBounds, page);
 
@@ -60,15 +60,14 @@ internal sealed class PdfTextEditService : IPdfTextEditService
             gfx.DrawString(newText, font, XBrushes.Black, new XPoint(xRect.X, xRect.Bottom), format);
 
             using var outMs = new MemoryStream();
-            doc.Save(outMs);
+            doc.SaveStamped(outMs);
             return outMs.ToArray();
         }, ct);
     }
 
     private static XRect ToXRect(PdfRect rect, PdfPage page)
     {
-        var w = page.Width.Point;
-        var h = page.Height.Point;
+        var (w, h) = PageGeometry.VisualSize(page);
         return new XRect(rect.Left * w, rect.Top * h, rect.Width * w, rect.Height * h);
     }
 }

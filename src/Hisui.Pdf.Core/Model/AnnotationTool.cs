@@ -12,4 +12,10 @@ public enum AnnotationTool
     Signature,
     Watermark,
     OcrSelection,
+    FormText,
+    FormCheckBox,
+    FormComboBox,
+    FormRadio,
+    FormListBox,
+    FormSignature,
 }
