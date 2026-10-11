@@ -60,7 +60,7 @@ internal sealed class PdfTextEditService : IPdfTextEditService
             gfx.DrawString(newText, font, XBrushes.Black, new XPoint(xRect.X, xRect.Bottom), format);
 
             using var outMs = new MemoryStream();
-            doc.Save(outMs);
+            doc.SaveStamped(outMs);
             return outMs.ToArray();
         }, ct);
     }

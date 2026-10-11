@@ -54,6 +54,22 @@ public class PdfFormServiceTests
     }
 
     [Fact]
+    public async Task Fields_SurviveRebuildThroughSession_IncludingRadioGroups()
+    {
+        var pdf = PdfFixtureBuilder.Create(2);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.1, 0.1, 0.4, 0.15), PdfFormFieldType.Text, "A");
+        pdf = await _sut.AddFieldAsync(pdf, 1, new PdfRect(0.1, 0.1, 0.15, 0.13), PdfFormFieldType.RadioButton, "R", ["x"]);
+        pdf = await _sut.AddFieldAsync(pdf, 1, new PdfRect(0.1, 0.2, 0.15, 0.23), PdfFormFieldType.RadioButton, "R", ["y"]);
+
+        var session = new PdfDocumentSession();
+        session.AddSource(pdf, 2);
+        var built = await new PdfPageService().BuildFromSessionAsync(session);
+
+        var fields = await _sut.ReadFieldsAsync(built);
+        Assert.Equal(["A", "R"], fields.Select(f => f.Name));
+    }
+
+    [Fact]
     public async Task AddField_DuplicateName_Throws()
     {
         var pdf = await _sut.AddFieldAsync(PdfFixtureBuilder.Create(1), 0, new PdfRect(0, 0, 0.3, 0.1), PdfFormFieldType.Text, "X");

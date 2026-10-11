@@ -99,7 +99,7 @@ internal sealed class PdfOcrService : IPdfOcrService
             }
 
             using var output = new MemoryStream();
-            doc.Save(output);
+            doc.SaveStamped(output);
             return output.ToArray();
         }, ct).ConfigureAwait(false);
     }

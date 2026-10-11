@@ -171,7 +171,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
     private static byte[] Save(PdfDocument doc)
     {
         using var ms = new MemoryStream();
-        doc.Save(ms);
+        doc.SaveStamped(ms);
         return ms.ToArray();
     }
 

@@ -44,7 +44,7 @@ internal sealed class PdfMetadataService : IPdfMetadataService
             if (metadata.Creator  is not null) info.Creator  = metadata.Creator;
 
             using var ms = new MemoryStream();
-            doc.Save(ms);
+            doc.SaveStamped(ms);
             return ms.ToArray();
         }, ct);
     }

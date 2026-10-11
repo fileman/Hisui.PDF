@@ -27,6 +27,9 @@ public interface IPdfFormService
     Task<byte[]> AddFieldAsync(byte[] pdf, int pageIndex, PdfRect rect, PdfFormFieldType type,
         string? name = null, IReadOnlyList<string>? options = null, CancellationToken ct = default);
 
+    /// <summary>Creates many fields in one pass (one document rewrite). Same rules as <see cref="AddFieldAsync"/>.</summary>
+    Task<byte[]> AddFieldsAsync(byte[] pdf, IReadOnlyList<FormFieldSpec> specs, CancellationToken ct = default);
+
     /// <summary>
     /// Rasterises every page (300 DPI, with form-fill rendered) and rebuilds the PDF as image pages,
     /// removing all interactive form infrastructure.

@@ -119,7 +119,7 @@ internal sealed class PdfRedactionService : IPdfRedactionService
         }
 
         using var output = new MemoryStream();
-        outputDoc.Save(output);
+        outputDoc.SaveStamped(output);
         return output.ToArray();
     }
 }

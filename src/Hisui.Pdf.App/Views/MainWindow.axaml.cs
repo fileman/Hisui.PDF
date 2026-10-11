@@ -54,6 +54,18 @@ public partial class MainWindow : Window
         Loaded += OnLoaded;
     }
 
+    // Item height: 130 thumbnail + 6 gap + ~16 label + 10 padding + 4 selection border.
+    private const double ThumbItemHeight = 166;
+
+    private void UpdateThumbLayout()
+    {
+        if (DataContext is not MainViewModel vm || this.FindControl<ListBox>("ThumbList") is not { } list) return;
+        if (list.ItemsPanelRoot is not WrapPanel wrap || list.Bounds.Width <= 0) return;
+
+        var fits = vm.Pages.Count * ThumbItemHeight <= list.Bounds.Height;
+        wrap.ItemWidth = Math.Floor(list.Bounds.Width / (fits ? 1 : 2));
+    }
+
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
         // Push the preview image's size to the VM so it can place search highlights in pixel space.
@@ -62,6 +74,14 @@ public partial class MainWindow : Window
             {
                 if (DataContext is MainViewModel vm) vm.UpdateSearchOverlaySize(b.Width, b.Height);
             }));
+
+        // Thumbnail strip: stack vertically while everything fits, switch to two columns when it would scroll.
+        if (this.FindControl<ListBox>("ThumbList") is { } thumbs)
+        {
+            thumbs.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(_ => UpdateThumbLayout()));
+            if (DataContext is MainViewModel tvm)
+                tvm.Pages.CollectionChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(UpdateThumbLayout);
+        }
 
         // Track the scroll viewport (for fit-width/height) and enable Ctrl+wheel zoom.
         if (this.FindControl<ScrollViewer>("PreviewScroll") is { } scroll)
@@ -96,6 +116,7 @@ public partial class MainWindow : Window
         flyout.Items.Add(MakeItem(loc["Menu.OpenInNewWindow"], vm.OpenInNewWindowCommand));
         flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
         flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.Save"], vm.SaveCommand));
         flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
         flyout.Items.Add(new Separator());
 

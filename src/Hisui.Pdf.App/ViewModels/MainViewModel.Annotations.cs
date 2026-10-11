@@ -53,6 +53,7 @@ public partial class MainViewModel
     /// <summary>Re-evaluates CanExecute for document/selection/history-gated commands.</summary>
     internal void RaiseCanExecute()
     {
+        SaveCommand.NotifyCanExecuteChanged();
         SaveAsCommand.NotifyCanExecuteChanged();
         SplitToSinglePagesCommand.NotifyCanExecuteChanged();
         MakeSearchableCommand.NotifyCanExecuteChanged();
@@ -61,6 +62,7 @@ public partial class MainViewModel
         ExtractImagesCommand.NotifyCanExecuteChanged();
         RemovePasswordCommand.NotifyCanExecuteChanged();
         AddWatermarkCommand.NotifyCanExecuteChanged();
+        DetectFormFieldsCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         RotateLeftCommand.NotifyCanExecuteChanged();
         RotateRightCommand.NotifyCanExecuteChanged();

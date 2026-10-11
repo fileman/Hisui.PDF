@@ -46,7 +46,7 @@ internal sealed class PdfOptimizer : IPdfOptimizer
             doc.Options.FlateEncodeMode = PdfFlateEncodeMode.BestCompression;
 
             using var ms = new MemoryStream();
-            doc.Save(ms);
+            doc.SaveStamped(ms);
             return ms.ToArray();
         }, ct);
     }

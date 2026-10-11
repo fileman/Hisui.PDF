@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPdfAnnotationService, PdfAnnotationService>();
         services.AddSingleton<IPdfRedactionService, PdfRedactionService>();
         services.AddSingleton<IPdfFormService, PdfFormService>();
+        services.AddSingleton<IPdfFormDetector, PdfFormDetector>();
         services.AddSingleton<IPdfTextExtractor, PdfTextExtractor>();
         services.AddSingleton<IPdfImageExtractor, PdfImageExtractor>();
         services.AddSingleton<IPdfSecurityService, PdfSecurityService>();

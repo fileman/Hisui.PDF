@@ -74,25 +74,29 @@ internal sealed class PdfFormService : IPdfFormService
             }
 
             using var output = new MemoryStream();
-            doc.Save(output);
+            doc.SaveStamped(output);
             return output.ToArray();
         }, ct);
     }
 
     public Task<byte[]> AddFieldAsync(byte[] pdf, int pageIndex, PdfRect rect, PdfFormFieldType type,
-        string? name = null, IReadOnlyList<string>? options = null, CancellationToken ct = default)
+        string? name = null, IReadOnlyList<string>? options = null, CancellationToken ct = default) =>
+        AddFieldsAsync(pdf,
+            [new FormFieldSpec { PageIndex = pageIndex, Rect = rect, Type = type, Name = name, Options = options }], ct);
+
+    public Task<byte[]> AddFieldsAsync(byte[] pdf, IReadOnlyList<FormFieldSpec> specs, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
-        if (type is PdfFormFieldType.Unknown)
-            throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown is not a creatable field type.");
+        ArgumentNullException.ThrowIfNull(specs);
+        foreach (var spec in specs)
+            if (spec.Type is PdfFormFieldType.Unknown)
+                throw new ArgumentOutOfRangeException(nameof(specs), spec.Type, "Unknown is not a creatable field type.");
+        if (specs.Count == 0) return Task.FromResult(pdf);
 
         return Task.Run(() =>
         {
             using var stream = new MemoryStream(pdf, writable: false);
             using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Modify);
-            if ((uint)pageIndex >= (uint)doc.PageCount)
-                throw new ArgumentOutOfRangeException(nameof(pageIndex));
-            var page = doc.Pages[pageIndex];
 
             // Existing /AcroForm (or a new one) and the field names already taken.
             var acro = doc.Internals.Catalog.Elements.GetDictionary("/AcroForm");
@@ -112,142 +116,164 @@ internal sealed class PdfFormService : IPdfFormService
                 if (Resolve(fields.Elements[i]) is PdfDictionary f && f.Elements.GetString("/T") is { Length: > 0 } t)
                     taken[t] = f;
 
-            // A radio button joins the group of the same name; any other duplicate is an error.
-            const int RadioFlags = (1 << 15) | (1 << 14); // Radio + NoToggleToOff
-            name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
-            PdfDictionary? group = null;
-            if (name is null)
+            foreach (var spec in specs)
             {
-                var prefix = type switch
-                {
-                    PdfFormFieldType.CheckBox => "CheckBox", PdfFormFieldType.ComboBox => "ComboBox",
-                    PdfFormFieldType.RadioButton => "Radio", PdfFormFieldType.ListBox => "List",
-                    PdfFormFieldType.Signature => "Signature", _ => "Text",
-                };
-                var n = 1;
-                while (taken.ContainsKey($"{prefix}{n}")) n++;
-                name = $"{prefix}{n}";
-            }
-            else if (taken.TryGetValue(name, out var existing))
-            {
-                if (type == PdfFormFieldType.RadioButton && (existing.Elements.GetInteger("/Ff") & (1 << 15)) != 0)
-                    group = existing;
-                else
-                    throw new ArgumentException($"A form field named '{name}' already exists.", nameof(name));
+                ct.ThrowIfCancellationRequested();
+                AddOne(doc, fields, taken, spec);
             }
 
-            // Visual (rendered) rect → raw PDF user space (origin bottom-left), honouring the page's /Rotate.
-            var rotation = PageGeometry.Rotation(page);
-            var (vw, vh) = PageGeometry.VisualSize(page);
-            var boxW = rect.Width * vw;
-            var boxH = rect.Height * vh;
-            var corner1 = new XPoint(rect.Left * vw, rect.Top * vh);
-            var corner2 = new XPoint(rect.Right * vw, rect.Bottom * vh);
-            if (PageGeometry.VisualToRaw(page) is { } toRaw)
-            {
-                corner1 = toRaw.Transform(corner1);
-                corner2 = toRaw.Transform(corner2);
-            }
-            var pageH = page.Height.Point;
-            var rawRect = new PdfRectangle(
-                new XPoint(Math.Min(corner1.X, corner2.X), pageH - Math.Max(corner1.Y, corner2.Y)),
-                new XPoint(Math.Max(corner1.X, corner2.X), pageH - Math.Min(corner1.Y, corner2.Y)));
+            // Tab order: widgets are appended to /Annots in spec order; /Tabs /S makes viewers follow that array
+            // instead of re-sorting by row (a tagged document keeps its own structure order).
+            if (!doc.Internals.Catalog.Elements.ContainsKey("/StructTreeRoot"))
+                foreach (var pageIndex in specs.Select(sp => sp.PageIndex).Distinct())
+                    doc.Pages[pageIndex].Elements.SetName("/Tabs", "/S");
 
-            var widget = new PdfDictionary(doc);
-            doc.Internals.AddObject(widget); // indirect before any array references it
-            widget.Elements.SetName("/Type", "/Annot");
-            widget.Elements.SetName("/Subtype", "/Widget");
-            widget.Elements.SetInteger("/F", 4); // Print
-            widget.Elements.SetRectangle("/Rect", rawRect);
-            widget.Elements["/P"] = page.Reference;
-            var mk = new PdfDictionary(doc);
-            if (rotation != 0) mk.Elements.SetInteger("/R", rotation);
-            mk.Elements["/BC"] = new PdfArray(doc, new PdfReal(0.2), new PdfReal(0.2), new PdfReal(0.2));
-            mk.Elements["/BG"] = new PdfArray(doc, new PdfReal(0.93), new PdfReal(0.95), new PdfReal(1));
-            widget.Elements["/MK"] = mk;
-
-            // Field-level entries live on the widget itself, except for radio buttons (group = parent field).
-            var fieldDict = widget;
-            switch (type)
-            {
-                case PdfFormFieldType.RadioButton:
-                    if (group is null)
-                    {
-                        group = new PdfDictionary(doc);
-                        group.Elements.SetName("/FT", "/Btn");
-                        group.Elements.SetString("/T", name);
-                        group.Elements.SetInteger("/Ff", RadioFlags);
-                        group.Elements.SetName("/V", "/Off");
-                        group.Elements["/Kids"] = new PdfArray(doc);
-                        doc.Internals.AddObject(group);
-                        fields.Elements.Add(group);
-                    }
-                    var kids = group.Elements.GetArray("/Kids")!;
-                    var export = SafeName(options?.FirstOrDefault(), $"Choice{kids.Elements.Count + 1}");
-                    for (var i = 0; i < kids.Elements.Count; i++)
-                        if (Resolve(kids.Elements[i]) is PdfDictionary k &&
-                            k.Elements.GetDictionary("/AP")?.Elements.GetDictionary("/N")?.Elements.ContainsKey("/" + export) == true)
-                            throw new ArgumentException($"Radio group '{name}' already has the choice '{export}'.", nameof(options));
-
-                    widget.Elements["/Parent"] = group.Reference;
-                    widget.Elements.SetName("/AS", "/Off");
-                    widget.Elements["/AP"] = Ap(doc, ("/" + export, Appearance(doc, boxW, boxH, rotation, on: true, round: true)),
-                                                      ("/Off", Appearance(doc, boxW, boxH, rotation, on: false, round: true)));
-                    kids.Elements.Add(widget);
-                    fieldDict = group;
-                    break;
-
-                case PdfFormFieldType.CheckBox:
-                    widget.Elements.SetName("/FT", "/Btn");
-                    widget.Elements.SetName("/V", "/Off");
-                    widget.Elements.SetName("/AS", "/Off");
-                    widget.Elements["/AP"] = Ap(doc, ("/Yes", Appearance(doc, boxW, boxH, rotation, on: true)),
-                                                     ("/Off", Appearance(doc, boxW, boxH, rotation, on: false)));
-                    break;
-
-                case PdfFormFieldType.ComboBox or PdfFormFieldType.ListBox:
-                    widget.Elements.SetName("/FT", "/Ch");
-                    if (type == PdfFormFieldType.ComboBox) widget.Elements.SetInteger("/Ff", 1 << 17); // Combo
-                    var opt = new PdfArray(doc);
-                    foreach (var o in options ?? [])
-                        if (!string.IsNullOrWhiteSpace(o)) opt.Elements.Add(new PdfString(o.Trim()));
-                    widget.Elements["/Opt"] = opt;
-                    widget.Elements.SetString("/DA", "/Helv 0 Tf 0 g");
-                    widget.Elements["/AP"] = Ap(doc, ("", Appearance(doc, boxW, boxH, rotation)));
-                    break;
-
-                case PdfFormFieldType.Signature:
-                    widget.Elements.SetName("/FT", "/Sig");
-                    widget.Elements["/AP"] = Ap(doc, ("", Appearance(doc, boxW, boxH, rotation)));
-                    break;
-
-                default: // Text
-                    widget.Elements.SetName("/FT", "/Tx");
-                    widget.Elements.SetString("/DA", "/Helv 0 Tf 0 g"); // font size 0 = auto
-                    widget.Elements["/AP"] = Ap(doc, ("", Appearance(doc, boxW, boxH, rotation)));
-                    break;
-            }
-            if (fieldDict == widget) widget.Elements.SetString("/T", name);
-
-            var annots = page.Elements.GetArray("/Annots");
-            if (annots is null)
-            {
-                annots = new PdfArray(doc);
-                page.Elements["/Annots"] = annots;
-            }
-            annots.Elements.Add(widget);
-            if (fieldDict == widget) fields.Elements.Add(widget);
-
-            // /Helv must exist in /DR for the /DA strings above.
-            EnsureHelvetica(doc, acro);
+            // /Helv must exist in /DR for the /DA strings the fields use.
+            AcroFormRestorer.EnsureHelvetica(doc, acro);
             acro.Elements.SetString("/DA", "/Helv 0 Tf 0 g");
-            if (type is PdfFormFieldType.Text or PdfFormFieldType.ComboBox or PdfFormFieldType.ListBox)
+            if (specs.Any(sp => sp.Type is PdfFormFieldType.Text or PdfFormFieldType.ComboBox or PdfFormFieldType.ListBox))
                 acro.Elements.SetBoolean("/NeedAppearances", true);
 
             using var output = new MemoryStream();
-            doc.Save(output);
+            doc.SaveStamped(output);
             return output.ToArray();
         }, ct);
+    }
+
+    private static void AddOne(PdfDocument doc, PdfArray fields, Dictionary<string, PdfDictionary> taken, FormFieldSpec spec)
+    {
+        var (pageIndex, rect, type, name, options) = (spec.PageIndex, spec.Rect, spec.Type, spec.Name, spec.Options);
+        if ((uint)pageIndex >= (uint)doc.PageCount)
+            throw new ArgumentOutOfRangeException(nameof(spec), $"Page {pageIndex} does not exist.");
+        var page = doc.Pages[pageIndex];
+
+        // A radio button joins the group of the same name; any other duplicate is an error.
+        const int RadioFlags = (1 << 15) | (1 << 14); // Radio + NoToggleToOff
+        name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        PdfDictionary? group = null;
+        if (name is null)
+        {
+            var prefix = type switch
+            {
+                PdfFormFieldType.CheckBox => "CheckBox", PdfFormFieldType.ComboBox => "ComboBox",
+                PdfFormFieldType.RadioButton => "Radio", PdfFormFieldType.ListBox => "List",
+                PdfFormFieldType.Signature => "Signature", _ => "Text",
+            };
+            var n = 1;
+            while (taken.ContainsKey($"{prefix}{n}")) n++;
+            name = $"{prefix}{n}";
+        }
+        else if (taken.TryGetValue(name, out var existing))
+        {
+            if (type == PdfFormFieldType.RadioButton && (existing.Elements.GetInteger("/Ff") & (1 << 15)) != 0)
+                group = existing;
+            else
+                throw new ArgumentException($"A form field named '{name}' already exists.", nameof(name));
+        }
+
+        // Visual (rendered) rect → raw PDF user space (origin bottom-left), honouring the page's /Rotate.
+        var rotation = PageGeometry.Rotation(page);
+        var (vw, vh) = PageGeometry.VisualSize(page);
+        var boxW = rect.Width * vw;
+        var boxH = rect.Height * vh;
+        var corner1 = new XPoint(rect.Left * vw, rect.Top * vh);
+        var corner2 = new XPoint(rect.Right * vw, rect.Bottom * vh);
+        if (PageGeometry.VisualToRaw(page) is { } toRaw)
+        {
+            corner1 = toRaw.Transform(corner1);
+            corner2 = toRaw.Transform(corner2);
+        }
+        var pageH = page.Height.Point;
+        var rawRect = new PdfRectangle(
+            new XPoint(Math.Min(corner1.X, corner2.X), pageH - Math.Max(corner1.Y, corner2.Y)),
+            new XPoint(Math.Max(corner1.X, corner2.X), pageH - Math.Min(corner1.Y, corner2.Y)));
+
+        var widget = new PdfDictionary(doc);
+        doc.Internals.AddObject(widget); // indirect before any array references it
+        widget.Elements.SetName("/Type", "/Annot");
+        widget.Elements.SetName("/Subtype", "/Widget");
+        widget.Elements.SetInteger("/F", 4); // Print
+        widget.Elements.SetRectangle("/Rect", rawRect);
+        widget.Elements["/P"] = page.Reference;
+        var mk = new PdfDictionary(doc);
+        if (rotation != 0) mk.Elements.SetInteger("/R", rotation);
+        mk.Elements["/BC"] = new PdfArray(doc, new PdfReal(0.2), new PdfReal(0.2), new PdfReal(0.2));
+        mk.Elements["/BG"] = new PdfArray(doc, new PdfReal(0.93), new PdfReal(0.95), new PdfReal(1));
+        widget.Elements["/MK"] = mk;
+
+        // Field-level entries live on the widget itself, except for radio buttons (group = parent field).
+        var fieldDict = widget;
+        switch (type)
+        {
+            case PdfFormFieldType.RadioButton:
+                if (group is null)
+                {
+                    group = new PdfDictionary(doc);
+                    group.Elements.SetName("/FT", "/Btn");
+                    group.Elements.SetString("/T", name);
+                    group.Elements.SetInteger("/Ff", RadioFlags);
+                    group.Elements.SetName("/V", "/Off");
+                    group.Elements["/Kids"] = new PdfArray(doc);
+                    doc.Internals.AddObject(group);
+                    fields.Elements.Add(group);
+                }
+                var kids = group.Elements.GetArray("/Kids")!;
+                var export = SafeName(options?.FirstOrDefault(), $"Choice{kids.Elements.Count + 1}");
+                for (var i = 0; i < kids.Elements.Count; i++)
+                    if (Resolve(kids.Elements[i]) is PdfDictionary k &&
+                        k.Elements.GetDictionary("/AP")?.Elements.GetDictionary("/N")?.Elements.ContainsKey("/" + export) == true)
+                        throw new ArgumentException($"Radio group '{name}' already has the choice '{export}'.", nameof(options));
+
+                widget.Elements["/Parent"] = group.Reference;
+                widget.Elements.SetName("/AS", "/Off");
+                widget.Elements["/AP"] = Ap(doc, ("/" + export, Appearance(doc, boxW, boxH, rotation, on: true, round: true)),
+                                                  ("/Off", Appearance(doc, boxW, boxH, rotation, on: false, round: true)));
+                kids.Elements.Add(widget);
+                fieldDict = group;
+                break;
+
+            case PdfFormFieldType.CheckBox:
+                widget.Elements.SetName("/FT", "/Btn");
+                widget.Elements.SetName("/V", "/Off");
+                widget.Elements.SetName("/AS", "/Off");
+                widget.Elements["/AP"] = Ap(doc, ("/Yes", Appearance(doc, boxW, boxH, rotation, on: true)),
+                                                 ("/Off", Appearance(doc, boxW, boxH, rotation, on: false)));
+                break;
+
+            case PdfFormFieldType.ComboBox or PdfFormFieldType.ListBox:
+                widget.Elements.SetName("/FT", "/Ch");
+                if (type == PdfFormFieldType.ComboBox) widget.Elements.SetInteger("/Ff", 1 << 17); // Combo
+                var opt = new PdfArray(doc);
+                foreach (var o in options ?? [])
+                    if (!string.IsNullOrWhiteSpace(o)) opt.Elements.Add(new PdfString(o.Trim()));
+                widget.Elements["/Opt"] = opt;
+                widget.Elements.SetString("/DA", "/Helv 0 Tf 0 g");
+                widget.Elements["/AP"] = Ap(doc, ("", Appearance(doc, boxW, boxH, rotation)));
+                break;
+
+            case PdfFormFieldType.Signature:
+                widget.Elements.SetName("/FT", "/Sig");
+                widget.Elements["/AP"] = Ap(doc, ("", Appearance(doc, boxW, boxH, rotation)));
+                break;
+
+            default: // Text
+                widget.Elements.SetName("/FT", "/Tx");
+                widget.Elements.SetString("/DA", "/Helv 0 Tf 0 g"); // font size 0 = auto
+                widget.Elements["/AP"] = Ap(doc, ("", Appearance(doc, boxW, boxH, rotation)));
+                break;
+        }
+        if (fieldDict == widget) widget.Elements.SetString("/T", name);
+
+        var annots = page.Elements.GetArray("/Annots");
+        if (annots is null)
+        {
+            annots = new PdfArray(doc);
+            page.Elements["/Annots"] = annots;
+        }
+        annots.Elements.Add(widget);
+        if (fieldDict == widget) fields.Elements.Add(widget);
+        taken[name] = fieldDict;
+        if (!string.IsNullOrWhiteSpace(spec.Tooltip)) fieldDict.Elements.SetString("/TU", spec.Tooltip);
     }
 
     /// <summary>PDF name-safe export value: letters/digits/underscore only.</summary>
@@ -324,23 +350,6 @@ internal sealed class PdfFormService : IPdfFormService
 
     private static PdfItem? Resolve(PdfItem? item) => item is PdfReference r ? r.Value : item;
 
-    private static void EnsureHelvetica(PdfDocument doc, PdfDictionary acro)
-    {
-        var dr = acro.Elements.GetDictionary("/DR");
-        if (dr is null) { dr = new PdfDictionary(doc); acro.Elements["/DR"] = dr; }
-        var fonts = dr.Elements.GetDictionary("/Font");
-        if (fonts is null) { fonts = new PdfDictionary(doc); dr.Elements["/Font"] = fonts; }
-        if (fonts.Elements.ContainsKey("/Helv")) return;
-
-        var helv = new PdfDictionary(doc);
-        helv.Elements.SetName("/Type", "/Font");
-        helv.Elements.SetName("/Subtype", "/Type1");
-        helv.Elements.SetName("/BaseFont", "/Helvetica");
-        helv.Elements.SetName("/Encoding", "/WinAnsiEncoding");
-        doc.Internals.AddObject(helv);
-        fonts.Elements["/Helv"] = helv.Reference;
-    }
-
     public async Task<byte[]> FlattenAsync(byte[] pdf, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
@@ -376,7 +385,7 @@ internal sealed class PdfFormService : IPdfFormService
             }
 
             using var ms = new MemoryStream();
-            outDoc.Save(ms);
+            outDoc.SaveStamped(ms);
             return ms.ToArray();
         }, ct);
     }

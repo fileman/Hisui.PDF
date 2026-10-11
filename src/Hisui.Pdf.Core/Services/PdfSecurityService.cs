@@ -51,7 +51,7 @@ internal sealed class PdfSecurityService : IPdfSecurityService
             settings.PermitAssembleDocument = options.PermitAssembleDocument;
 
             using var ms = new MemoryStream();
-            doc.Save(ms);
+            doc.SaveStamped(ms);
             return ms.ToArray();
         }, ct);
     }
@@ -71,7 +71,7 @@ internal sealed class PdfSecurityService : IPdfSecurityService
                 using var doc = PdfReader.Open(s, password, PdfDocumentOpenMode.Modify);
                 doc.SecurityHandler.SetEncryptionToNoneAndResetPasswords();
                 using var ms = new MemoryStream();
-                doc.Save(ms);
+                doc.SaveStamped(ms);
                 return ms.ToArray();
             }
             catch (PdfSharp.Pdf.IO.PdfReaderException)
@@ -83,7 +83,7 @@ internal sealed class PdfSecurityService : IPdfSecurityService
                 for (var i = 0; i < src.PageCount; i++)
                     dst.AddPage(src.Pages[i]);
                 using var ms = new MemoryStream();
-                dst.Save(ms);
+                dst.SaveStamped(ms);
                 return ms.ToArray();
             }
         }, ct);

@@ -40,4 +40,37 @@ internal static class PageGeometry
         if (VisualToRaw(page) is { } m) gfx.MultiplyTransform(m, XMatrixOrder.Prepend);
         return gfx;
     }
+
+    /// <summary>
+    /// PdfPig 0.1.x splits words on pages with /Rotate (letters come back in rotated coordinates but the
+    /// word extractor assumes horizontal text). So words are read from a copy with the rotation removed,
+    /// and boxes are rotated back to the rendered orientation by the caller. Returns the original bytes
+    /// and no rotations when nothing is rotated or the document can't be rewritten.
+    /// </summary>
+    public static (byte[] Pdf, int[] Rotations) Unrotate(byte[] pdf)
+    {
+        try
+        {
+            using var input = new MemoryStream(pdf, writable: false);
+            using var doc = PdfSharp.Pdf.IO.PdfReader.Open(input, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify);
+            var rotations = new int[doc.PageCount];
+            var any = false;
+            for (var i = 0; i < rotations.Length; i++)
+            {
+                rotations[i] = ((doc.Pages[i].Rotate % 360) + 360) % 360;
+                if (rotations[i] == 0) continue;
+                any = true;
+                doc.Pages[i].Rotate = 0;
+            }
+            if (!any) return (pdf, rotations);
+
+            using var output = new MemoryStream();
+            doc.SaveStamped(output);
+            return (output.ToArray(), rotations);
+        }
+        catch (Exception)
+        {
+            return (pdf, []);
+        }
+    }
 }
