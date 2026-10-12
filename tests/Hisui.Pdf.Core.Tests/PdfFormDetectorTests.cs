@@ -66,6 +66,31 @@ public class PdfFormDetectorTests
     }
 
     [Fact]
+    public async Task RuledMatrix_EmptyCellsAtRowColumnCrossings_BecomeFields()
+    {
+        var pdf = Build(gfx =>
+        {
+            var font = new XFont("Arial", 8);
+            string[] cols = ["", "Fitocella", "Vaso"];
+            string[] rows = ["ROVERELLA", "CERRO", "LECCIO"];
+            for (var r = 0; r <= rows.Length; r++)
+                for (var c = 0; c < 3; c++)
+                {
+                    var rect = new XRect(100 + c * 70, 100 + r * 20, 70, 20);
+                    gfx.DrawRectangle(XPens.Black, rect);
+                    var label = r == 0 ? cols[c] : c == 0 ? rows[r - 1] : "";
+                    if (label.Length > 0) gfx.DrawString(label, font, XBrushes.Black, new XPoint(rect.X + 3, rect.Y + 13));
+                }
+        });
+
+        var specs = await _sut.DetectFieldsAsync(pdf);
+
+        Assert.Equal(6, specs.Count);
+        Assert.Contains(specs, s => s.Name == "ROVERELLA__Fitocella");
+        Assert.Contains(specs, s => s.Name == "LECCIO__Vaso");
+    }
+
+    [Fact]
     public async Task FewWhiteRectangles_AreNotAGrid()
     {
         var pdf = Build(gfx =>

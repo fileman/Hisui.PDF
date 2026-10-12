@@ -138,9 +138,10 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenAsync()
     {
-        var path = await _dialogs.OpenPdfAsync();
-        if (path is null) return;
-        await OpenPathAsync(path);
+        var paths = await _dialogs.OpenPdfsAsync();
+        if (paths.Count == 0) return;
+        await OpenPathAsync(paths[0]);
+        foreach (var extra in paths.Skip(1)) _windows.OpenWindow(extra); // one window per additional file
     }
 
     /// <summary>Opens a new, empty document window (multi-window).</summary>
@@ -151,9 +152,8 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenInNewWindowAsync()
     {
-        var path = await _dialogs.OpenPdfAsync();
-        if (path is null) return;
-        _windows.OpenWindow(path);
+        foreach (var path in await _dialogs.OpenPdfsAsync())
+            _windows.OpenWindow(path);
     }
 
     [RelayCommand]
@@ -190,8 +190,8 @@ public partial class MainViewModel : ObservableObject
 
             SyncPagesFromSession();
             SetOpenedFromEncrypted(wasEncrypted); // enables "remove password" only for once-encrypted files
+            _currentPath = path; // before Title: the tab tooltip reads it when Title changes
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
-            _currentPath = path;
             _settings.AddRecentFile(path);
             RefreshRecentFilesMenu();
             await RenderThumbnailsAsync(ct);
@@ -233,6 +233,9 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Path of the file the document was opened from or last saved to; null for a new/merged document.</summary>
     private string? _currentPath;
+
+    /// <summary>Full path of the open file (null for a new/merged document).</summary>
+    public string? CurrentPath => _currentPath;
 
     /// <summary>Saves over the current file. Falls back to Save As when there is no file yet, or when the
     /// original was password-protected (overwriting it would silently strip the protection).</summary>
