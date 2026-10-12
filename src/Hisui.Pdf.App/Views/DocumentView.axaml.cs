@@ -545,7 +545,9 @@ public partial class DocumentView : UserControl
                     if (OperatingSystem.IsWindows() && update.MsiUrl is not null
                         && await _updates.DownloadInstallerAsync(update) is { } msi)
                     {
-                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\"") { UseShellExecute = true });
+                        // Elevate up front: AppLocker's default MSI rules allow unsigned packages only for Administrators,
+                        // and the per-machine install needs elevation anyway. UAC cancel throws, so we stay open.
+                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\"") { UseShellExecute = true, Verb = "runas" });
                         Owner.Close();
                     }
                     else
