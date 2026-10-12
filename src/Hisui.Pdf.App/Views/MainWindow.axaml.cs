@@ -1,8 +1,11 @@
 using System.ComponentModel;
 using System.IO;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Reactive;
+using Avalonia.VisualTree;
 using Hisui.Pdf.App.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,12 +16,18 @@ public partial class MainWindow : Window
 {
     private readonly IServiceProvider _services;
     private readonly HashSet<DocumentView> _claimed = [];
+    private Control? _captionSpacer;
 
     public MainWindow(IServiceProvider services)
     {
         InitializeComponent();
         _services = services;
         Tabs.SelectionChanged += (_, _) => UpdateWindowTitle();
+        Tabs.TemplateApplied += (_, e) =>
+        {
+            if (e.NameScope.Find<Control>("PART_NewTab") is Button add) add.Click += (_, _) => OpenInTab();
+            _captionSpacer = e.NameScope.Find<Control>("PART_CaptionSpacer");
+        };
         KeyDown += (_, e) =>
         {
             if (e.Key == Key.W && e.KeyModifiers.HasFlag(KeyModifiers.Control) && Tabs.SelectedItem is TabItem t)
@@ -28,6 +37,22 @@ public partial class MainWindow : Window
             }
         };
         AddTab();
+        Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(FitCaptionButtons, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
+    // Avalonia 12 draws the title and caption buttons itself when the client area is extended, and exposes no API to
+    // trim them. Hide the title text (our tabs fill the strip) and the full-screen button, then reserve exactly the
+    // width the remaining caption buttons take, measured from the decoration overlay.
+    private void FitCaptionButtons()
+    {
+        Visual root = this;
+        while (root.GetVisualParent() is { } parent) root = parent;
+        Control? Part(string name) => root.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == name);
+
+        if (Part("PART_TitleTextPanel") is { } title) title.IsVisible = false;
+        if (Part("PART_FullScreenButton") is { } fullScreen) fullScreen.IsVisible = false;
+        if (Part("PART_OverlayPanel") is { } buttons && _captionSpacer is { } spacer)
+            buttons.GetObservable(BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b => spacer.Width = b.Width));
     }
 
     /// <summary>The document view of the selected tab.</summary>
@@ -80,7 +105,7 @@ public partial class MainWindow : Window
         var vm = (MainViewModel)view.DataContext!;
 
         var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 180, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis };
-        var close = new Button { Content = "✕", Padding = new(4, 0), Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new(0), FontSize = 11 };
+        var close = new Button { Content = "✕", Padding = new(5, 2), Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new(0), FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
         var item = new TabItem { Content = view, Header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { label, close } } };
         close.Click += (_, _) => CloseTab(item);
 
