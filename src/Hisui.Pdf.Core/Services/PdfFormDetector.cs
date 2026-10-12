@@ -316,6 +316,10 @@ internal sealed class PdfFormDetector : IPdfFormDetector
             }
             if (headers.Count == 0) continue;
 
+            // A column that is mostly text is a label column (side-by-side repeated table): its blanks are not fields.
+            var column = content.Where(c => Math.Abs(c.Cell.Left - cell.Left) <= T && Math.Abs(c.Cell.Right - cell.Right) <= T).ToList();
+            if (column.Count(c => c.Text.Length > 0) >= 0.4 * column.Count) continue;
+
             var rowLabel = content.Where(c => c.Text.Length > 0 && c.Cell.Right <= cell.Left + T &&
                     Math.Min(c.Cell.Top, cell.Top) - Math.Max(c.Cell.Bottom, cell.Bottom) > 0.5 * cell.Height)
                 .OrderByDescending(c => c.Cell.Right).Select(c => c.Text).FirstOrDefault() ?? "";
