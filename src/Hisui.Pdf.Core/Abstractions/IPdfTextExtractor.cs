@@ -20,6 +20,12 @@ public interface IPdfTextExtractor
     /// page's text with words joined by single spaces, so multi-word phrases match across words and line
     /// breaks. <paramref name="options"/> toggles case-sensitivity and whole-word matching.
     /// </summary>
+    /// <summary>Every page's words (outer list = pages), boxes normalised in rendered orientation.</summary>
+    Task<IReadOnlyList<IReadOnlyList<TextWord>>> ExtractAllWordsAsync(byte[] pdf, CancellationToken ct = default);
+
+    /// <summary>Regular-expression search over each page's text (words joined by single spaces).</summary>
+    Task<IReadOnlyList<TextSearchResult>> SearchPatternAsync(byte[] pdf, System.Text.RegularExpressions.Regex pattern, CancellationToken ct = default);
+
     Task<IReadOnlyList<TextSearchResult>> SearchAsync(
         byte[] pdf, string query, TextSearchOptions? options = null, CancellationToken ct = default);
 }

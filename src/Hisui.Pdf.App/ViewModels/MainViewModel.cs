@@ -29,6 +29,11 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfAnnotationService _annotations;
     private readonly IPdfFormService _forms;
     private readonly IPdfFormDetector _formDetector;
+    private readonly IPdfCommentService _commentService;
+    private readonly IPdfNavigationService _navigation;
+    private readonly IPdfCompareService _compare;
+    private readonly IPdfRedactionService _redaction;
+    private readonly IPdfConformanceService _conformance;
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
@@ -56,6 +61,11 @@ public partial class MainViewModel : ObservableObject
         IPdfAnnotationService annotations,
         IPdfFormService forms,
         IPdfFormDetector formDetector,
+        IPdfCommentService commentService,
+        IPdfNavigationService navigation,
+        IPdfCompareService compare,
+        IPdfRedactionService redaction,
+        IPdfConformanceService conformance,
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
@@ -76,6 +86,11 @@ public partial class MainViewModel : ObservableObject
         _annotations = annotations;
         _forms = forms;
         _formDetector = formDetector;
+        _commentService = commentService;
+        _navigation = navigation;
+        _compare = compare;
+        _redaction = redaction;
+        _conformance = conformance;
         _textEdit = textEdit;
         _textExtractor = textExtractor;
         _ocr = ocr;
@@ -190,6 +205,7 @@ public partial class MainViewModel : ObservableObject
 
             _session = new PdfDocumentSession();
             _session.AddSource(bytes, count);
+            _savedVersion = _session.Version;
             _thumbCache.Clear();
             _previewCache.Clear();
 
@@ -288,8 +304,24 @@ public partial class MainViewModel : ObservableObject
 
             _currentPath = path;
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
+            _savedVersion = _session!.Version;
+            OnPropertyChanged(nameof(HasUnsavedChanges));
             StatusMessage = _loc.Format("Status.Saved", Path.GetFileName(path));
         });
+    }
+
+    private long _savedVersion;
+
+    /// <summary>Edits made since the document was opened or last saved (undoing back to that point clears it).</summary>
+    public bool HasUnsavedChanges => _session is not null && (_session.Version != _savedVersion || _pendingFieldEdit is not null);
+
+    /// <summary>Saves for a close prompt; true when nothing unsaved is left (false: Save As cancelled or failed).</summary>
+    public async Task<bool> SaveBeforeCloseAsync()
+    {
+        await FlushFieldEditAsync();
+        if (!HasUnsavedChanges) return true;
+        await SaveCommand.ExecuteAsync(null);
+        return !HasUnsavedChanges;
     }
 
     [RelayCommand(CanExecute = nameof(CanEditSelected))]
@@ -564,7 +596,7 @@ public partial class MainViewModel : ObservableObject
     private static void Exit()
     {
         if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lt)
-            lt.Shutdown();
+            lt.MainWindow?.Close(); // through the window's unsaved-changes prompt
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -677,6 +709,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (_session is null) return;
         var key = (item.SourceDocumentId, item.SourcePageIndex);
+        _ = LoadFieldsAsync(item);
         if (_previewCache.TryGetValue(key, out var cached))
         {
             if (!ReferenceEquals(item.Preview, cached)) { item.Preview = cached; item.SetBaseSize(cached.Size); }
@@ -727,6 +760,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         PreviewImage = preview;
+        await LoadFieldsAsync(item);
     }
 
     private void RefreshRecentFilesMenu()
@@ -751,6 +785,7 @@ public partial class MainViewModel : ObservableObject
         // Guard against re-entrancy: a second operation starting mid-await would clobber the shared
         // _cts (making Cancel target the wrong op) and reset IsBusy while the first is still running.
         if (IsBusy) return;
+        await FlushFieldEditAsync(); // field text still being typed is part of this operation's input
 
         using var cts = new CancellationTokenSource();
         _cts = cts;

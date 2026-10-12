@@ -1,4 +1,5 @@
 using PdfSharp.Drawing;
+using Hisui.Pdf.Core.Model;
 using PdfSharp.Pdf;
 
 namespace Hisui.Pdf.Core.Services;
@@ -31,6 +32,41 @@ internal static class PageGeometry
             270 => new XMatrix(0, 1, -1, 0, w, 0),
             _   => null,
         };
+    }
+
+    /// <summary>Visual (rendered, normalised) rect → raw PDF user space (origin bottom-left), honouring /Rotate.</summary>
+    public static PdfRectangle ToRaw(PdfPage page, PdfRect rect)
+    {
+        var (vw, vh) = VisualSize(page);
+        var corner1 = new XPoint(rect.Left * vw, rect.Top * vh);
+        var corner2 = new XPoint(rect.Right * vw, rect.Bottom * vh);
+        if (VisualToRaw(page) is { } toRaw)
+        {
+            corner1 = toRaw.Transform(corner1);
+            corner2 = toRaw.Transform(corner2);
+        }
+        var pageH = page.Height.Point;
+        return new PdfRectangle(
+            new XPoint(Math.Min(corner1.X, corner2.X), pageH - Math.Max(corner1.Y, corner2.Y)),
+            new XPoint(Math.Max(corner1.X, corner2.X), pageH - Math.Min(corner1.Y, corner2.Y)));
+    }
+
+    /// <summary>Inverse of <see cref="ToRaw"/>.</summary>
+    public static PdfRect ToVisual(PdfPage page, PdfRectangle raw)
+    {
+        var (vw, vh) = VisualSize(page);
+        var pageH = page.Height.Point;
+        var p1 = new XPoint(raw.X1, pageH - raw.Y1);
+        var p2 = new XPoint(raw.X2, pageH - raw.Y2);
+        if (VisualToRaw(page) is { } toRaw)
+        {
+            var toVisual = toRaw;
+            toVisual.Invert();
+            p1 = toVisual.Transform(p1);
+            p2 = toVisual.Transform(p2);
+        }
+        return new PdfRect(Math.Min(p1.X, p2.X) / vw, Math.Min(p1.Y, p2.Y) / vh,
+                           Math.Max(p1.X, p2.X) / vw, Math.Max(p1.Y, p2.Y) / vh);
     }
 
     /// <summary>Graphics (append mode) whose coordinates are the rendered orientation.</summary>

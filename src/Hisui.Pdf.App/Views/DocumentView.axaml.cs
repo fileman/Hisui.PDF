@@ -42,6 +42,24 @@ public partial class DocumentView : UserControl
             return await dialog.ShowDialog<bool>(Owner) ? dialog.Password : null;
         };
 
+        viewModel.ShowFieldPropertiesDialog = props => FieldPropertiesDialog.ShowAsync(Owner, props);
+        viewModel.PromptTextAsync = async (title, initial, multiline) =>
+        {
+            var dialog = new FormDialog(title);
+            var box = dialog.Add(null, multiline
+                ? new TextBox { Text = initial, AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Height = 120 }
+                : new TextBox { Text = initial });
+            if (!multiline) box.SelectAll();
+            dialog.Opened += (_, _) => box.Focus();
+            return await dialog.ShowAsync(Owner) ? box.Text ?? "" : null;
+        };
+        viewModel.PromptLinkAsync = () => NavigationDialogs.PromptLinkAsync(Owner);
+        viewModel.PromptHeaderFooterAsync = () => NavigationDialogs.PromptHeaderFooterAsync(Owner);
+        viewModel.ShowReportAsync = (title, text) => NavigationDialogs.ShowReportAsync(Owner, title, text);
+        viewModel.PromptRedactionPatternsAsync = () => NavigationDialogs.PromptRedactionPatternsAsync(Owner);
+        viewModel.PromptProfileAsync = (initial, title, check) => ConformanceDialog.ShowAsync(Owner, initial, title, check);
+        viewModel.ChooseAsync = (message, choices) => FormDialog.ChooseAsync(Owner, "Hisui PDF", message, choices);
+
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
         AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         AddHandler(DragDrop.DropEvent, OnDrop);
@@ -163,6 +181,7 @@ public partial class DocumentView : UserControl
         flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
         flyout.Items.Add(MakeItem(loc["Menu.Save"], vm.SaveCommand));
         flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.SaveAsProfile"], vm.SaveAsProfileCommand));
         flyout.Items.Add(new Separator());
 
         // Document tools (Acrobat-parity)
