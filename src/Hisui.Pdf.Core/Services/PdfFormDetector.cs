@@ -158,28 +158,6 @@ internal sealed class PdfFormDetector : IPdfFormDetector
         // spanned by the painted cells.
         var columns = Cluster(kept.Select(c => (c.Rect.Left, c.Rect.Right)));
         var rowsLattice = Cluster(kept.Select(c => (c.Rect.Bottom, c.Rect.Top)));
-        var occupied = new HashSet<(int, int)>();
-        foreach (var (rect, _) in kept)
-            occupied.Add((NearestIndex(columns, rect.Left), NearestIndex(rowsLattice, rect.Bottom)));
-        for (var ci = 0; ci < columns.Count; ci++)
-            for (var ri = 0; ri < rowsLattice.Count; ri++)
-                if (!occupied.Contains((ci, ri)))
-                    cells.Add(new PigRect(columns[ci].Lo, rowsLattice[ri].Lo, columns[ci].Hi, rowsLattice[ri].Hi));
-
-        var horizontal = letters.Where(l => l.Horizontal && !l.IsSpace).ToList();
-        var rotated = letters.Where(l => !l.Horizontal).ToList();
-        var headers = new Dictionary<int, string>();
-
-        // Rows by vertical centre, split into segments wherever there is a wide gap (side-by-side tables).
-        var rows = new List<List<PigRect>>();
-        foreach (var cell in cells.OrderByDescending(c => (c.Bottom + c.Top) / 2))
-        {
-            var cy = (cell.Bottom + cell.Top) / 2;
-            var row = rows.FirstOrDefault(rw => Math.Abs((rw[0].Bottom + rw[0].Top) / 2 - cy) <= 2);
-            if (row is null) rows.Add(row = []);
-            row.Add(cell);
-        }
-
         // Side-by-side tables ("halves"): runs of lattice columns separated by a wide gutter. A row label sits
         // between the previous half and this one, however many grey columns precede the first white cell.
         var halfOf = new int[columns.Count];
@@ -194,6 +172,35 @@ internal sealed class PdfFormDetector : IPdfFormDetector
             }
             else halfRight[^1] = columns[ci].Hi;
             halfOf[ci] = halfLeft.Count - 1;
+        }
+
+        var occupied = new HashSet<(int, int)>();
+        var rowsInHalf = new HashSet<(int Half, int Row)>();
+        foreach (var (rect, _) in kept)
+        {
+            var (ci, ri) = (NearestIndex(columns, rect.Left), NearestIndex(rowsLattice, rect.Bottom));
+            occupied.Add((ci, ri));
+            if (ci >= 0) rowsInHalf.Add((halfOf[ci], ri));
+        }
+        // A blank lattice cell counts only where its table half has painted cells on that row: a shorter
+        // side-by-side table must not inherit the taller one's rows.
+        for (var ci = 0; ci < columns.Count; ci++)
+            for (var ri = 0; ri < rowsLattice.Count; ri++)
+                if (!occupied.Contains((ci, ri)) && rowsInHalf.Contains((halfOf[ci], ri)))
+                    cells.Add(new PigRect(columns[ci].Lo, rowsLattice[ri].Lo, columns[ci].Hi, rowsLattice[ri].Hi));
+
+        var horizontal = letters.Where(l => l.Horizontal && !l.IsSpace).ToList();
+        var rotated = letters.Where(l => !l.Horizontal).ToList();
+        var headers = new Dictionary<int, string>();
+
+        // Rows by vertical centre, split into segments wherever there is a wide gap (side-by-side tables).
+        var rows = new List<List<PigRect>>();
+        foreach (var cell in cells.OrderByDescending(c => (c.Bottom + c.Top) / 2))
+        {
+            var cy = (cell.Bottom + cell.Top) / 2;
+            var row = rows.FirstOrDefault(rw => Math.Abs((rw[0].Bottom + rw[0].Top) / 2 - cy) <= 2);
+            if (row is null) rows.Add(row = []);
+            row.Add(cell);
         }
 
         foreach (var row in rows)

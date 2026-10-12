@@ -47,6 +47,19 @@ public partial class PageItemViewModel : ObservableObject
         DisplayHeight = _baseSize.Height * _zoom;
     }
 
+    /// <summary>Form widgets on this page (loaded with its preview) for the fill/layout overlay.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<Hisui.Pdf.Core.Model.PdfFormWidget> _fields = [];
+
+    /// <summary>Link annotations on this page (clickable in normal viewing).</summary>
+    [ObservableProperty]
+    private IReadOnlyList<Hisui.Pdf.Core.Model.PdfLink> _links = [];
+
+    /// <summary>Updates <see cref="Fields"/> without notifying: the live editors already show these values.</summary>
+#pragma warning disable MVVMTK0034
+    internal void SetFieldsSilently(IReadOnlyList<Hisui.Pdf.Core.Model.PdfFormWidget> fields) => _fields = fields;
+#pragma warning restore MVVMTK0034
+
     /// <summary>On-screen rotation in degrees (0/90/180/270). Baked into the PDF only on save.</summary>
     [ObservableProperty]
     private double _rotationAngle;

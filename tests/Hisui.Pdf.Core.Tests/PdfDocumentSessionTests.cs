@@ -255,4 +255,21 @@ public class PdfDocumentSessionTests
         Assert.Equal(5, session.Pages.Count);
         Assert.Equal(2, session.SourceCount);
     }
+
+    [Fact]
+    public void Version_ChangesOnEdit_AndUndoReturnsToSavedVersion()
+    {
+        var session = new PdfDocumentSession();
+        session.AddSource([1], 2);
+        var saved = session.Version;
+
+        session.Rotate(0, PageRotation.Clockwise90);
+        Assert.NotEqual(saved, session.Version);
+
+        session.Undo();
+        Assert.Equal(saved, session.Version);
+
+        session.Redo();
+        Assert.NotEqual(saved, session.Version);
+    }
 }

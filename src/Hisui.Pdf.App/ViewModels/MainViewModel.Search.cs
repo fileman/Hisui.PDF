@@ -139,6 +139,19 @@ public partial class MainViewModel
     }
 
     /// <summary>Clears results + highlights. Wired to structural document changes (open/add/delete/move/undo).</summary>
+    /// <summary>Shows externally computed marks (comparison, redaction preview) with the search highlight and F3 navigation.</summary>
+    private void ShowMarks(IReadOnlyList<TextSearchResult> marks, string summary)
+    {
+        _results = marks;
+        _currentMatch = marks.Count > 0 ? 0 : -1;
+        _lastSearchSignature = null;
+        NextMatchCommand.NotifyCanExecuteChanged();
+        PrevMatchCommand.NotifyCanExecuteChanged();
+        SearchSummary = summary;
+        if (marks.Count > 0) _ = NavigateToCurrentMatchAsync();
+        else Highlights.Clear();
+    }
+
     internal void InvalidateSearch()
     {
         _results = [];
