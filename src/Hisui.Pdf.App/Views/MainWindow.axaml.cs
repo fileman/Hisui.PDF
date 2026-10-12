@@ -12,6 +12,7 @@ namespace Hisui.Pdf.App.Views;
 public partial class MainWindow : Window
 {
     private readonly IServiceProvider _services;
+    private readonly HashSet<DocumentView> _claimed = [];
 
     public MainWindow(IServiceProvider services)
     {
@@ -36,11 +37,16 @@ public partial class MainWindow : Window
     /// With no path, adds an empty tab.</summary>
     public void OpenInTab(string? path = null)
     {
-        var view = path is not null && CurrentView?.DataContext is MainViewModel { IsDocumentLoaded: false }
-            ? CurrentView
+        // Loading is async, so IsDocumentLoaded alone can't tell that a tab was just claimed by a previous file.
+        var view = path is not null && CurrentView is { } cur && !_claimed.Contains(cur)
+                   && cur.DataContext is MainViewModel { IsDocumentLoaded: false }
+            ? cur
             : AddTab();
         if (path is not null && view.DataContext is MainViewModel vm)
+        {
+            _claimed.Add(view);
             _ = vm.OpenPathAsync(path);
+        }
     }
 
     private DocumentView AddTab()
@@ -69,6 +75,7 @@ public partial class MainWindow : Window
     private void CloseTab(TabItem item)
     {
         Tabs.Items.Remove(item);
+        if (item.Content is DocumentView v) _claimed.Remove(v);
         if (Tabs.ItemCount == 0) Close();
     }
 
