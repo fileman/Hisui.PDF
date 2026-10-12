@@ -17,4 +17,7 @@ public sealed class AppSettings
 
     /// <summary>UI theme code: "System" (follow the OS), "Light" or "Dark".</summary>
     public string Theme { get; set; } = "System";
+
+    /// <summary>Page view: false = one page at a time (wheel flips pages), true = pages stacked in one scroll.</summary>
+    public bool ContinuousScroll { get; set; }
 }

@@ -66,14 +66,13 @@ public partial class App : Application
                 window.Opened += (_, _) => _ = window.CurrentView?.CheckForUpdatesAsync(manual: false);
 
             // "Open with" / command-line: open every file passed (the first reuses the empty startup tab).
-            foreach (var file in (desktop.Args ?? []).Where(File.Exists))
-                window.OpenInTab(file);
+            window.OpenArgs(desktop.Args ?? []);
 
-            // Files forwarded by later launches (single instance) open as extra tabs here.
-            SingleInstance.Received = paths => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            // Arguments forwarded by later launches (single instance) open as extra tabs here.
+            SingleInstance.Received = args => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 window.Bring();
-                foreach (var file in paths.Where(File.Exists)) window.OpenInTab(file);
+                window.OpenArgs(args);
             });
 
             desktop.Exit += async (_, _) =>

@@ -87,6 +87,12 @@
       <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.Open" Name="MUIVerb" Type="string" Value="Open with Hisui PDF" />
       <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.Open" Name="Icon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
       <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.Open\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; &quot;%1&quot;" KeyPath="yes" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToWord" Name="MUIVerb" Type="string" Value="Convert to Word with Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToWord" Name="Icon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToWord\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; --convert docx &quot;%1&quot;" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToImages" Name="MUIVerb" Type="string" Value="Convert to images with Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToImages" Name="Icon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToImages\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; --convert png &quot;%1&quot;" />
     </Component>
   </Fragment>
 

@@ -50,6 +50,30 @@ public partial class DocumentView : UserControl
         // Keyboard shortcuts that target the view (not a VM command): print dialog, find, match nav, clear.
         KeyDown += OnWindowKeyDown;
 
+        // Collapse/restore the side-panel columns with the VM flags.
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(MainViewModel.IsToolPanelOpen) or nameof(MainViewModel.IsThumbnailPanelOpen):
+                    ApplyPanelLayout();
+                    break;
+                case nameof(MainViewModel.SelectedPage) when !_followingScroll:
+                    ScrollToSelectedPage();
+                    break;
+                case nameof(MainViewModel.ShowContinuousPages) or nameof(MainViewModel.ZoomLevel):
+                    Avalonia.Threading.Dispatcher.UIThread.Post(ScrollToSelectedPage, Avalonia.Threading.DispatcherPriority.Loaded);
+                    break;
+                case nameof(MainViewModel.PreviewImage): // a cache invalidation re-rendered the page: refresh the stack too
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => UpdateContinuousPages(select: false), Avalonia.Threading.DispatcherPriority.Loaded);
+                    break;
+                case nameof(MainViewModel.PreviewDisplayHeight):
+                    ApplyPendingEdge();
+                    break;
+            }
+        };
+        ApplyPanelLayout();
+
         // Wire annotation canvas pointer events after layout is complete.
         Loaded += OnLoaded;
     }
@@ -66,6 +90,17 @@ public partial class DocumentView : UserControl
 
         var fits = vm.Pages.Count * ThumbItemHeight <= list.Bounds.Height;
         wrap.ItemWidth = Math.Floor(list.Bounds.Width / (fits ? 1 : 2));
+    }
+
+    // BodyGrid columns: 0 rail | 1 tool panel | 2 thumbnails | 3 splitter | 4 preview.
+    private void ApplyPanelLayout()
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var cols = BodyGrid.ColumnDefinitions;
+        cols[1].Width = new GridLength(vm.IsToolPanelOpen ? 220 : 0);
+        cols[2].MinWidth = vm.IsThumbnailPanelOpen ? 200 : 0;
+        cols[2].Width = new GridLength(vm.IsThumbnailPanelOpen ? 266 : 0);
+        cols[3].Width = new GridLength(vm.IsThumbnailPanelOpen ? 5 : 0);
     }
 
     private bool _wired;
@@ -91,8 +126,8 @@ public partial class DocumentView : UserControl
                 tvm.Pages.CollectionChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(UpdateThumbLayout);
         }
 
-        // Track the scroll viewport (for fit-width/height) and enable Ctrl+wheel zoom.
-        if (this.FindControl<ScrollViewer>("PreviewScroll") is { } scroll)
+        // Track the scroll viewport (for fit-width/height) and handle the wheel (Ctrl = zoom, edge = page flip).
+        foreach (var scroll in new[] { PreviewScroll, ContinuousScroll })
         {
             scroll.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b =>
             {
@@ -100,6 +135,8 @@ public partial class DocumentView : UserControl
             }));
             scroll.AddHandler(PointerWheelChangedEvent, OnPreviewWheel, RoutingStrategies.Tunnel);
         }
+        PreviewScroll.ScrollChanged += (_, _) => _lastScrollTick = Environment.TickCount64;
+        ContinuousScroll.ScrollChanged += (_, e) => UpdateContinuousPages(select: e.OffsetDelta.Y != 0 && !_suppressSelect);
 
         _annotCanvas = this.FindControl<Canvas>("AnnotationCanvas");
         if (_annotCanvas is null) return;
@@ -130,6 +167,10 @@ public partial class DocumentView : UserControl
 
         // Document tools (Acrobat-parity)
         flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
+        var convert = new MenuItem { Header = loc["Menu.Convert"], IsEnabled = vm.IsDocumentLoaded };
+        foreach (var (key, format) in new[] { ("Menu.ConvertWord", "docx"), ("Menu.ConvertText", "txt"), ("Menu.ConvertImages", "png") })
+            convert.Items.Add(new MenuItem { Header = loc[key], Command = vm.ConvertCommand, CommandParameter = format });
+        flyout.Items.Add(convert);
         var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
         propsItem.Click += OnDocumentPropertiesClick;
         flyout.Items.Add(propsItem);
@@ -240,10 +281,109 @@ public partial class DocumentView : UserControl
     private void OnPreviewWheel(object? sender, PointerWheelEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return; // plain wheel scrolls as usual
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            // Plain wheel scrolls as usual; in single-page view it also flips pages at the scroll edges.
+            if (ReferenceEquals(sender, PreviewScroll)) FlipPageAtEdge(vm, e);
+            return;
+        }
         if (e.Delta.Y > 0) vm.ZoomInCommand.Execute(null);
         else if (e.Delta.Y < 0) vm.ZoomOutCommand.Execute(null);
         e.Handled = true;
+    }
+
+    // ── Wheel paging (single-page view) ───────────────────────────────────────
+
+    private enum Edge { None, Top, Bottom }
+
+    private long _lastScrollTick;
+    private Edge _pendingEdge;
+
+    private void FlipPageAtEdge(MainViewModel vm, PointerWheelEventArgs e)
+    {
+        if (e.Delta.Y == 0 || vm.SelectedPage is null) return;
+        var down = e.Delta.Y < 0;
+        var atEdge = down
+            ? PreviewScroll.Offset.Y + PreviewScroll.Viewport.Height >= PreviewScroll.Extent.Height - 1
+            : PreviewScroll.Offset.Y <= 1;
+        // The notch must arrive already at the edge, and not right after the scroll that got there.
+        if (!atEdge || Environment.TickCount64 - _lastScrollTick < 250) return;
+
+        var index = vm.Pages.IndexOf(vm.SelectedPage) + (down ? 1 : -1);
+        if (index < 0 || index >= vm.Pages.Count) return;
+        _pendingEdge = down ? Edge.Top : Edge.Bottom;
+        _lastScrollTick = Environment.TickCount64;
+        vm.SelectedPage = vm.Pages[index];
+        e.Handled = true;
+    }
+
+    // Once the new page's preview has laid out, show its top (flipped forward) or bottom (flipped back).
+    private void ApplyPendingEdge()
+    {
+        var edge = _pendingEdge;
+        if (edge == Edge.None) return;
+        _pendingEdge = Edge.None;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (edge == Edge.Top) PreviewScroll.ScrollToHome();
+            else PreviewScroll.ScrollToEnd();
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
+    // ── Continuous view ───────────────────────────────────────────────────────
+
+    private const double ContinuousMargin = 16, PageGap = 12;
+
+    private bool _followingScroll, _suppressSelect;
+
+    // Rotation is a layout transform, so a sideways page takes its width as slot height.
+    private static double SlotHeight(PageItemViewModel p) =>
+        (Math.Abs(p.RotationAngle) % 180 > 1 ? p.DisplayWidth : p.DisplayHeight) + PageGap;
+
+    /// <summary>Scrolls the stack so the selected page is at the top (thumbnail click, mode/zoom change).</summary>
+    private void ScrollToSelectedPage()
+    {
+        if (DataContext is not MainViewModel { ShowContinuousPages: true, SelectedPage: { } selected } vm) return;
+        var y = ContinuousMargin;
+        foreach (var page in vm.Pages)
+        {
+            if (ReferenceEquals(page, selected)) break;
+            y += SlotHeight(page);
+        }
+        _suppressSelect = true;
+        ContinuousScroll.Offset = new Vector(ContinuousScroll.Offset.X, y);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _suppressSelect = false;
+            UpdateContinuousPages(select: false);
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    /// <summary>Loads previews for pages near the viewport and, when scrolled, selects the most visible page.</summary>
+    private void UpdateContinuousPages(bool select)
+    {
+        if (DataContext is not MainViewModel { ShowContinuousPages: true } vm) return;
+        var viewport = ContinuousScroll.Viewport.Height;
+        var top = ContinuousScroll.Offset.Y - ContinuousMargin;
+        var bottom = top + viewport;
+        PageItemViewModel? best = null;
+        var bestVisible = double.MinValue;
+        var y = 0.0;
+        foreach (var page in vm.Pages)
+        {
+            var height = SlotHeight(page) - PageGap;
+            var visible = Math.Min(y + height, bottom) - Math.Max(y, top);
+            if (visible > bestVisible) { bestVisible = visible; best = page; }
+            if (y + height > top - viewport && y < bottom + viewport) vm.EnsurePagePreview(page); // one viewport of look-ahead
+            y += height + PageGap;
+            if (y > bottom + viewport) break;
+        }
+
+        if (!select || best is null || ReferenceEquals(best, vm.SelectedPage)) return;
+        _followingScroll = true;
+        vm.SelectedPage = best;
+        _followingScroll = false;
+        ThumbList.ScrollIntoView(best);
     }
 
     // ── Annotation pointer handlers ───────────────────────────────────────────

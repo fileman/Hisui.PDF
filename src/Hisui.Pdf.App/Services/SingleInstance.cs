@@ -7,24 +7,24 @@ namespace Hisui.Pdf.App.Services;
 
 /// <summary>
 /// Keeps one app process per user session: later launches (e.g. Explorer's "Open with" on several PDFs)
-/// forward their file paths to the running instance over a named pipe and exit, so all files end up as tabs.
+/// forward their command-line arguments to the running instance over a named pipe and exit, so all files end up as tabs.
 /// </summary>
 internal static class SingleInstance
 {
     private static readonly string Id = $"HisuiPDF.{Environment.UserName}.{Process.GetCurrentProcess().SessionId}";
     private static readonly object Gate = new();
-    private static List<string>? _pending = [];
-    private static Action<IReadOnlyList<string>>? _received;
+    private static List<string[]>? _pending = [];
+    private static Action<string[]>? _received;
     private static Mutex? _mutex;
 
-    /// <summary>Set once the UI is ready; paths that arrived earlier are delivered immediately.</summary>
-    public static Action<IReadOnlyList<string>>? Received
+    /// <summary>Set once the UI is ready; arguments that arrived earlier are delivered immediately.</summary>
+    public static Action<string[]>? Received
     {
         set
         {
-            List<string>? backlog;
+            List<string[]>? backlog;
             lock (Gate) { _received = value; backlog = _pending; _pending = null; }
-            if (value is not null && backlog is { Count: > 0 }) value(backlog);
+            if (value is not null && backlog is not null) foreach (var args in backlog) value(args);
         }
     }
 
@@ -48,13 +48,14 @@ internal static class SingleInstance
 
     private static bool Forward(string[] args)
     {
-        var paths = args.Select(Path.GetFullPath);
+        // One line per launch: "A:" + tab-separated args (existing files made absolute; the receiver's cwd differs).
+        var message = "A:" + string.Join('\t', args.Select(a => File.Exists(a) ? Path.GetFullPath(a) : a));
         try
         {
             using var client = new NamedPipeClientStream(".", Id, PipeDirection.Out);
             client.Connect(10_000);
             using var writer = new StreamWriter(client, new UTF8Encoding(false));
-            foreach (var p in paths) writer.WriteLine(p);
+            writer.WriteLine(message);
             return true;
         }
         catch (Exception ex) when (ex is TimeoutException or IOException)
@@ -73,22 +74,21 @@ internal static class SingleInstance
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 await server.WaitForConnectionAsync();
                 using var reader = new StreamReader(server, Encoding.UTF8);
-                var paths = new List<string>();
-                while (await reader.ReadLineAsync() is { Length: > 0 } line) paths.Add(line);
-                Deliver(paths);
+                if (await reader.ReadLineAsync() is { } line && line.StartsWith("A:"))
+                    Deliver(line[2..].Split('\t', StringSplitOptions.RemoveEmptyEntries));
             }
             catch (IOException) { /* client vanished mid-message: keep listening */ }
         }
     }
 
-    private static void Deliver(List<string> paths)
+    private static void Deliver(string[] args)
     {
-        Action<IReadOnlyList<string>>? handler;
+        Action<string[]>? handler;
         lock (Gate)
         {
             handler = _received;
-            if (handler is null) { _pending!.AddRange(paths); return; }
+            if (handler is null) { _pending!.Add(args); return; }
         }
-        handler(paths);
+        handler(args);
     }
 }
