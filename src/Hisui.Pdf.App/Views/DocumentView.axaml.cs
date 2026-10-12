@@ -58,6 +58,9 @@ public partial class DocumentView : UserControl
         viewModel.ShowReportAsync = (title, text) => NavigationDialogs.ShowReportAsync(Owner, title, text);
         viewModel.PromptRedactionPatternsAsync = () => NavigationDialogs.PromptRedactionPatternsAsync(Owner);
         viewModel.PromptProfileAsync = (initial, title, check) => ConformanceDialog.ShowAsync(Owner, initial, title, check);
+        viewModel.PromptSignatureAsync = invisible => ToolDialogs.PromptSignatureAsync(Owner, _signatures, invisible);
+        viewModel.PromptOcrLanguagesAsync = (store, current) => ToolDialogs.PromptOcrLanguagesAsync(Owner, store, current);
+        viewModel.PromptBatchAsync = () => ToolDialogs.PromptBatchAsync(Owner);
         viewModel.ChooseAsync = (message, choices) => FormDialog.ChooseAsync(Owner, "Hisui PDF", message, choices);
 
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
@@ -187,7 +190,7 @@ public partial class DocumentView : UserControl
         // Document tools (Acrobat-parity)
         flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
         var convert = new MenuItem { Header = loc["Menu.Convert"], IsEnabled = vm.IsDocumentLoaded };
-        foreach (var (key, format) in new[] { ("Menu.ConvertWord", "docx"), ("Menu.ConvertText", "txt"), ("Menu.ConvertImages", "png") })
+        foreach (var (key, format) in new[] { ("Menu.ConvertWord", "docx"), ("Menu.ConvertExcel", "xlsx"), ("Menu.ConvertPowerPoint", "pptx"), ("Menu.ConvertText", "txt"), ("Menu.ConvertImages", "png") })
             convert.Items.Add(new MenuItem { Header = loc[key], Command = vm.ConvertCommand, CommandParameter = format });
         flyout.Items.Add(convert);
         var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
@@ -197,6 +200,10 @@ public partial class DocumentView : UserControl
         protectItem.Click += OnProtectClick;
         flyout.Items.Add(protectItem);
         flyout.Items.Add(MakeItem(loc["Menu.RemovePassword"], vm.RemovePasswordCommand));
+        if (FeatureFlags.DigitalSigning) flyout.Items.Add(MakeItem(loc["Menu.SignInvisible"], vm.SignInvisibleCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.VerifySignatures"], vm.VerifySignaturesCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.Batch"], vm.BatchCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.OcrLanguages"], vm.ChooseOcrLanguagesCommand));
         flyout.Items.Add(new Separator());
 
         var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };

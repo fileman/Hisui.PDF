@@ -22,4 +22,6 @@ public enum AnnotationTool
     Comment,
     /// <summary>A link area to a page or a web address.</summary>
     Link,
+    /// <summary>A certificate (PAdES) signature in the dragged area.</summary>
+    DigitalSignature,
 }

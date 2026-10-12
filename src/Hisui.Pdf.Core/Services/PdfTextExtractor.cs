@@ -70,16 +70,66 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
             {
                 ct.ThrowIfCancellationRequested();
                 var turn = RotationOf(rotations, page.Number - 1);
-                pages.Add(page.GetWords().Where(w => !string.IsNullOrWhiteSpace(w.Text)).Select(w => new TextWord
+                var horizontal = page.GetWords()
+                    .Where(w => !string.IsNullOrWhiteSpace(w.Text) && w.TextOrientation == UglyToad.PdfPig.Content.TextOrientation.Horizontal)
+                    .Select(w => new TextWord
+                    {
+                        Text = w.Text,
+                        PageIndex = page.Number - 1,
+                        BoundingBox = ToBoundingBox(w.BoundingBox, page.Width, page.Height).RotateClockwise(turn),
+                        FontSizePoints = w.Letters.FirstOrDefault()?.FontSize ?? 12,
+                    });
+                var vertical = VerticalLines(page.Letters).Select(line => new TextWord
                 {
-                    Text = w.Text,
+                    Text = line.Text,
                     PageIndex = page.Number - 1,
-                    BoundingBox = ToBoundingBox(w.BoundingBox, page.Width, page.Height).RotateClockwise(turn),
-                    FontSizePoints = w.Letters.FirstOrDefault()?.FontSize ?? 12,
-                }).ToList());
+                    BoundingBox = ToBoundingBox(line.Box, page.Width, page.Height).RotateClockwise(turn),
+                    FontSizePoints = line.FontSize,
+                    IsHorizontal = false,
+                });
+                pages.Add(horizontal.Concat(vertical).ToList());
             }
             return pages;
         }, ct);
+    }
+
+    /// <summary>
+    /// Vertical text (e.g. rotated column headers) as one entry per vertical line. PdfPig's word grouping assumes
+    /// horizontal text and interleaves neighbouring rotated lines, so the lines are rebuilt from the letters.
+    /// </summary>
+    private static IEnumerable<(string Text, UglyToad.PdfPig.Core.PdfRectangle Box, double FontSize)> VerticalLines(IReadOnlyList<UglyToad.PdfPig.Content.Letter> letters)
+    {
+        var index = new Dictionary<UglyToad.PdfPig.Content.Letter, int>(ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < letters.Count; i++) index[letters[i]] = i;
+        var rotated = letters.Where(l => l.TextOrientation is UglyToad.PdfPig.Content.TextOrientation.Rotate90 or UglyToad.PdfPig.Content.TextOrientation.Rotate270
+                                         && !string.IsNullOrWhiteSpace(l.Value)).ToList();
+        var lines = new List<List<UglyToad.PdfPig.Content.Letter>>();
+        foreach (var l in rotated.OrderBy(l => (l.BoundingBox.Left + l.BoundingBox.Right) / 2))
+        {
+            var cx = (l.BoundingBox.Left + l.BoundingBox.Right) / 2;
+            var line = lines.LastOrDefault();
+            var lineX = line is null ? double.NaN : line.Average(x => (x.BoundingBox.Left + x.BoundingBox.Right) / 2);
+            if (line is null || Math.Abs(cx - lineX) > Math.Max(1, l.FontSize) * 0.45) lines.Add(line = []);
+            line.Add(l);
+        }
+        foreach (var line in lines)
+        {
+            // Content order is reading order; a space goes where the pen jumps (baseline end → next start).
+            var ordered = line.OrderBy(l => index[l]).ToList();
+            var sb = new System.Text.StringBuilder();
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                if (i > 0)
+                {
+                    var (a, b) = (ordered[i - 1].EndBaseLine, ordered[i].StartBaseLine);
+                    if (Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y)) > ordered[i].FontSize * 0.2) sb.Append(' ');
+                }
+                sb.Append(ordered[i].Value);
+            }
+            var box = new UglyToad.PdfPig.Core.PdfRectangle(line.Min(l => l.BoundingBox.Left), line.Min(l => l.BoundingBox.Bottom),
+                line.Max(l => l.BoundingBox.Right), line.Max(l => l.BoundingBox.Top));
+            yield return (sb.ToString().Trim(), box, line[0].FontSize);
+        }
     }
 
     public async Task<IReadOnlyList<TextSearchResult>> SearchPatternAsync(byte[] pdf, System.Text.RegularExpressions.Regex pattern, CancellationToken ct = default)

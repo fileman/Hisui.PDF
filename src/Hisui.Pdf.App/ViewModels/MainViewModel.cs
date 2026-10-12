@@ -34,6 +34,9 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfCompareService _compare;
     private readonly IPdfRedactionService _redaction;
     private readonly IPdfConformanceService _conformance;
+    private readonly IPdfSignatureService _signatures;
+    private readonly IPdfOfficeExporter _office;
+    private readonly IOcrLanguageStore _ocrLanguages;
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
@@ -66,6 +69,9 @@ public partial class MainViewModel : ObservableObject
         IPdfCompareService compare,
         IPdfRedactionService redaction,
         IPdfConformanceService conformance,
+        IPdfSignatureService signatures,
+        IPdfOfficeExporter office,
+        IOcrLanguageStore ocrLanguages,
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
@@ -91,6 +97,9 @@ public partial class MainViewModel : ObservableObject
         _compare = compare;
         _redaction = redaction;
         _conformance = conformance;
+        _signatures = signatures;
+        _office = office;
+        _ocrLanguages = ocrLanguages;
         _textEdit = textEdit;
         _textExtractor = textExtractor;
         _ocr = ocr;
@@ -461,7 +470,7 @@ public partial class MainViewModel : ObservableObject
 
             try
             {
-                var searchable = await _ocr.MakeSearchableAsync(current, options: null, ct);
+                var searchable = await _ocr.MakeSearchableAsync(current, CurrentOcrOptions(), ct);
                 await Task.Run(() => File.WriteAllBytes(path, searchable), ct);
                 StatusMessage = _loc.Format("Status.OcrSaved", scanned.Count, Path.GetFileName(path));
             }

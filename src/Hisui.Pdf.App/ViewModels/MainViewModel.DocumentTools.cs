@@ -57,6 +57,8 @@ public partial class MainViewModel
         {
             "docx" => await _dialogs.SaveFileAsync(baseName + ".docx", ".docx", _loc["Picker.WordType"]),
             "txt" => await _dialogs.SaveFileAsync(baseName + ".txt", ".txt", _loc["Picker.TextType"]),
+            "xlsx" => await _dialogs.SaveFileAsync(baseName + ".xlsx", ".xlsx", _loc["Picker.ExcelType"]),
+            "pptx" => await _dialogs.SaveFileAsync(baseName + ".pptx", ".pptx", _loc["Picker.PowerPointType"]),
             "png" => await _dialogs.PickFolderAsync(),
             _ => null,
         };
@@ -69,6 +71,12 @@ public partial class MainViewModel
             {
                 case "docx":
                     await File.WriteAllBytesAsync(target, await _wordExporter.ExportAsync(current, ct), ct);
+                    break;
+                case "xlsx":
+                    await File.WriteAllBytesAsync(target, await _office.ExportXlsxAsync(current, ct), ct);
+                    break;
+                case "pptx":
+                    await File.WriteAllBytesAsync(target, await _office.ExportPptxAsync(current, 150, ct), ct);
                     break;
                 case "txt":
                     var text = await _textExtractor.ExtractTextAsync(current, null, ct);
