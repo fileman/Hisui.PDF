@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Setup.exe wrapper around the MSI. Burn elevates (UAC) before handing the per-machine MSI to
+     Windows Installer, so AppLocker's default "Administrators may run any MSI" rule applies.
+     Double-clicking the unsigned MSI as a standard token is blocked before UAC ever shows. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+
+  <!-- DisableModify + DisableRemove hide the bundle from Programs and Features: the MSI entry stays
+       the only one, as with a direct MSI install and in-app (MSI) updates.
+       ponytail: an in-app MSI upgrade leaves the hidden bundle registration behind; the next
+       Setup.exe (same UpgradeCode) replaces it. -->
+  <Bundle
+    Name="Hisui PDF"
+    Manufacturer="Emanuele Filardo"
+    Version="$(var.Version)"
+    UpgradeCode="{6B3E2C1A-5F4D-4E8B-9A7C-2D1F0E3B4A58}"
+    IconSourceFile="..\Hisui.Pdf.App\Assets\HisuiPDF.ico"
+    DisableModify="yes"
+    DisableRemove="yes">
+
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        Theme="rtfLicense"
+        LicenseFile="..\Hisui.Pdf.Installer.Win\license.rtf"
+        LogoFile="..\Hisui.Pdf.App\Assets\HisuiPDF.ico"
+        ShowVersion="yes" />
+    </BootstrapperApplication>
+
+    <Chain>
+      <MsiPackage SourceFile="$(var.Hisui.Pdf.Installer.Win.TargetPath)" Visible="yes" Cache="remove" />
+    </Chain>
+
+  </Bundle>
+</Wix>
