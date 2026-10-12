@@ -62,6 +62,7 @@ public partial class MainWindow : Window
         void Refresh()
         {
             label.Text = vm.Title.Contains(" — ") ? vm.Title[(vm.Title.IndexOf(" — ", StringComparison.Ordinal) + 3)..] : vm.Title;
+            ToolTip.SetTip(item, vm.CurrentPath is { } p ? $"{Path.GetFileName(p)}\n{p}" : label.Text);
             if (ReferenceEquals(Tabs.SelectedItem, item)) UpdateWindowTitle();
         }
         vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MainViewModel.Title)) Refresh(); };
