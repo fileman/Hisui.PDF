@@ -33,7 +33,7 @@
             <TextBlock Text="{loc:Tr About.Ai}" FontSize="10" FontWeight="SemiBold"
                        Foreground="{DynamicResource RibbonSubtleTextBrush}" LetterSpacing="1.2" />
             <TextBlock Margin="0,4,0,14">
-                <Run Text="Claude Sonnet 5.5" FontWeight="SemiBold" />
+                <Run Text="Claude" FontWeight="SemiBold" />
                 <Run Text=" — Anthropic" />
             </TextBlock>
 
