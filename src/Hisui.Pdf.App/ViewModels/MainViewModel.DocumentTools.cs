@@ -44,6 +44,49 @@ public partial class MainViewModel
         });
     }
 
+    // ── Convert (PDF to Word / text / images) ───────────────────────────────
+
+    /// <summary>Exports the open document: "docx" (Word), "txt" (plain text) or "png" (one image per page, into a folder).</summary>
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    public async Task ConvertAsync(string format)
+    {
+        if (!HasDocument) return;
+
+        var baseName = Path.GetFileNameWithoutExtension(_currentPath ?? "documento.pdf");
+        string? target = format switch
+        {
+            "docx" => await _dialogs.SaveFileAsync(baseName + ".docx", ".docx", _loc["Picker.WordType"]),
+            "txt" => await _dialogs.SaveFileAsync(baseName + ".txt", ".txt", _loc["Picker.TextType"]),
+            "png" => await _dialogs.PickFolderAsync(),
+            _ => null,
+        };
+        if (target is null) return;
+
+        await RunBusyAsync(_loc["Status.Converting"], async ct =>
+        {
+            var current = await _pageService.BuildFromSessionAsync(_session!, ct);
+            switch (format)
+            {
+                case "docx":
+                    await File.WriteAllBytesAsync(target, await _wordExporter.ExportAsync(current, ct), ct);
+                    break;
+                case "txt":
+                    var text = await _textExtractor.ExtractTextAsync(current, null, ct);
+                    await File.WriteAllTextAsync(target, text.Replace("\f", "\r\n\r\n"), ct);
+                    break;
+                case "png":
+                    var count = await _renderer.GetPageCountAsync(current, ct);
+                    for (var i = 0; i < count; i++)
+                    {
+                        var png = await _renderer.RenderPageToPngAsync(current, i, 150, ct);
+                        await File.WriteAllBytesAsync(Path.Combine(target, $"{baseName}-p{i + 1:D3}.png"), png, ct);
+                    }
+                    break;
+            }
+            StatusMessage = _loc.Format("Status.Converted", target);
+        });
+    }
+
     // ── Document properties (metadata) — view shows the dialog around these ───
 
     public async Task<PdfMetadata?> ReadMetadataAsync()

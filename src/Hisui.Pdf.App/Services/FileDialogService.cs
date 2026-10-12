@@ -65,6 +65,22 @@ internal sealed class FileDialogService : IFileDialogService
         return file?.TryGetLocalPath();
     }
 
+    public async Task<string?> SaveFileAsync(string suggestedFileName, string extension, string typeName)
+    {
+        var sp = GetStorageProvider();
+        if (sp is null) return null;
+
+        var file = await sp.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = _loc["Picker.SaveAs"],
+            SuggestedFileName = suggestedFileName,
+            DefaultExtension = extension,
+            FileTypeChoices = [new FilePickerFileType(typeName) { Patterns = [$"*{extension}"] }],
+        });
+
+        return file?.TryGetLocalPath();
+    }
+
     public async Task<string?> PickFolderAsync()
     {
         var sp = GetStorageProvider();

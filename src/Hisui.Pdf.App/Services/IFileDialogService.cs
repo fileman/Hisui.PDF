@@ -7,5 +7,7 @@ public interface IFileDialogService
     Task<IReadOnlyList<string>> OpenPdfsAsync();
     Task<string?> SavePdfAsync(string suggestedFileName);
     Task<string?> PickFolderAsync();
+    /// <summary>Save-file picker for a non-PDF export (e.g. ".docx"); null if cancelled.</summary>
+    Task<string?> SaveFileAsync(string suggestedFileName, string extension, string typeName);
     Task<string?> OpenImageAsync();
 }

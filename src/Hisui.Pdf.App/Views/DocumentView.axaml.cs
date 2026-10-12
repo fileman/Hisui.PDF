@@ -130,6 +130,10 @@ public partial class DocumentView : UserControl
 
         // Document tools (Acrobat-parity)
         flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
+        var convert = new MenuItem { Header = loc["Menu.Convert"], IsEnabled = vm.IsDocumentLoaded };
+        foreach (var (key, format) in new[] { ("Menu.ConvertWord", "docx"), ("Menu.ConvertText", "txt"), ("Menu.ConvertImages", "png") })
+            convert.Items.Add(new MenuItem { Header = loc[key], Command = vm.ConvertCommand, CommandParameter = format });
+        flyout.Items.Add(convert);
         var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
         propsItem.Click += OnDocumentPropertiesClick;
         flyout.Items.Add(propsItem);

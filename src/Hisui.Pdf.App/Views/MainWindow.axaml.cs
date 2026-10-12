@@ -33,9 +33,24 @@ public partial class MainWindow : Window
     /// <summary>The document view of the selected tab.</summary>
     public DocumentView? CurrentView => (Tabs.SelectedItem as TabItem)?.Content as DocumentView;
 
-    /// <summary>Opens <paramref name="path"/> in the selected tab when it is empty, otherwise in a new tab.
-    /// With no path, adds an empty tab.</summary>
-    public void OpenInTab(string? path = null)
+    // Context-menu conversions can arrive together (one launch per selected file): ask for save locations one at a time.
+    private static readonly SemaphoreSlim ConvertGate = new(1, 1);
+
+    /// <summary>Handles command-line arguments: files to open, optionally preceded by <c>--convert docx|txt|png</c>
+    /// (open the file, then export it).</summary>
+    public void OpenArgs(IReadOnlyList<string> args)
+    {
+        string? convert = null;
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] == "--convert" && i + 1 < args.Count && args[i + 1] is "docx" or "txt" or "png") convert = args[++i];
+            else if (File.Exists(args[i])) OpenInTab(args[i], convert);
+        }
+    }
+
+    /// <summary>Opens <paramref name="path"/> in the selected tab when it is empty, otherwise in a new tab, and
+    /// optionally exports it to <paramref name="convert"/>. With no path, adds an empty tab.</summary>
+    public void OpenInTab(string? path = null, string? convert = null)
     {
         // Loading is async, so IsDocumentLoaded alone can't tell that a tab was just claimed by a previous file.
         var view = path is not null && CurrentView is { } cur && !_claimed.Contains(cur)
@@ -45,8 +60,18 @@ public partial class MainWindow : Window
         if (path is not null && view.DataContext is MainViewModel vm)
         {
             _claimed.Add(view);
-            _ = vm.OpenPathAsync(path);
+            _ = OpenAndConvertAsync(vm, path, convert);
         }
+    }
+
+    private static async Task OpenAndConvertAsync(MainViewModel vm, string path, string? convert)
+    {
+        await vm.OpenPathAsync(path);
+        if (convert is null || !vm.IsDocumentLoaded) return;
+
+        await ConvertGate.WaitAsync();
+        try { await vm.ConvertAsync(convert); }
+        finally { ConvertGate.Release(); }
     }
 
     private DocumentView AddTab()
