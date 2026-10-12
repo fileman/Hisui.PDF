@@ -126,8 +126,10 @@
                 Name="Hisui PDF"
                 Description="PDF editor: merge, split, annotate, redact, sign"
                 Target="[INSTALLFOLDER]Hisui.Pdf.App.exe"
-                WorkingDirectory="INSTALLFOLDER"
-                Icon="AppIcon.ico" />
+                WorkingDirectory="INSTALLFOLDER" />
+      <!-- No Icon=: an Icon-table icon lives in %WINDIR%\Installer\{ProductCode}\, which every upgrade
+           (new ProductCode) deletes, breaking taskbar pins copied from this shortcut. Without it the
+           shortcut shows the EXE's embedded icon from a path that survives upgrades. -->
       <!-- Clean up the Start Menu folder on uninstall -->
       <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
       <!-- Registry key used as the component's KeyPath (required for shortcut components) -->
