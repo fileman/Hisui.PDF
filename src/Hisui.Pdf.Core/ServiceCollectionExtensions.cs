@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPdfFormDetector, PdfFormDetector>();
         services.AddSingleton<IPdfTextExtractor, PdfTextExtractor>();
         services.AddSingleton<IPdfImageExtractor, PdfImageExtractor>();
+        services.AddSingleton<IPdfWordExporter, PdfWordExporter>();
         services.AddSingleton<IPdfSecurityService, PdfSecurityService>();
         services.AddSingleton<IPdfMetadataService, PdfMetadataService>();
         services.AddSingleton<IPdfOptimizer, PdfOptimizer>();

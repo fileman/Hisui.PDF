@@ -34,6 +34,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfOcrService _ocr;
     private readonly IPdfOptimizer _optimizer;
     private readonly IPdfImageExtractor _imageExtractor;
+    private readonly IPdfWordExporter _wordExporter;
     private readonly IPdfMetadataService _metadata;
     private readonly IPdfSecurityService _security;
     private readonly IPrintService _print;
@@ -59,6 +60,7 @@ public partial class MainViewModel : ObservableObject
         IPdfOcrService ocr,
         IPdfOptimizer optimizer,
         IPdfImageExtractor imageExtractor,
+        IPdfWordExporter wordExporter,
         IPdfMetadataService metadata,
         IPdfSecurityService security,
         IPrintService print,
@@ -77,6 +79,7 @@ public partial class MainViewModel : ObservableObject
         _ocr = ocr;
         _optimizer = optimizer;
         _imageExtractor = imageExtractor;
+        _wordExporter = wordExporter;
         _metadata = metadata;
         _security = security;
         _print = print;

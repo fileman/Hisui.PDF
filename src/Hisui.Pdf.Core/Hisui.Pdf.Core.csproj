@@ -17,6 +17,8 @@
     <PackageReference Include="PDFsharp" />
     <!-- Read / extract (text with coordinates, images, structure). -->
     <PackageReference Include="PdfPig" />
+    <!-- Writes .docx for PDF-to-Word export (MIT). -->
+    <PackageReference Include="DocumentFormat.OpenXml" />
     <!-- Page rendering to PNG (PDFium + SkiaSharp). -->
     <PackageReference Include="PDFtoImage" />
     <!-- OCR engine for scanned-PDF conversion (Tesseract 5). -->

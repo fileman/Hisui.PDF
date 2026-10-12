@@ -308,5 +308,14 @@
   "Log.Copy": "Copia",
   "Log.OpenFolder": "Apri cartella",
   "Log.Refresh": "Aggiorna",
-  "Log.Empty": "(nessuna voce)"
+  "Log.Empty": "(nessuna voce)",
+  "Menu.Convert": "Converti in",
+  "Menu.ConvertWord": "Word (.docx)...",
+  "Menu.ConvertText": "Testo (.txt)...",
+  "Menu.ConvertImages": "Immagini (.png)...",
+  "Status.Converting": "Conversione in corso...",
+  "Status.Converted": "Convertito in {0}",
+  "Picker.WordType": "Documenti Word",
+  "Picker.TextType": "File di testo",
+  "Picker.SaveAs": "Salva con nome"
 }
