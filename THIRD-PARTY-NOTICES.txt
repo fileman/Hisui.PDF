@@ -85,6 +85,12 @@ Components
    Note     : The 'eng.traineddata' / 'ita.traineddata' files bundled in the
               'tessdata' folder next to the executable, used by the OCR feature.
 
+12. DocumentFormat.OpenXml 3.3.0
+   License  : MIT
+   Copyright: (c) Microsoft Corporation
+   Project  : https://github.com/dotnet/Open-XML-SDK
+   Note     : Writes the .docx file for the PDF-to-Word export.
+
 
 --------------------------------------------------------------------------------
 License texts
