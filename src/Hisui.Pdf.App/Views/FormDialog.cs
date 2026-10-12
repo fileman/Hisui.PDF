@@ -67,10 +67,21 @@ internal sealed class FormDialog : Window
 
     /// <summary>Message with one button per choice; returns the chosen index, or -1 when dismissed (Esc / close).
     /// The last choice is the default (Enter).</summary>
-    public static async Task<int> ChooseAsync(Window owner, string title, string message, params string[] choices)
+    public static async Task<int> ChooseAsync(Window owner, string title, string message, params string[] choices) =>
+        (await ChooseCoreAsync(owner, title, message, null, choices)).Choice;
+
+    /// <summary><see cref="ChooseAsync"/> with a check box under the message (e.g. "Don't ask again"); returns the
+    /// choice and whether the box was ticked.</summary>
+    public static Task<(int Choice, bool Checked)> ChooseWithCheckAsync(Window owner, string title, string message,
+        string checkText, params string[] choices) =>
+        ChooseCoreAsync(owner, title, message, checkText, choices);
+
+    private static async Task<(int Choice, bool Checked)> ChooseCoreAsync(Window owner, string title, string message,
+        string? checkText, string[] choices)
     {
         var dialog = new FormDialog(title);
         dialog.AddText(message);
+        var check = checkText is null ? null : dialog.Add(null, new CheckBox { Content = checkText });
         for (var i = 0; i < choices.Length; i++)
         {
             var index = i;
@@ -80,7 +91,8 @@ internal sealed class FormDialog : Window
             dialog._buttons.Children.Add(button);
         }
         dialog.Accept = () => dialog.Close(choices.Length - 1);
-        return await dialog.ShowDialog<object?>(owner) is int chosen ? chosen : -1;
+        var choice = await dialog.ShowDialog<object?>(owner) is int chosen ? chosen : -1;
+        return (choice, check?.IsChecked == true);
     }
 
     /// <summary>Message with a single OK.</summary>

@@ -83,7 +83,7 @@ public sealed class FieldLayer : Canvas
             case nameof(MainViewModel.IsFormLayoutMode) or nameof(MainViewModel.IsAnnotationActive) or nameof(MainViewModel.ShowTabOrder):
                 Rebuild();
                 break;
-            case nameof(MainViewModel.SelectedFields):
+            case nameof(MainViewModel.SelectedFields) or nameof(MainViewModel.AlignAnchor):
                 UpdateSelectionVisuals();
                 break;
         }
@@ -114,8 +114,8 @@ public sealed class FieldLayer : Canvas
         }
         UpdateSelectionVisuals();
         // Keep the keyboard on the anchor after a layout edit rebuilt the boxes (arrows, Del keep working).
-        if (hadFocus && vm.IsFormLayoutMode && ReferenceEquals(vm.SelectionPage, page) && vm.SelectedFields.Count > 0 &&
-            _boxes.TryGetValue(vm.SelectedFields[0], out var anchor))
+        if (hadFocus && vm.IsFormLayoutMode && ReferenceEquals(vm.SelectionPage, page) && vm.AlignAnchor is { } anchorIndex &&
+            _boxes.TryGetValue(anchorIndex, out var anchor))
             Dispatcher.UIThread.Post(() => anchor.Focus(), DispatcherPriority.Loaded);
     }
 
@@ -127,7 +127,7 @@ public sealed class FieldLayer : Canvas
         {
             var on = selected.Contains(index);
             box.Background = on ? SelectedFill : BoxFill;
-            box.BorderThickness = new Thickness(on ? (selected.Count > 0 && selected[0] == index ? 2.5 : 2) : 1);
+            box.BorderThickness = new Thickness(on ? (_vm.AlignAnchor == index ? 2.5 : 2) : 1);
         }
     }
 

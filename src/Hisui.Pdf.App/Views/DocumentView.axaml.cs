@@ -95,6 +95,9 @@ public partial class DocumentView : UserControl
         };
         ApplyPanelLayout();
 
+        // The recent list is shared by every tab and window: re-read it whenever this tab comes into view.
+        AttachedToVisualTree += (_, _) => viewModel.RefreshRecentFiles();
+
         // Wire annotation canvas pointer events after layout is complete.
         Loaded += OnLoaded;
     }
@@ -206,17 +209,25 @@ public partial class DocumentView : UserControl
         flyout.Items.Add(MakeItem(loc["Menu.OcrLanguages"], vm.ChooseOcrLanguagesCommand));
         flyout.Items.Add(new Separator());
 
+        vm.RefreshRecentFiles(); // another tab or window may have changed the shared list
         var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
-        foreach (var entry in vm.RecentFiles)
+        foreach (var entry in vm.AllRecentFiles.Take(15)) // the full list is paged in the empty state
         {
             var item = new MenuItem
             {
                 Header = entry.DisplayName,
                 Command = vm.OpenRecentCommand,
                 CommandParameter = entry.FullPath,
+                // A leading star marks the pinned files.
+                Icon = entry.IsPinned ? new TextBlock { Text = "★" } : null,
             };
             ToolTip.SetTip(item, entry.FullPath);
             recent.Items.Add(item);
+        }
+        if (vm.HasUnpinnedRecentFiles)
+        {
+            recent.Items.Add(new Separator());
+            recent.Items.Add(MakeItem(loc["Recent.Clear"], vm.ClearRecentCommand));
         }
         flyout.Items.Add(recent);
         flyout.Items.Add(new Separator());
@@ -250,6 +261,19 @@ public partial class DocumentView : UserControl
             theme.Items.Add(item);
         }
         flyout.Items.Add(theme);
+
+        // Re-enables the prompt a "Don't ask again" turned off.
+        var confirmClose = new MenuItem
+        {
+            Header = loc["Menu.ConfirmCloseLastTab"],
+            Icon = _settings.Settings.ConfirmCloseLastTab ? new TextBlock { Text = "✓" } : null,
+        };
+        confirmClose.Click += (_, _) =>
+        {
+            _settings.Settings.ConfirmCloseLastTab = !_settings.Settings.ConfirmCloseLastTab;
+            _settings.Save();
+        };
+        flyout.Items.Add(confirmClose);
         flyout.Items.Add(new Separator());
 
         var updates = new MenuItem { Header = loc["Menu.CheckUpdates"] };
