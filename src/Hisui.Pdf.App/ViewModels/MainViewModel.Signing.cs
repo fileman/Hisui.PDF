@@ -14,27 +14,38 @@ public partial class MainViewModel
     /// <summary>Digital signature tool: the dragged area becomes the visible signature; then sign, save, reopen.</summary>
     private async Task SignAreaAsync(PdfRect area) => await SignCoreAsync(area);
 
-    /// <summary>Invisible signature (no box on the page).</summary>
+    /// <summary>Signs an empty signature field of the document, or invisibly when there is none (or the user picks that).</summary>
     [RelayCommand(CanExecute = nameof(HasDocument))]
-    private Task SignInvisibleAsync() => SignCoreAsync(null);
+    private Task SignInvisibleAsync() => SignCoreAsync(null, chooseField: true);
 
-    private async Task SignCoreAsync(PdfRect? area)
+    private async Task SignCoreAsync(PdfRect? area, bool chooseField = false)
     {
         if (_session is null || SelectedPage is null || PromptSignatureAsync is null) return;
         await FlushFieldEditAsync();
         var pageIndex = Pages.IndexOf(SelectedPage);
-        byte[]? current = null;
-        await RunBusyAsync(_loc["Status.Preparing"], async ct => current = await _pageService.BuildFromSessionAsync(_session, ct));
+        // The signature is appended to the file as opened, so the signatures already in it stay valid; edits made
+        // since opening need the document rebuilt first, which invalidates them (warned below).
+        var current = _session.UnchangedSingleSource();
+        if (current is null)
+            await RunBusyAsync(_loc["Status.Preparing"], async ct => current = await _pageService.BuildFromSessionAsync(_session, ct));
         if (current is null) return;
 
-        // PDFsharp rewrites the whole file, so signatures already in the document would no longer verify.
-        var existing = await _signatures.VerifyAsync(current);
-        if (existing.Count > 0 && (ChooseAsync is null ||
-            await ChooseAsync(_loc.Format("Sign.ExistingWarning", existing.Count), [_loc["Dialog.Cancel"], _loc["Sign.Continue"]]) != 1)) return;
+        var broken = (await _signatures.VerifyAsync(current)).Count(s => !s.IntegrityOk);
+        if (broken > 0 && (ChooseAsync is null ||
+            await ChooseAsync(_loc.Format("Sign.ExistingWarning", broken), [_loc["Dialog.Cancel"], _loc["Sign.Continue"]]) != 1)) return;
 
-        if (await PromptSignatureAsync(area is null) is not { } request) return;
+        string? field = null;
+        if (chooseField && await _signatures.ListEmptySignatureFieldsAsync(current) is { Count: > 0 } empty)
+        {
+            if (ChooseAsync is null) return;
+            var pick = await ChooseAsync(_loc["Sign.ChooseField"], [_loc["Dialog.Cancel"], .. empty, _loc["Sign.Invisible"]]);
+            if (pick <= 0) return;
+            if (pick <= empty.Count) field = empty[pick - 1];
+        }
+
+        if (await PromptSignatureAsync(area is null && field is null) is not { } request) return;
         // The tool's area is relative to the page as shown; the built document has the session rotation baked in.
-        request = request with { PageIndex = pageIndex, Rect = area?.RotateClockwise(PageTurns) };
+        request = request with { PageIndex = pageIndex, Rect = area?.RotateClockwise(PageTurns), FieldName = field };
 
         var name = _currentPath is null ? "documento" : Path.GetFileNameWithoutExtension(_currentPath);
         var path = await _dialogs.SavePdfAsync(name + "-firmato.pdf");
@@ -61,9 +72,7 @@ public partial class MainViewModel
         await RunBusyAsync(_loc["Sign.Verifying"], async ct =>
         {
             // Verify the file as opened: rebuilding would rewrite it and break every signature.
-            var bytes = _session.SourceCount == 1 && _session.Pages.Select(p => p.SourceDocumentId).Distinct().Count() == 1
-                ? _session.GetSource(_session.Pages[0].SourceDocumentId)
-                : await _pageService.BuildFromSessionAsync(_session, ct);
+            var bytes = _session.UnchangedSingleSource() ?? await _pageService.BuildFromSessionAsync(_session, ct);
             infos = await _signatures.VerifyAsync(bytes, ct);
         });
         if (infos is null) return;

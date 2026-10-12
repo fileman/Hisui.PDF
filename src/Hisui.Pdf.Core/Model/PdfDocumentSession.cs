@@ -48,6 +48,18 @@ public sealed class PdfDocumentSession
         return id;
     }
 
+    /// <summary>The bytes of the only source when the pages are exactly its own, in order and unrotated (so the working
+    /// document is that file as is); null otherwise. Signing appends to these bytes instead of rebuilding the file.</summary>
+    public byte[]? UnchangedSingleSource()
+    {
+        if (_sources.Count != 1 || _pages.Count == 0) return null;
+        var (id, bytes) = _sources.First();
+        if (_pages.Count != _sourcePageCounts[id]) return null;
+        for (var i = 0; i < _pages.Count; i++)
+            if (_pages[i].SourceDocumentId != id || _pages[i].SourcePageIndex != i || _pages[i].Rotation != PageRotation.None) return null;
+        return bytes;
+    }
+
     /// <summary>Bytes of a source document previously registered with <see cref="AddSource"/>.</summary>
     public byte[] GetSource(int sourceDocumentId) => _sources[sourceDocumentId];
 

@@ -8,6 +8,8 @@ public sealed record SignRequest
     /// <summary>Certificate with its private key (Windows store, smart card or a .pfx file).</summary>
     public required X509Certificate2 Certificate { get; init; }
     public int PageIndex { get; init; }
+    /// <summary>Existing empty signature field to sign into; its widget gives page and box (PageIndex and Rect are ignored).</summary>
+    public string? FieldName { get; init; }
     /// <summary>Visible signature box (normalised, rendered orientation); null = invisible signature.</summary>
     public PdfRect? Rect { get; init; }
     public string? Reason { get; init; }
