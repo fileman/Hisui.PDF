@@ -14,8 +14,8 @@ namespace Hisui.Pdf.Core.Services;
 /// <summary>
 /// Heuristic form-field detection over PdfPig letters and paths. Works in raw page space (y up, /Rotate
 /// removed) and rotates the resulting rects back to the rendered orientation.
-/// Rules: underscore runs → text fields; symbol-font box glyphs → check boxes; small white filled rectangles
-/// (≥ 6 on a page, i.e. a grid) → text fields named from row label + rotated column header.
+/// Rules: underscore runs → text fields; symbol-font box glyphs → check boxes; grids of small painted cells
+/// (≥ 6 on a page) → white or unpainted cells become text fields named from row label + rotated column header.
 /// </summary>
 internal sealed class PdfFormDetector : IPdfFormDetector
 {
@@ -151,8 +151,10 @@ internal sealed class PdfFormDetector : IPdfFormDetector
             var cy = (c.Rect.Bottom + c.Rect.Top) / 2;
             if (!kept.Any(k => cx >= k.Rect.Left && cx <= k.Rect.Right && cy >= k.Rect.Bottom && cy <= k.Rect.Top)) kept.Add(c);
         }
+        // A grid of grey cells alone qualifies: its white cells are often left unpainted.
+        if (kept.Count < MinCellsForGrid) return;
         var cells = kept.Where(c => c.White).Select(c => c.Rect).ToList();
-        if (cells.Count < MinCellsForGrid) return;
+        var horizontal = letters.Where(l => l.Horizontal && !l.IsSpace).ToList();
 
         // Blank (unpainted) cells are the white of the page: recover them from the row × column lattice
         // spanned by the painted cells.
@@ -187,9 +189,14 @@ internal sealed class PdfFormDetector : IPdfFormDetector
         for (var ci = 0; ci < columns.Count; ci++)
             for (var ri = 0; ri < rowsLattice.Count; ri++)
                 if (!occupied.Contains((ci, ri)) && rowsInHalf.Contains((halfOf[ci], ri)))
-                    cells.Add(new PigRect(columns[ci].Lo, rowsLattice[ri].Lo, columns[ci].Hi, rowsLattice[ri].Hi));
+                {
+                    var blank = new PigRect(columns[ci].Lo, rowsLattice[ri].Lo, columns[ci].Hi, rowsLattice[ri].Hi);
+                    // Text inside means a data cell between shaded ones, not a blank to fill.
+                    if (!horizontal.Any(l => (l.Left + l.Right) / 2 is var x && x > blank.Left && x < blank.Right &&
+                                             (l.Bottom + l.Top) / 2 is var y && y > blank.Bottom && y < blank.Top))
+                        cells.Add(blank);
+                }
 
-        var horizontal = letters.Where(l => l.Horizontal && !l.IsSpace).ToList();
         var rotated = letters.Where(l => !l.Horizontal).ToList();
         var headers = new Dictionary<int, string>();
 
@@ -303,15 +310,31 @@ internal sealed class PdfFormDetector : IPdfFormDetector
         }
 
         var text = letters.Where(l => !l.IsSpace && l.Value != "_").ToList();
-        string TextIn(PigRect c) => BuildText(text.Where(l => l.Horizontal && Center(l) is var (x, y) &&
-            x >= c.Left - 1 && x <= c.Right + 1 && y >= c.Bottom - 1 && y <= c.Top + 1).OrderByDescending(l => (int)(l.BaselineY / LineTolerance)).ThenBy(l => l.Left));
+        string TextIn(PigRect c)
+        {
+            var inside = text.Where(l => Center(l) is var (x, y) &&
+                x >= c.Left - 1 && x <= c.Right + 1 && y >= c.Bottom - 1 && y <= c.Top + 1).ToList();
+            var flat = BuildText(inside.Where(l => l.Horizontal)
+                .OrderByDescending(l => (int)(l.BaselineY / LineTolerance)).ThenBy(l => l.Left));
+            // Rotated column headers: content-stream order is reading order.
+            return flat.Length > 0 ? flat : BuildText(inside.Where(l => !l.Horizontal).OrderBy(l => l.Index));
+        }
         var content = cells.Select(c => (Cell: c, Text: TextIn(c))).ToList();
 
-        foreach (var (cell, t) in content.Where(c => c.Text.Length == 0))
+        // Grey-shaded cells mean "not fillable" (see DetectGridCells).
+        var shaded = page.Paths
+            .Where(p => p.IsFilled && p.FillColor is not null && p.FillColor.ToRGBValues() is var (r, g, b) &&
+                        r + g + b >= 1.5 && !(r >= 0.98 && g >= 0.98 && b >= 0.98))
+            .Select(p => p.GetBoundingRectangle()).OfType<PigRect>().ToList();
+        bool Shaded(PigRect c) => shaded.Any(s => s.Width >= 0.5 * c.Width && s.Height >= 0.5 * c.Height &&
+            Center2(c) is var (x, y) && x >= s.Left && x <= s.Right && y >= s.Bottom && y <= s.Top);
+
+        foreach (var (cell, t) in content.Where(c => c.Text.Length == 0 && !Shaded(c.Cell)))
         {
             // Header: texts of the cells stacked above, nearest first. Row label: nearest text cell to the left.
             var headers = new List<string>();
             var cur = cell;
+            var rowNumber = 1; // blank cells between this one and the nearest header, plus one
             for (; ; )
             {
                 var above = content.Where(c => Math.Abs(c.Cell.Bottom - cur.Top) <= T &&
@@ -320,6 +343,7 @@ internal sealed class PdfFormDetector : IPdfFormDetector
                 if (above is null) break;
                 cur = above.Value.Cell;
                 if (above.Value.Text.Length > 0) headers.Add(above.Value.Text);
+                else if (headers.Count == 0) rowNumber++;
             }
             if (headers.Count == 0) continue;
 
@@ -331,8 +355,12 @@ internal sealed class PdfFormDetector : IPdfFormDetector
                     Math.Min(c.Cell.Top, cell.Top) - Math.Max(c.Cell.Bottom, cell.Bottom) > 0.5 * cell.Height)
                 .OrderByDescending(c => c.Cell.Right).Select(c => c.Text).FirstOrDefault() ?? "";
 
-            var name = string.Join("__", new[] { rowLabel, headers[0] }.Where(s => s.Length > 0).Select(s => Sanitize(s, "campo")));
+            // No row label (header-only table): number the rows, so the first row is not the odd one without a suffix.
+            var name = rowLabel.Length > 0
+                ? Sanitize(rowLabel, "campo") + "__" + Sanitize(headers[0], "campo")
+                : Sanitize(headers[0], "campo") + "__" + rowNumber.ToString(CultureInfo.InvariantCulture);
             var tip = string.Join(" - ", new[] { rowLabel }.Concat(Enumerable.Reverse(headers)).Where(s => s.Length > 0));
+            if (rowLabel.Length == 0) tip += $" - riga {rowNumber}";
             var rect = new PigRect(cell.Left + 0.5, cell.Bottom + 0.5, cell.Right - 0.5, cell.Top - 0.5);
             if (output.Any(o => Overlaps(rect, [o.Rect]))) continue;
             output.Add(new Candidate(rect, PdfFormFieldType.Text, Truncate(name, 90), Truncate(tip, 160), rect));
@@ -341,6 +369,7 @@ internal sealed class PdfFormDetector : IPdfFormDetector
         static bool Near(PigRect a, PigRect b) =>
             Math.Abs(a.Left - b.Left) < 1 && Math.Abs(a.Right - b.Right) < 1 && Math.Abs(a.Top - b.Top) < 1 && Math.Abs(a.Bottom - b.Bottom) < 1;
         static (double, double) Center(L l) => ((l.Left + l.Right) / 2, (l.Bottom + l.Top) / 2);
+        static (double, double) Center2(PigRect r) => ((r.Left + r.Right) / 2, (r.Bottom + r.Top) / 2);
     }
 
     /// <summary>Merges collinear (±1 pt) segments that touch or overlap into single lines.</summary>

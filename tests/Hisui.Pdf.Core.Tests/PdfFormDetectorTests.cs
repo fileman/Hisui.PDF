@@ -66,6 +66,22 @@ public class PdfFormDetectorTests
     }
 
     [Fact]
+    public async Task Grid_OnlyGreyPainted_UnpaintedCellsBecomeFields_UnlessTheyHoldText()
+    {
+        var pdf = Build(gfx =>
+        {
+            for (var row = 0; row < 6; row++)
+                for (var col = 0; col < 6; col++)
+                    if ((row + col) % 2 == 0) gfx.DrawRectangle(XBrushes.Gray, new XRect(100 + col * 21, 100 + row * 11, 20, 10));
+            gfx.DrawString("7", new XFont("Arial", 7), XBrushes.Black, new XPoint(100 + 21 + 8, 100 + 8)); // row 0, col 1
+        });
+
+        var specs = await _sut.DetectFieldsAsync(pdf);
+
+        Assert.Equal(17, specs.Count); // 18 unpainted cells, one holds text
+    }
+
+    [Fact]
     public async Task SideBySideGrids_ShorterGridDoesNotInheritTallerGridRows()
     {
         var pdf = Build(gfx =>
@@ -164,5 +180,56 @@ public class PdfFormDetectorTests
 
         var fields = await forms.ReadFieldsAsync(saved);
         Assert.Equal(["NOME", "E_MAIL"], fields.Select(f => f.Name));
+    }
+
+    /// <summary>Ruled 3×4 table: grey header row with rotated column titles, optional row labels on the left.</summary>
+    private static void RotatedHeaderTable(XGraphics g, bool greyBody, bool rowLabels = true)
+    {
+        var font = new XFont("Arial", 6);
+        for (var r = 0; r < 5; r++)
+            for (var c = 0; c < 4; c++)
+            {
+                var rect = r == 0 ? new XRect(100 + c * 40, 100, 40, 40) : new XRect(100 + c * 40, 140 + (r - 1) * 12, 40, 12);
+                if (r == 0 || (greyBody && c > 0 && (r + c) % 2 == 0)) g.DrawRectangle(XBrushes.LightGray, rect);
+                g.DrawRectangle(new XPen(XColors.Black, 0.5), rect);
+                if (r == 0 && c > 0)
+                {
+                    var state = g.Save();
+                    g.RotateAtTransform(-90, new XPoint(rect.X + 20, rect.Y + 38));
+                    g.DrawString($"Col{c}", font, XBrushes.Black, rect.X + 20, rect.Y + 38);
+                    g.Restore(state);
+                }
+                if (r == 0 && c == 0) g.DrawString("Specie", font, XBrushes.Black, rect.X + 2, rect.Y + 36);
+                if (r > 0 && c == 0 && rowLabels) g.DrawString($"Riga{r}", font, XBrushes.Black, rect.X + 2, rect.Y + 9);
+            }
+    }
+
+    [Fact]
+    public async Task RuledTable_HeaderOnly_EveryBodyCellIsAField()
+    {
+        var specs = await _sut.DetectFieldsAsync(Build(g => RotatedHeaderTable(g, greyBody: false, rowLabels: false)));
+
+        Assert.Equal(16, specs.Count); // Specie column included: it is blank too
+        Assert.Equal(["Specie__1", "Col1__1", "Col2__1", "Col3__1"], specs.Take(4).Select(s => s.Name));
+        Assert.Equal("Col2__4", specs[14].Name);
+        Assert.Equal("Col2 - riga 4", specs[14].Tooltip);
+    }
+
+    [Fact]
+    public async Task RuledTable_RotatedColumnHeaders_NameTheBlankCells()
+    {
+        var specs = await _sut.DetectFieldsAsync(Build(g => RotatedHeaderTable(g, greyBody: false)));
+
+        Assert.Equal(12, specs.Count);
+        Assert.Contains(specs, s => s.Name == "Riga3__Col2");
+    }
+
+    [Fact]
+    public async Task RuledTable_GreyShadedCells_AreNotFields()
+    {
+        var specs = await _sut.DetectFieldsAsync(Build(g => RotatedHeaderTable(g, greyBody: true)));
+
+        Assert.Equal(["Riga1__Col2", "Riga2__Col1", "Riga2__Col3", "Riga3__Col2", "Riga4__Col1", "Riga4__Col3"],
+            specs.Select(s => s.Name).Order());
     }
 }
