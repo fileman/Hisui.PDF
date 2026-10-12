@@ -43,6 +43,7 @@ public partial class MainViewModel : ObservableObject
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
     private readonly Dictionary<(int Source, int Page), IImage> _previewCache = [];
+    private readonly HashSet<(int Source, int Page)> _renderingPreviews = [];
 
     private PdfDocumentSession? _session;
     private CancellationTokenSource? _cts;
@@ -71,6 +72,7 @@ public partial class MainViewModel : ObservableObject
         _renderer = renderer;
         _dialogs = dialogs;
         _settings = settings;
+        _isContinuousView = settings.Settings.ContinuousScroll;
         _annotations = annotations;
         _forms = forms;
         _formDetector = formDetector;
@@ -621,6 +623,7 @@ public partial class MainViewModel : ObservableObject
             };
             if (_thumbCache.TryGetValue((pageRef.SourceDocumentId, pageRef.SourcePageIndex), out var thumb))
                 item.Thumbnail = thumb;
+            PreparePage(item);
             Pages.Add(item);
         }
 
@@ -649,7 +652,50 @@ public partial class MainViewModel : ObservableObject
             }
 
             item.Thumbnail = thumb;
+            PreparePage(item);
         }
+    }
+
+    /// <summary>Gives a page its continuous-view size: the cached render's, else estimated from the thumbnail.</summary>
+    private void PreparePage(PageItemViewModel item)
+    {
+        item.SetZoom(ZoomLevel);
+        if (_previewCache.TryGetValue((item.SourceDocumentId, item.SourcePageIndex), out var preview))
+        {
+            item.Preview = preview;
+            item.SetBaseSize(preview.Size);
+            return;
+        }
+        var scale = (double)_settings.Settings.PreviewDpi / ThumbnailDpi;
+        item.SetBaseSize(item.Thumbnail is { } t
+            ? new Avalonia.Size(t.Size.Width * scale, t.Size.Height * scale)
+            : new Avalonia.Size(8.27 * _settings.Settings.PreviewDpi, 11.69 * _settings.Settings.PreviewDpi)); // A4
+    }
+
+    /// <summary>Renders <paramref name="item"/>'s full-size preview for continuous view (shared cache with the single-page preview).</summary>
+    public async void EnsurePagePreview(PageItemViewModel item)
+    {
+        if (_session is null) return;
+        var key = (item.SourceDocumentId, item.SourcePageIndex);
+        if (_previewCache.TryGetValue(key, out var cached))
+        {
+            if (!ReferenceEquals(item.Preview, cached)) { item.Preview = cached; item.SetBaseSize(cached.Size); }
+            return;
+        }
+        if (!_renderingPreviews.Add(key)) return;
+        try
+        {
+            var png = await _renderer.RenderPageToPngAsync(_session.GetSource(item.SourceDocumentId), item.SourcePageIndex, _settings.Settings.PreviewDpi);
+            var preview = BitmapConversions.ToFrozenBitmap(png);
+            _previewCache[key] = preview;
+            item.Preview = preview;
+            item.SetBaseSize(preview.Size);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _loc.Format("Status.RenderError", ex.Message);
+        }
+        finally { _renderingPreviews.Remove(key); }
     }
 
     private async Task UpdatePreviewAsync(PageItemViewModel? item)

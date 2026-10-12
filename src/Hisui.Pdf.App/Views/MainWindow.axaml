@@ -1,12 +1,102 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
+        xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
         x:Class="Hisui.Pdf.App.Views.MainWindow"
         Title="Hisui PDF"
         Icon="avares://Hisui.Pdf.App/Assets/HisuiPDF.ico"
         Height="760" Width="1180"
         WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="40"
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
         Background="{DynamicResource RibbonWindowBrush}">
-    <!-- Shell: one tab per open document; each tab hosts a self-contained DocumentView. -->
-    <TabControl x:Name="Tabs" Padding="0" />
+
+    <Window.Styles>
+        <!-- Document tabs as pills -->
+        <Style Selector="TabItem">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="pill" Height="30" Padding="12,0,6,0" CornerRadius="7"
+                            Background="Transparent" BorderBrush="Transparent" BorderThickness="1">
+                        <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Header}"
+                                          ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                          Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="TabItem:pointerover /template/ Border#pill">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="TabItem:selected /template/ Border#pill">
+            <Setter Property="Background" Value="{DynamicResource RibbonTabStripBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource RibbonDividerBrush}" />
+        </Style>
+        <Style Selector="TabItem:selected">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
+        </Style>
+
+        <!-- "+" new-tab button -->
+        <Style Selector="Button.newtab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+        </Style>
+        <Style Selector="Button.newtab /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="7" />
+        </Style>
+        <Style Selector="Button.newtab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <!-- Shell: one tab per open document; each tab hosts a self-contained DocumentView. The tab strip
+         doubles as the title bar when the window extends into its decorations. -->
+    <TabControl x:Name="Tabs" Padding="0">
+        <TabControl.Template>
+            <ControlTemplate>
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" Height="40" ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+                          Background="{DynamicResource RibbonWindowBrush}">
+                        <Border Width="16" Height="16" Margin="14,0,10,0" CornerRadius="4"
+                                VerticalAlignment="Center" Background="{DynamicResource RibbonAccentBrush}" />
+                        <ItemsPresenter Name="PART_ItemsPresenter" Grid.Column="1" VerticalAlignment="Center">
+                            <ItemsPresenter.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsPresenter.ItemsPanel>
+                        </ItemsPresenter>
+                        <Button Name="PART_NewTab" Grid.Column="2" Classes="newtab"
+                                ToolTip.Tip="{loc:Tr Tab.New}" AutomationProperties.Name="{loc:Tr Tab.New}">
+                            <Path Width="12" Height="12" Data="M6 1v10 M1 6h10" Stroke="{Binding $parent[Button].Foreground}"
+                                  StrokeThickness="1.4" StrokeLineCap="Round" Stretch="Uniform" />
+                        </Button>
+                        <!-- Empty strip: drags the window (native move + double-click maximize). -->
+                        <Border Grid.Column="3" Background="Transparent"
+                                chrome:WindowDecorationProperties.ElementRole="TitleBar" />
+                        <!-- Room for the caption buttons (width fitted in code-behind) -->
+                        <Border Name="PART_CaptionSpacer" Grid.Column="4" Width="140"
+                                IsVisible="{Binding $parent[Window].IsExtendedIntoWindowDecorations}" />
+                    </Grid>
+                    <ContentPresenter Name="PART_SelectedContentHost"
+                                      Content="{TemplateBinding SelectedContent}"
+                                      ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+                </DockPanel>
+            </ControlTemplate>
+        </TabControl.Template>
+    </TabControl>
 </Window>

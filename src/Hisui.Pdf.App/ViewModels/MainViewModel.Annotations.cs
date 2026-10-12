@@ -23,6 +23,39 @@ public partial class MainViewModel
 
     [ObservableProperty] private RibbonTab _ribbonTab = RibbonTab.Home;
 
+    // Page view mode. A tool needs the single-page overlay, so it temporarily takes over from continuous view.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowContinuous))]
+    [NotifyPropertyChangedFor(nameof(ShowContinuousPages))]
+    [NotifyPropertyChangedFor(nameof(ShowSinglePage))]
+    private bool _isContinuousView;
+
+    partial void OnIsContinuousViewChanged(bool value)
+    {
+        _settings.Settings.ContinuousScroll = value;
+        _settings.Save();
+    }
+
+    [RelayCommand]
+    private void SetContinuousView(bool continuous) => IsContinuousView = continuous;
+
+    public bool ShowContinuous => IsContinuousView && !IsAnnotationActive;
+    public bool ShowContinuousPages => IsDocumentLoaded && ShowContinuous;
+    public bool ShowSinglePage => IsDocumentLoaded && !ShowContinuous;
+
+    // Side panels: thumbnails open by default, tool panel closed so the page gets the room.
+    [ObservableProperty] private bool _isThumbnailPanelOpen = true;
+    [ObservableProperty] private bool _isToolPanelOpen;
+
+    /// <summary>Rail click: show <paramref name="tab"/>'s tools, or close the panel when it is already showing.</summary>
+    [RelayCommand]
+    private void ToggleToolPanel(RibbonTab tab)
+    {
+        if (IsToolPanelOpen && RibbonTab == tab) { IsToolPanelOpen = false; return; }
+        RibbonTab = tab;
+        IsToolPanelOpen = true;
+    }
+
     partial void OnRibbonTabChanged(RibbonTab value)
     {
         // Each tab has its own tool set; never carry a tool over.
@@ -32,7 +65,7 @@ public partial class MainViewModel
     /// <summary>Header for the thumbnail panel, e.g. "Pagine · 6".</summary>
     public string PageCountLabel => _loc.Format("Status.PageCount", Pages.Count);
 
-    /// <summary>Right-aligned status-bar text, e.g. "Pagina 3 di 6".</summary>
+    /// <summary>Page indicator in the command bar, e.g. "Pagina 3 di 6".</summary>
     public string PageInfo
     {
         get
@@ -73,6 +106,8 @@ public partial class MainViewModel
         RedoCommand.NotifyCanExecuteChanged();
         SearchCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsDocumentLoaded));
+        OnPropertyChanged(nameof(ShowContinuousPages));
+        OnPropertyChanged(nameof(ShowSinglePage));
         OnPropertyChanged(nameof(ShowEmptyState));
     }
 
@@ -93,6 +128,9 @@ public partial class MainViewModel
         DragRect = default;
         OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
+        OnPropertyChanged(nameof(ShowContinuous));
+        OnPropertyChanged(nameof(ShowContinuousPages));
+        OnPropertyChanged(nameof(ShowSinglePage));
     }
 
     partial void OnPreviewRotationAngleChanged(double value)

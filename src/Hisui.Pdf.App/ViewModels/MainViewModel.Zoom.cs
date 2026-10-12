@@ -27,6 +27,11 @@ public partial class MainViewModel
     private double NativeW => PreviewImage?.Size.Width ?? 0;
     private double NativeH => PreviewImage?.Size.Height ?? 0;
 
+    partial void OnZoomLevelChanged(double value)
+    {
+        foreach (var page in Pages) page.SetZoom(value);
+    }
+
     partial void OnPreviewImageChanged(IImage? value)
     {
         OnPropertyChanged(nameof(PreviewDisplayWidth));
@@ -66,6 +71,7 @@ public partial class MainViewModel
     /// <summary>Pushed from the view: the preview scroll viewport size, used by fit-width / fit-height.</summary>
     public void UpdateViewportSize(double width, double height)
     {
+        if (width <= 0 || height <= 0) return; // the hidden one of the two preview scrollers reports 0
         _viewportW = width;
         _viewportH = height;
     }
