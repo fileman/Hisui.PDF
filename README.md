@@ -66,6 +66,7 @@ the release page. Pre-releases are never offered.
 - **[Avalonia](https://avaloniaui.net/) 12** — cross-platform UI
 - **[PDFsharp](https://docs.pdfsharp.net/)** — structural & write operations
 - **[PdfPig](https://github.com/UglyToad/PdfPig)** — text/image extraction
+- **[Open XML SDK](https://github.com/dotnet/Open-XML-SDK)** — Word (.docx) export
 - **[PDFtoImage](https://github.com/sungaila/PDFtoImage)** (PDFium) — page rendering
 - **[Tesseract](https://github.com/charlesw/tesseract)** — OCR for scanned PDFs
 - **[SkiaSharp](https://github.com/mono/SkiaSharp)** — raster compositing

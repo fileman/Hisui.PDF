@@ -51,6 +51,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="PDFsharp 6.2.4" />
@@ -76,6 +77,10 @@
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="SkiaSharp / PDFium" Margin="0,4,0,0" />
                 <TextBlock Grid.Row="5" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.Skia}" />
+
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="DocumentFormat.OpenXml 3.3.0" Margin="0,4,0,0" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
+                           Text="{loc:Tr About.Lib.OpenXml}" />
             </Grid>
 
         </StackPanel>
