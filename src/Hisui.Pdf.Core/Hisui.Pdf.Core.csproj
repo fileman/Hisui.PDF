@@ -29,6 +29,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Liberation Sans (OFL-1.1, Arial-metric): the only font Hisui PDF writes into documents, so output never
+         depends on (or embeds) a proprietary system font. See THIRD-PARTY-NOTICES.txt / licenses/OFL-Liberation.txt. -->
+    <EmbeddedResource Include="Fonts\LiberationSans-*.ttf" LogicalName="Hisui.Pdf.Core.Fonts.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Tests exercise the internal service implementations directly. -->
     <InternalsVisibleTo Include="Hisui.Pdf.Core.Tests" />
   </ItemGroup>

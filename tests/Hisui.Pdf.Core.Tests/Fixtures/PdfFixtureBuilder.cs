@@ -44,7 +44,7 @@ public static class PdfFixtureBuilder
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageCount);
         // Ensure font resolver is active (harmless no-op if already set by PdfAnnotationService's static ctor).
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
 
         using var document = new PdfDocument();
         for (var i = 0; i < pageCount; i++)

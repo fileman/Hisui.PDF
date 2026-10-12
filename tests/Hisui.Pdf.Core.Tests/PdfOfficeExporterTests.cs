@@ -16,7 +16,7 @@ public class PdfOfficeExporterTests
 
     private static byte[] TablePdf()
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         using var doc = new PdfSharp.Pdf.PdfDocument();
         var page = doc.AddPage();
         using (var gfx = XGraphics.FromPdfPage(page))
@@ -62,7 +62,7 @@ public class PdfOfficeExporterTests
     [Fact]
     public async Task Xlsx_RotatedColumnHeadersBecomeTheHeaderRow()
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         using var doc = new PdfSharp.Pdf.PdfDocument();
         var page = doc.AddPage();
         using (var gfx = XGraphics.FromPdfPage(page))

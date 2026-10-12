@@ -124,6 +124,10 @@
         <File Source="..\..\licenses\OFL.txt" />
       </Component>
 
+      <Component Id="LicenseOflLiberation" Directory="LicensesFolder" Guid="*">
+        <File Source="..\..\licenses\OFL-Liberation.txt" />
+      </Component>
+
     </ComponentGroup>
   </Fragment>
 
