@@ -4,6 +4,7 @@ namespace Hisui.Pdf.App.Services;
 public interface IFileDialogService
 {
     Task<string?> OpenPdfAsync();
+    Task<IReadOnlyList<string>> OpenPdfsAsync();
     Task<string?> SavePdfAsync(string suggestedFileName);
     Task<string?> PickFolderAsync();
     Task<string?> OpenImageAsync();

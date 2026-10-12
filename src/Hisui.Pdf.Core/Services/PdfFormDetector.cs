@@ -47,6 +47,7 @@ internal sealed class PdfFormDetector : IPdfFormDetector
                 DetectUnderscores(letters, candidates);
                 DetectCheckBoxes(letters, candidates);
                 DetectGridCells(page, letters, candidates);
+                DetectRuledCells(page, letters, candidates);
 
                 var pageSpecs = candidates
                     .Where(c => !Overlaps(c.Rect, taken))
@@ -232,6 +233,116 @@ internal sealed class PdfFormDetector : IPdfFormDetector
                 output.Add(new Candidate(rect, PdfFormFieldType.Text, Truncate(name, 90), tip.Length > 0 ? tip : null, extent));
             }
         }
+    }
+
+    /// <summary>
+    /// Ruled tables (cells drawn with lines): every empty cell with header text somewhere above it in its column
+    /// becomes a text field, named from the row label (text to the left) and the nearest header.
+    /// ponytail: cells need 4 full borders; label|value rows with no header above are skipped.
+    /// </summary>
+    private static void DetectRuledCells(Page page, List<L> letters, List<Candidate> output)
+    {
+        var hRaw = new List<(double Pos, double Lo, double Hi)>(); // y, x0, x1
+        var vRaw = new List<(double Pos, double Lo, double Hi)>(); // x, y0, y1
+        foreach (var path in page.Paths)
+        {
+            var bb = path.GetBoundingRectangle();
+            if (path.IsFilled && !path.IsStroked && !(bb is { } b && (b.Width < 1.5 || b.Height < 1.5))) continue;
+            foreach (var sub in path.Where(s => s.Commands.Count > 0))
+            {
+                var first = default(UglyToad.PdfPig.Core.PdfPoint);
+                var last = first;
+                foreach (var cmd in sub.Commands)
+                {
+                    switch (cmd)
+                    {
+                        case UglyToad.PdfPig.Core.PdfSubpath.Move m: first = last = m.Location; break;
+                        case UglyToad.PdfPig.Core.PdfSubpath.Line ln: AddSegment(ln.From, ln.To); last = ln.To; break;
+                        case UglyToad.PdfPig.Core.PdfSubpath.Close: AddSegment(last, first); last = first; break;
+                    }
+                }
+            }
+        }
+
+        void AddSegment(UglyToad.PdfPig.Core.PdfPoint a, UglyToad.PdfPig.Core.PdfPoint b)
+        {
+            if (Math.Abs(a.Y - b.Y) < 0.6 && Math.Abs(a.X - b.X) >= 4) hRaw.Add(((a.Y + b.Y) / 2, Math.Min(a.X, b.X), Math.Max(a.X, b.X)));
+            else if (Math.Abs(a.X - b.X) < 0.6 && Math.Abs(a.Y - b.Y) >= 4) vRaw.Add(((a.X + b.X) / 2, Math.Min(a.Y, b.Y), Math.Max(a.Y, b.Y)));
+        }
+
+        var hs = MergeLines(hRaw);
+        var vs = MergeLines(vRaw);
+        if (hs.Count < 2 || vs.Count < 2) return;
+
+        // Minimal rectangles: top edge h, left edge v1, nearest right edge v2, nearest bottom edge spanning both.
+        const double T = 1.5;
+        var cells = new List<PigRect>();
+        foreach (var h in hs)
+        {
+            var down = vs.Where(v => v.Pos >= h.Lo - T && v.Pos <= h.Hi + T && v.Hi >= h.Pos - T && v.Lo < h.Pos - 4)
+                .OrderBy(v => v.Pos).ToList();
+            for (var i = 0; i + 1 < down.Count; i++)
+            {
+                var v1 = down[i];
+                var v2 = down[i + 1];
+                if (v2.Pos - v1.Pos < 8) continue;
+                var bottom = hs.Where(b => b.Pos < h.Pos - 4 && b.Lo <= v1.Pos + T && b.Hi >= v2.Pos - T &&
+                                           v1.Lo <= b.Pos + T && v2.Lo <= b.Pos + T)
+                    .OrderByDescending(b => b.Pos).FirstOrDefault();
+                if (bottom == default) continue;
+                var cell = new PigRect(v1.Pos, bottom.Pos, v2.Pos, h.Pos);
+                if (cell.Height >= 7 && cell.Width >= 10 && !cells.Any(c => Near(c, cell))) cells.Add(cell);
+            }
+        }
+
+        var text = letters.Where(l => !l.IsSpace && l.Value != "_").ToList();
+        string TextIn(PigRect c) => BuildText(text.Where(l => l.Horizontal && Center(l) is var (x, y) &&
+            x >= c.Left - 1 && x <= c.Right + 1 && y >= c.Bottom - 1 && y <= c.Top + 1).OrderByDescending(l => (int)(l.BaselineY / LineTolerance)).ThenBy(l => l.Left));
+        var content = cells.Select(c => (Cell: c, Text: TextIn(c))).ToList();
+
+        foreach (var (cell, t) in content.Where(c => c.Text.Length == 0))
+        {
+            // Header: texts of the cells stacked above, nearest first. Row label: nearest text cell to the left.
+            var headers = new List<string>();
+            var cur = cell;
+            for (; ; )
+            {
+                var above = content.Where(c => Math.Abs(c.Cell.Bottom - cur.Top) <= T &&
+                        Math.Min(c.Cell.Right, cur.Right) - Math.Max(c.Cell.Left, cur.Left) > 0.5 * cur.Width)
+                    .Select(c => ((PigRect Cell, string Text)?)c).FirstOrDefault();
+                if (above is null) break;
+                cur = above.Value.Cell;
+                if (above.Value.Text.Length > 0) headers.Add(above.Value.Text);
+            }
+            if (headers.Count == 0) continue;
+
+            var rowLabel = content.Where(c => c.Text.Length > 0 && c.Cell.Right <= cell.Left + T &&
+                    Math.Min(c.Cell.Top, cell.Top) - Math.Max(c.Cell.Bottom, cell.Bottom) > 0.5 * cell.Height)
+                .OrderByDescending(c => c.Cell.Right).Select(c => c.Text).FirstOrDefault() ?? "";
+
+            var name = string.Join("__", new[] { rowLabel, headers[0] }.Where(s => s.Length > 0).Select(s => Sanitize(s, "campo")));
+            var tip = string.Join(" - ", new[] { rowLabel }.Concat(Enumerable.Reverse(headers)).Where(s => s.Length > 0));
+            var rect = new PigRect(cell.Left + 0.5, cell.Bottom + 0.5, cell.Right - 0.5, cell.Top - 0.5);
+            if (output.Any(o => Overlaps(rect, [o.Rect]))) continue;
+            output.Add(new Candidate(rect, PdfFormFieldType.Text, Truncate(name, 90), Truncate(tip, 160), rect));
+        }
+
+        static bool Near(PigRect a, PigRect b) =>
+            Math.Abs(a.Left - b.Left) < 1 && Math.Abs(a.Right - b.Right) < 1 && Math.Abs(a.Top - b.Top) < 1 && Math.Abs(a.Bottom - b.Bottom) < 1;
+        static (double, double) Center(L l) => ((l.Left + l.Right) / 2, (l.Bottom + l.Top) / 2);
+    }
+
+    /// <summary>Merges collinear (±1 pt) segments that touch or overlap into single lines.</summary>
+    private static List<(double Pos, double Lo, double Hi)> MergeLines(List<(double Pos, double Lo, double Hi)> raw)
+    {
+        var merged = new List<(double Pos, double Lo, double Hi)>();
+        foreach (var s in raw.OrderBy(s => s.Pos).ThenBy(s => s.Lo))
+        {
+            var i = merged.FindIndex(m => Math.Abs(m.Pos - s.Pos) <= 1 && s.Lo <= m.Hi + 1.5 && s.Hi >= m.Lo - 1.5);
+            if (i < 0) merged.Add(s);
+            else merged[i] = (merged[i].Pos, Math.Min(merged[i].Lo, s.Lo), Math.Max(merged[i].Hi, s.Hi));
+        }
+        return merged;
     }
 
     /// <summary>Groups (lo, hi) spans whose lo values agree within 1.5 pt; keeps clusters with at least 3 members.</summary>

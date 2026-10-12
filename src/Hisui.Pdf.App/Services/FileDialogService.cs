@@ -34,6 +34,21 @@ internal sealed class FileDialogService : IFileDialogService
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
+    public async Task<IReadOnlyList<string>> OpenPdfsAsync()
+    {
+        var sp = GetStorageProvider();
+        if (sp is null) return [];
+
+        var files = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = _loc["Picker.OpenPdf"],
+            AllowMultiple = true,
+            FileTypeFilter = [PdfType],
+        });
+
+        return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
+    }
+
     public async Task<string?> SavePdfAsync(string suggestedFileName)
     {
         var sp = GetStorageProvider();
