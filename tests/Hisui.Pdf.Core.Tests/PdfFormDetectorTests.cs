@@ -66,6 +66,27 @@ public class PdfFormDetectorTests
     }
 
     [Fact]
+    public async Task SideBySideGrids_ShorterGridDoesNotInheritTallerGridRows()
+    {
+        var pdf = Build(gfx =>
+        {
+            // Left grid 6 rows, right grid 3 rows (beyond a gutter); every cell grey except one white per row.
+            void Grid(double x, int rowCount)
+            {
+                for (var row = 0; row < rowCount; row++)
+                    for (var col = 0; col < 3; col++)
+                        gfx.DrawRectangle(col == 1 ? XBrushes.White : XBrushes.Gray, new XRect(x + col * 21, 100 + row * 11, 20, 10));
+            }
+            Grid(100, 6);
+            Grid(250, 3);
+        });
+
+        var specs = await _sut.DetectFieldsAsync(pdf);
+
+        Assert.Equal(9, specs.Count);
+    }
+
+    [Fact]
     public async Task RuledMatrix_EmptyCellsAtRowColumnCrossings_BecomeFields()
     {
         var pdf = Build(gfx =>

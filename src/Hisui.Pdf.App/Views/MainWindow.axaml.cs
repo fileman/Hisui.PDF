@@ -22,21 +22,34 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _services = services;
-        Tabs.SelectionChanged += (_, _) => UpdateWindowTitle();
+        Tabs.SelectionChanged += (_, _) =>
+        {
+            UpdateWindowTitle();
+            (Tabs.SelectedItem as Control)?.BringIntoView();
+        };
         Tabs.TemplateApplied += (_, e) =>
         {
             if (e.NameScope.Find<Control>("PART_NewTab") is Button add) add.Click += (_, _) => OpenInTab();
             _captionSpacer = e.NameScope.Find<Control>("PART_CaptionSpacer");
+            // The wheel scrolls the tab strip sideways when it overflows.
+            if (e.NameScope.Find<Control>("PART_TabScroll") is ScrollViewer strip)
+                strip.PointerWheelChanged += (_, w) =>
+                {
+                    strip.Offset = strip.Offset.WithX(strip.Offset.X - (w.Delta.Y + w.Delta.X) * 60);
+                    w.Handled = true;
+                };
         };
         KeyDown += (_, e) =>
         {
             if (e.Key == Key.W && e.KeyModifiers.HasFlag(KeyModifiers.Control) && Tabs.SelectedItem is TabItem t)
             {
-                CloseTab(t);
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) _ = CloseAllTabsAsync();
+                else _ = CloseTabAsync(t);
                 e.Handled = true;
             }
         };
         AddTab();
+        Closing += OnClosing;
         Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(FitCaptionButtons, Avalonia.Threading.DispatcherPriority.Loaded);
     }
 
@@ -77,11 +90,15 @@ public partial class MainWindow : Window
     /// optionally exports it to <paramref name="convert"/>. With no path, adds an empty tab.</summary>
     public void OpenInTab(string? path = null, string? convert = null)
     {
-        // Loading is async, so IsDocumentLoaded alone can't tell that a tab was just claimed by a previous file.
-        var view = path is not null && CurrentView is { } cur && !_claimed.Contains(cur)
-                   && cur.DataContext is MainViewModel { IsDocumentLoaded: false }
-            ? cur
-            : AddTab();
+        // Reuse an empty tab (the current one first) rather than leaving it in front of the documents. Loading is async,
+        // so IsDocumentLoaded alone can't tell that a tab was just claimed by a previous file or is opening one itself.
+        var empty = path is null
+            ? null
+            : Tabs.Items.OfType<TabItem>().OrderBy(t => ReferenceEquals(t, Tabs.SelectedItem) ? 0 : 1)
+                .FirstOrDefault(t => t.Content is DocumentView v && !_claimed.Contains(v)
+                                     && v.DataContext is MainViewModel { IsDocumentLoaded: false, IsBusy: false });
+        if (empty is not null) Tabs.SelectedItem = empty;
+        var view = empty?.Content as DocumentView ?? AddTab();
         if (path is not null && view.DataContext is MainViewModel vm)
         {
             _claimed.Add(view);
@@ -107,15 +124,29 @@ public partial class MainWindow : Window
         var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 180, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis };
         var close = new Button { Content = "✕", Padding = new(5, 2), Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new(0), FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
         var item = new TabItem { Content = view, Header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { label, close } } };
-        close.Click += (_, _) => CloseTab(item);
+        close.Click += (_, _) => _ = CloseTabAsync(item);
+        var loc = Localization.Localizer.Instance;
+        var closeThis = new MenuItem { Header = loc["Tab.Close"], InputGesture = new KeyGesture(Key.W, KeyModifiers.Control) };
+        var closeOthers = new MenuItem { Header = loc["Tab.CloseOthers"] };
+        var closeAll = new MenuItem { Header = loc["Tab.CloseAll"], InputGesture = new KeyGesture(Key.W, KeyModifiers.Control | KeyModifiers.Shift) };
+        closeThis.Click += (_, _) => _ = CloseTabAsync(item);
+        closeOthers.Click += async (_, _) =>
+        {
+            foreach (var other in Tabs.Items.OfType<TabItem>().Where(t => t != item).ToList())
+                if (!await CloseTabAsync(other)) return;
+        };
+        closeAll.Click += (_, _) => _ = CloseAllTabsAsync();
+        item.ContextMenu = new ContextMenu { Items = { closeThis, closeOthers, closeAll } };
 
         void Refresh()
         {
-            label.Text = vm.Title.Contains(" — ") ? vm.Title[(vm.Title.IndexOf(" — ", StringComparison.Ordinal) + 3)..] : vm.Title;
+            close.Content = vm.HasUnsavedChanges ? "●" : "✕"; // unsaved marker, like an editor tab
+            // An empty tab reads "New tab", not a second copy of the app name in front of the documents.
+            label.Text = vm.Title.Contains(" — ") ? vm.Title[(vm.Title.IndexOf(" — ", StringComparison.Ordinal) + 3)..] : Localization.Localizer.Instance["Tab.New"];
             ToolTip.SetTip(item, vm.CurrentPath is { } p ? $"{Path.GetFileName(p)}\n{p}" : label.Text);
             if (ReferenceEquals(Tabs.SelectedItem, item)) UpdateWindowTitle();
         }
-        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MainViewModel.Title)) Refresh(); };
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName is nameof(MainViewModel.Title) or nameof(MainViewModel.HasUnsavedChanges)) Refresh(); };
         Refresh();
 
         Tabs.Items.Add(item);
@@ -123,11 +154,58 @@ public partial class MainWindow : Window
         return view;
     }
 
-    private void CloseTab(TabItem item)
+    /// <summary>Closes a tab after offering to save unsaved changes; false when the user cancels.</summary>
+    private async Task<bool> CloseTabAsync(TabItem item)
     {
+        if (!await ConfirmDiscardAsync(item)) return false;
         Tabs.Items.Remove(item);
         if (item.Content is DocumentView v) _claimed.Remove(v);
-        if (Tabs.ItemCount == 0) Close();
+        if (Tabs.ItemCount == 0) { _closeConfirmed = true; Close(); }
+        return true;
+    }
+
+    /// <summary>Save / Don't save / Cancel for a tab with unsaved changes. True when the tab may close.</summary>
+    private async Task<bool> ConfirmDiscardAsync(TabItem item)
+    {
+        if (item.Content is not DocumentView { DataContext: MainViewModel vm }) return true;
+        await vm.FlushFieldEditAsync();
+        if (!vm.HasUnsavedChanges) return true;
+
+        Tabs.SelectedItem = item;
+        var loc = Localization.Localizer.Instance;
+        var name = vm.CurrentPath is { } p ? Path.GetFileName(p) : loc["Tab.New"];
+        return await FormDialog.ChooseAsync(this, "Hisui PDF", loc.Format("Unsaved.Message", name),
+                   loc["Dialog.Cancel"], loc["Unsaved.Discard"], loc["Unsaved.Save"]) switch
+        {
+            2 => await vm.SaveBeforeCloseAsync(),
+            1 => true,
+            _ => false,
+        };
+    }
+
+    private bool _closeConfirmed;
+
+    // Window close (title bar, Alt+F4, Exit): ask for every tab with unsaved changes first.
+    private async void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_closeConfirmed) return;
+        e.Cancel = true;
+        foreach (var tab in Tabs.Items.OfType<TabItem>().ToList())
+            if (!await ConfirmDiscardAsync(tab)) return;
+        _closeConfirmed = true;
+        Close();
+    }
+
+    /// <summary>Closes every tab and leaves one empty tab (the window stays open).</summary>
+    private async Task CloseAllTabsAsync()
+    {
+        foreach (var tab in Tabs.Items.OfType<TabItem>().ToList())
+        {
+            if (!await ConfirmDiscardAsync(tab)) return;
+            Tabs.Items.Remove(tab);
+            if (tab.Content is DocumentView v) _claimed.Remove(v);
+        }
+        AddTab();
     }
 
     private void UpdateWindowTitle() =>

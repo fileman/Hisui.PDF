@@ -3,6 +3,7 @@
         xmlns:conv="clr-namespace:Hisui.Pdf.App.Converters"
         xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
         xmlns:vm="clr-namespace:Hisui.Pdf.App.ViewModels"
+        xmlns:views="clr-namespace:Hisui.Pdf.App.Views"
         x:Class="Hisui.Pdf.App.Views.DocumentView"
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
         Background="{DynamicResource RibbonWindowBrush}">
@@ -269,6 +270,39 @@
         <Style Selector="Button.recent-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
         </Style>
+
+        <!-- Form-field editors sit on the white page: same light fill in every theme and state -->
+        <Style Selector="TextBox.field /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#E8F0FE" />
+            <Setter Property="BorderBrush" Value="#7FA6E6" />
+            <Setter Property="BorderThickness" Value="0.5" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <Style Selector="TextBox.field:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="#005FB8" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBox.field.required /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#C42B1C" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBox.field.invalid /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#FDE7E9" />
+            <Setter Property="BorderBrush" Value="#C42B1C" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="ToggleButton.field /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#E8F0FE" />
+            <Setter Property="BorderBrush" Value="#7FA6E6" />
+            <Setter Property="BorderThickness" Value="0.5" />
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+        <Style Selector="ToggleButton.field:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BorderBrush" Value="#005FB8" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
     </UserControl.Styles>
 
     <!-- Root: ribbon shell + modal busy overlay. -->
@@ -459,6 +493,34 @@
                                 <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Forms}" />
                             </StackPanel>
                         </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Comments}"
+                                      ToolTip.Tip="{loc:Tr Rail.Comments}" AutomationProperties.Name="{loc:Tr Rail.Comments}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Comments" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconStickyNote}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Comments}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Bookmarks}"
+                                      ToolTip.Tip="{loc:Tr Rail.Bookmarks}" AutomationProperties.Name="{loc:Tr Rail.Bookmarks}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Bookmarks" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="M4.5 2h7v12l-3.5-3-3.5 3z" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Bookmarks}" />
+                            </StackPanel>
+                        </ToggleButton>
                     </StackPanel>
                 </Border>
 
@@ -553,12 +615,49 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
                                     </StackPanel>
                                 </Button>
+                                <Button Classes="ribbon-small" Command="{Binding SaveAsProfileCommand}" ToolTip.Tip="{loc:Tr Conf.Button.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M4 2h6l2.5 2.5V14H4z M6 9l1.5 1.5L10.5 7" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Conf.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding CheckAccessibilityCommand}" ToolTip.Tip="{loc:Tr Conf.A11y.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2.5a1.2 1.2 0 1 0 .01 0 M3.5 5.5L8 6.5l4.5-1 M8 6.5v3 M8 9.5l-2.5 4.5 M8 9.5l2.5 4.5" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Conf.A11y}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding CompareCommand}" ToolTip.Tip="{loc:Tr Compare.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 3h5v10H2z M9 3h5v10H9z M3.5 6h2 M10.5 6h2 M10.5 9h2" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Compare.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding RedactPatternsCommand}" ToolTip.Tip="{loc:Tr Redact.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 4h12 M2 8h5 M10 7h4v3h-4z M2 12h12" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Redact.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding AddHeaderFooterCommand}" ToolTip.Tip="{loc:Tr Stamp.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M3 2h10v12H3z M5 4h6 M5 12h6" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Stamp.Button}" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
 
                             <!-- ANNOTA -->
                             <StackPanel Spacing="2"
                                         IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Annota}">
                                 <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Annotate}" />
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Link.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Link, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="M6.5 9.5l3-3 M7 4.5l1.5-1.5a2.5 2.5 0 0 1 3.5 3.5L10.5 8 M9 11.5L7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8" />
+                                        <TextBlock Text="{loc:Tr Tool.Link}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
                                 <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Highlight.Tooltip}"
                                              IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Highlight, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
@@ -631,6 +730,81 @@
                                 </Button>
                             </StackPanel>
 
+                            <!-- BOOKMARKS -->
+                            <StackPanel Spacing="4"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Bookmarks}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Bookmarks.Section}" />
+                                <WrapPanel Margin="4,0">
+                                    <Button Classes="ribbon-small" Command="{Binding AddBookmarkCommand}" HorizontalAlignment="Left" ToolTip.Tip="{loc:Tr Bookmarks.Add.Tooltip}">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Add}" /></Button>
+                                    <Button Classes="ribbon-small" Command="{Binding AddChildBookmarkCommand}" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.AddChild}" /></Button>
+                                    <Button Classes="ribbon-small" Command="{Binding RenameBookmarkCommand}" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Rename}" /></Button>
+                                    <Button Classes="ribbon-small" Command="{Binding DeleteBookmarkCommand}" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Delete}" /></Button>
+                                </WrapPanel>
+                                <WrapPanel Margin="4,0">
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="up" ToolTip.Tip="{loc:Tr Bookmarks.Up}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="{StaticResource IconUp}" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="down" ToolTip.Tip="{loc:Tr Bookmarks.Down}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="{StaticResource IconDown}" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="in" ToolTip.Tip="{loc:Tr Bookmarks.In}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M3 8h9 M9 5l3 3-3 3 M2 2v12" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="out" ToolTip.Tip="{loc:Tr Bookmarks.Out}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M13 8H4 M7 5L4 8l3 3 M14 2v12" /></Button>
+                                </WrapPanel>
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Bookmarks.Empty}" TextWrapping="Wrap" FontSize="11" Margin="8,4"
+                                           IsVisible="{Binding !BookmarkRows.Count}" />
+                                <ListBox ItemsSource="{Binding BookmarkRows}" SelectedItem="{Binding SelectedBookmark, Mode=TwoWay}"
+                                         Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent}">
+                                                <TextBlock Text="{Binding Title}" FontSize="12" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="1" Text="{Binding PageLabel}" FontSize="10.5" Margin="6,0,0,0"
+                                                           Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <!-- COMMENTS -->
+                            <StackPanel Spacing="4"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Comments}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Comments.Section}" />
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Comments.Add.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Comment, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconStickyNote}" />
+                                        <TextBlock Text="{loc:Tr Comments.Add}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Comments.Hint}" TextWrapping="Wrap" FontSize="11" Margin="8,0,4,2" />
+                                <WrapPanel Margin="4,0">
+                                    <Button Classes="ribbon-small" Command="{Binding ReplyToCommentCommand}" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Reply}" /></Button>
+                                    <Button Classes="ribbon-small" Command="{Binding EditCommentCommand}" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Edit}" /></Button>
+                                    <Button Classes="ribbon-small" Command="{Binding DeleteCommentCommand}" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Delete}" /></Button>
+                                </WrapPanel>
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Comments.Empty}" TextWrapping="Wrap" FontSize="11" Margin="8,4"
+                                           IsVisible="{Binding !CommentList.Count}" />
+                                <ListBox ItemsSource="{Binding CommentList}" SelectedItem="{Binding SelectedComment, Mode=TwoWay}"
+                                         Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="{Binding Indent}" Spacing="1">
+                                                <TextBlock Text="{Binding Header}" FontSize="10.5" Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                                <TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" MaxHeight="64" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
                             <!-- FORMS -->
                             <StackPanel Spacing="2"
                                         IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Forms}">
@@ -684,6 +858,55 @@
                                         <TextBlock Text="{loc:Tr Tool.FormSignature}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
+
+                                <!-- Layout of the selected fields (layout mode: click / Ctrl+click on the page) -->
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.Layout}" Margin="0,10,0,0" />
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Fields.SelectHint}" TextWrapping="Wrap" FontSize="11" Margin="8,0,4,4" />
+                                <WrapPanel Margin="4,0">
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="left" ToolTip.Tip="{loc:Tr Fields.AlignLeft}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M1 0v15 M4 3h9v3h-9z M4 9h6v3h-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="hcenter" ToolTip.Tip="{loc:Tr Fields.AlignHCenter}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M7.5 0v15 M2 3h11v3h-11z M4 9h7v3h-7z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="right" ToolTip.Tip="{loc:Tr Fields.AlignRight}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M14 0v15 M2 3h9v3h-9z M5 9h6v3h-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="top" ToolTip.Tip="{loc:Tr Fields.AlignTop}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M0 1h15 M3 4v9h3v-9z M9 4v6h3v-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="vcenter" ToolTip.Tip="{loc:Tr Fields.AlignVCenter}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M0 7.5h15 M3 2v11h3v-11z M9 4v7h3v-7z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="bottom" ToolTip.Tip="{loc:Tr Fields.AlignBottom}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M0 14h15 M3 2v9h3v-9z M9 5v6h3v-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="width" ToolTip.Tip="{loc:Tr Fields.SameWidth}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M1 4v7 M14 4v7 M1 7.5h13 M3 5.5l-2 2 2 2 M12 5.5l2 2-2 2" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="height" ToolTip.Tip="{loc:Tr Fields.SameHeight}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M4 1h7 M4 14h7 M7.5 1v13 M5.5 3l2-2 2 2 M5.5 12l2 2 2-2" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="size" ToolTip.Tip="{loc:Tr Fields.SameSize}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 2h11v11h-11z M5 5h5v5h-5z" /></Button>
+                                </WrapPanel>
+                                <Button Classes="ribbon-small" Command="{Binding EditFieldPropertiesCommand}" ToolTip.Tip="{loc:Tr Fields.Properties.Tooltip}">
+                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Properties}" /></Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteSelectedFieldsCommand}">
+                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Delete}" /></Button>
+
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.TabOrder}" Margin="0,10,0,0" />
+                                <CheckBox Content="{loc:Tr Fields.ShowTabOrder}" IsChecked="{Binding ShowTabOrder}" Margin="8,0" FontSize="12.5" />
+                                <StackPanel Orientation="Horizontal" Margin="4,0">
+                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="up" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabEarlier}" /></Button>
+                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="down" HorizontalAlignment="Left">
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabLater}" /></Button>
+                                </StackPanel>
+                                <Button Classes="ribbon-small" Command="{Binding SortTabOrderCommand}" ToolTip.Tip="{loc:Tr Fields.SortTabOrder.Tooltip}">
+                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.SortTabOrder}" /></Button>
+
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr FormData.Section}" Margin="0,10,0,0" />
+                                <Button Classes="ribbon-small" Command="{Binding ExportFormDataCommand}">
+                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Export}" /></Button>
+                                <Button Classes="ribbon-small" Command="{Binding ImportFormDataCommand}">
+                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Import}" /></Button>
+                                <Button Classes="ribbon-small" Command="{Binding ResetFormCommand}">
+                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Reset}" /></Button>
+                                <Button Classes="ribbon-small" Command="{Binding FlattenFieldsCommand}" ToolTip.Tip="{loc:Tr FormData.Flatten.Tooltip}">
+                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Flatten}" /></Button>
                                 <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
                                 <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
                                         IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
@@ -758,7 +981,12 @@
                                         </LayoutTransformControl.LayoutTransform>
                                         <Border Width="{Binding DisplayWidth}" Height="{Binding DisplayHeight}"
                                                 Background="{DynamicResource RibbonPageBrush}">
-                                            <Image Source="{Binding Preview}" Stretch="Fill" />
+                                            <Panel>
+                                                <Image Source="{Binding Preview}" Stretch="Fill" />
+                                                <views:LinkLayer Page="{Binding}" />
+                                                <views:FieldLayer Page="{Binding}" />
+                                                <views:CommentLayer Page="{Binding}" />
+                                            </Panel>
                                         </Border>
                                     </LayoutTransformControl>
                                 </DataTemplate>
@@ -810,6 +1038,36 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+
+                            <views:LinkLayer Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:LinkLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:LinkLayer.RenderTransform>
+                            </views:LinkLayer>
+
+                            <!-- Form fields: editors to fill them, or boxes to move/resize in form layout mode (code-behind) -->
+                            <views:FieldLayer x:Name="FieldCanvas" Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:FieldLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:FieldLayer.RenderTransform>
+                            </views:FieldLayer>
+                            <views:CommentLayer Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:CommentLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:CommentLayer.RenderTransform>
+                            </views:CommentLayer>
 
                             <Canvas x:Name="AnnotationCanvas"
                                     Background="Transparent"

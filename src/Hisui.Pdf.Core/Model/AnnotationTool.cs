@@ -18,4 +18,8 @@ public enum AnnotationTool
     FormRadio,
     FormListBox,
     FormSignature,
+    /// <summary>A real sticky-note comment (/Text annotation), editable and replyable.</summary>
+    Comment,
+    /// <summary>A link area to a page or a web address.</summary>
+    Link,
 }

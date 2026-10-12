@@ -19,6 +19,19 @@ internal sealed class FileDialogService : IFileDialogService
     private FilePickerFileType ImageType =>
         new(_loc["Picker.Images"]) { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.tiff"] };
 
+    public async Task<string?> OpenFileAsync(string typeName, params string[] patterns)
+    {
+        var sp = GetStorageProvider();
+        if (sp is null) return null;
+        var files = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = typeName,
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType(typeName) { Patterns = patterns }],
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
     public async Task<string?> OpenPdfAsync()
     {
         var sp = GetStorageProvider();

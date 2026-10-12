@@ -60,6 +60,7 @@ public partial class MainViewModel
     {
         // Each tab has its own tool set; never carry a tool over.
         ActiveTool = AnnotationTool.None;
+        RaiseFormLayoutModeChanged();
     }
 
     /// <summary>Header for the thumbnail panel, e.g. "Pagine · 6".</summary>
@@ -96,6 +97,11 @@ public partial class MainViewModel
         RemovePasswordCommand.NotifyCanExecuteChanged();
         AddWatermarkCommand.NotifyCanExecuteChanged();
         DetectFormFieldsCommand.NotifyCanExecuteChanged();
+        SortTabOrderCommand.NotifyCanExecuteChanged();
+        ExportFormDataCommand.NotifyCanExecuteChanged();
+        ImportFormDataCommand.NotifyCanExecuteChanged();
+        ResetFormCommand.NotifyCanExecuteChanged();
+        FlattenFieldsCommand.NotifyCanExecuteChanged();
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         RotateLeftCommand.NotifyCanExecuteChanged();
         RotateRightCommand.NotifyCanExecuteChanged();
@@ -109,6 +115,15 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(ShowContinuousPages));
         OnPropertyChanged(nameof(ShowSinglePage));
         OnPropertyChanged(nameof(ShowEmptyState));
+        OnPropertyChanged(nameof(HasUnsavedChanges));
+        _ = RefreshCommentsAsync(); // no-op unless the Comments panel shows and the document changed
+        _ = RefreshBookmarksAsync();
+        AddBookmarkCommand.NotifyCanExecuteChanged();
+        AddHeaderFooterCommand.NotifyCanExecuteChanged();
+        CompareCommand.NotifyCanExecuteChanged();
+        RedactPatternsCommand.NotifyCanExecuteChanged();
+        SaveAsProfileCommand.NotifyCanExecuteChanged();
+        CheckAccessibilityCommand.NotifyCanExecuteChanged();
     }
 
     public bool IsAnnotationActive => ActiveTool != AnnotationTool.None;
@@ -128,6 +143,7 @@ public partial class MainViewModel
         DragRect = default;
         OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
+        RaiseFormLayoutModeChanged();
         OnPropertyChanged(nameof(ShowContinuous));
         OnPropertyChanged(nameof(ShowContinuousPages));
         OnPropertyChanged(nameof(ShowSinglePage));
@@ -177,7 +193,7 @@ public partial class MainViewModel
 
         // Area tools need a real drag; ignore an accidental click / near-zero drag so we don't
         // produce a degenerate (invisible) annotation. StickyNote is a click gesture, so it's exempt.
-        if (ActiveTool != AnnotationTool.StickyNote &&
+        if (ActiveTool is not (AnnotationTool.StickyNote or AnnotationTool.Comment) &&
             (Math.Abs(pos.X - _dragStart.X) < 5 || Math.Abs(pos.Y - _dragStart.Y) < 5))
             return;
 
@@ -194,8 +210,24 @@ public partial class MainViewModel
             C(Math.Max(_dragStart.Y, pos.Y) / h));
 
         // StickyNote is a click gesture — anchor on the press point.
-        if (ActiveTool == AnnotationTool.StickyNote)
+        if (ActiveTool is AnnotationTool.StickyNote or AnnotationTool.Comment)
             normRect = PdfRect.FromLTWH(C(_dragStart.X / w), C(_dragStart.Y / h), 0, 0);
+
+        if (ActiveTool == AnnotationTool.Link)
+        {
+            ActiveTool = AnnotationTool.None; // one-shot: back to viewing, where the new link is clickable
+            await AddLinkAsync(normRect);
+            return;
+        }
+
+        if (ActiveTool == AnnotationTool.Comment)
+        {
+            if (PromptTextAsync is null) return;
+            ActiveTool = AnnotationTool.None; // one-shot: the new comment can be moved/edited right away
+            var text = await PromptTextAsync(_loc["Comments.Add"], "", true);
+            if (!string.IsNullOrWhiteSpace(text)) await AddCommentAsync(SelectedPage, normRect, text);
+            return;
+        }
 
         if (ActiveTool == AnnotationTool.OcrSelection)
         {

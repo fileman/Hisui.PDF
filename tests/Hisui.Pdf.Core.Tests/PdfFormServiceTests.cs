@@ -111,4 +111,65 @@ public class PdfFormServiceTests
         var result = await _sut.FlattenAsync(pdf);
         Assert.True(result[0] == '%' && result[1] == 'P' && result[2] == 'D' && result[3] == 'F');
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(90)]
+    public async Task Widgets_ReadFillMoveDelete_RoundTrip(int rotate)
+    {
+        var pdf = PdfFixtureBuilder.Create(1);
+        if (rotate != 0)
+        {
+            using var doc = PdfReader.Open(new MemoryStream(pdf), PdfDocumentOpenMode.Modify);
+            doc.Pages[0].Rotate = rotate;
+            using var ms = new MemoryStream();
+            doc.Save(ms);
+            pdf = ms.ToArray();
+        }
+        var r = new PdfRect(0.1, 0.2, 0.5, 0.25);
+        pdf = await _sut.AddFieldAsync(pdf, 0, r, PdfFormFieldType.Text, "Name");
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.6, 0.2, 0.65, 0.23), PdfFormFieldType.CheckBox, "Ok");
+
+        var widgets = await _sut.ReadWidgetsAsync(pdf, 0);
+        Assert.Equal(["Name", "Ok"], widgets.Select(w => w.Name));
+        AssertClose(r, widgets[0].Rect);
+        Assert.Equal("false", widgets[1].Value);
+
+        var blank = await new PdfiumRenderer().RenderPageToPngAsync(pdf, 0, 72);
+        pdf = await _sut.FillFieldsAsync(pdf, new Dictionary<string, string> { ["Name"] = "Ada Lovelace", ["Ok"] = "true" });
+        widgets = await _sut.ReadWidgetsAsync(pdf, 0);
+        Assert.Equal("Ada Lovelace", widgets[0].Value);
+        Assert.Equal("true", widgets[1].Value);
+        Assert.NotEqual(blank, await new PdfiumRenderer().RenderPageToPngAsync(pdf, 0, 72)); // the value is drawn
+
+        var moved = new PdfRect(0.2, 0.5, 0.7, 0.58);
+        pdf = await _sut.SetWidgetRectAsync(pdf, 0, widgets[0].AnnotIndex, moved);
+        AssertClose(moved, (await _sut.ReadWidgetsAsync(pdf, 0))[0].Rect);
+
+        pdf = await _sut.DeleteWidgetAsync(pdf, 0, widgets[0].AnnotIndex);
+        Assert.Equal(["Ok"], (await _sut.ReadWidgetsAsync(pdf, 0)).Select(w => w.Name));
+        Assert.Equal(["Ok"], (await _sut.ReadFieldsAsync(pdf)).Select(f => f.Name));
+
+        static void AssertClose(PdfRect expected, PdfRect actual)
+        {
+            Assert.Equal(expected.Left, actual.Left, 3);
+            Assert.Equal(expected.Top, actual.Top, 3);
+            Assert.Equal(expected.Right, actual.Right, 3);
+            Assert.Equal(expected.Bottom, actual.Bottom, 3);
+        }
+    }
+
+    [Fact]
+    public async Task FillFields_SelectsRadioChoice()
+    {
+        var pdf = PdfFixtureBuilder.Create(1);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.1, 0.1, 0.15, 0.13), PdfFormFieldType.RadioButton, "Size", ["Small"]);
+        pdf = await _sut.AddFieldAsync(pdf, 0, new PdfRect(0.1, 0.2, 0.15, 0.23), PdfFormFieldType.RadioButton, "Size", ["Large"]);
+
+        pdf = await _sut.FillFieldsAsync(pdf, new Dictionary<string, string> { ["Size"] = "Large" });
+
+        var widgets = await _sut.ReadWidgetsAsync(pdf, 0);
+        Assert.All(widgets, w => Assert.Equal("Large", w.Value));
+        Assert.Equal(["Small", "Large"], widgets.Select(w => w.OnState));
+    }
 }

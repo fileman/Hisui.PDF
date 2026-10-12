@@ -58,6 +58,57 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
         }, ct);
     }
 
+    public Task<IReadOnlyList<IReadOnlyList<TextWord>>> ExtractAllWordsAsync(byte[] pdf, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<IReadOnlyList<IReadOnlyList<TextWord>>>(() =>
+        {
+            var (flat, rotations) = PageGeometry.Unrotate(pdf);
+            using var doc = PdfDocument.Open(flat);
+            var pages = new List<IReadOnlyList<TextWord>>();
+            foreach (var page in doc.GetPages())
+            {
+                ct.ThrowIfCancellationRequested();
+                var turn = RotationOf(rotations, page.Number - 1);
+                pages.Add(page.GetWords().Where(w => !string.IsNullOrWhiteSpace(w.Text)).Select(w => new TextWord
+                {
+                    Text = w.Text,
+                    PageIndex = page.Number - 1,
+                    BoundingBox = ToBoundingBox(w.BoundingBox, page.Width, page.Height).RotateClockwise(turn),
+                    FontSizePoints = w.Letters.FirstOrDefault()?.FontSize ?? 12,
+                }).ToList());
+            }
+            return pages;
+        }, ct);
+    }
+
+    public async Task<IReadOnlyList<TextSearchResult>> SearchPatternAsync(byte[] pdf, System.Text.RegularExpressions.Regex pattern, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pattern);
+        var pages = await ExtractAllWordsAsync(pdf, ct);
+        return pages.SelectMany((words, i) => FindPattern(words.Select(w => (w.Text, w.BoundingBox)).ToList(), i, pattern)).ToList();
+    }
+
+    /// <summary>Regex counterpart of <see cref="FindMatches"/>: matches over the space-joined words, mapped back to word boxes.</summary>
+    internal static IEnumerable<TextSearchResult> FindPattern(IReadOnlyList<(string Text, PdfRect Box)> words, int pageIndex, System.Text.RegularExpressions.Regex pattern)
+    {
+        var sb = new System.Text.StringBuilder();
+        var spans = new List<(int Start, int End, PdfRect Box)>(words.Count);
+        foreach (var (text, box) in words)
+        {
+            if (sb.Length > 0) sb.Append(' ');
+            spans.Add((sb.Length, sb.Length + text.Length, box));
+            sb.Append(text);
+        }
+        foreach (System.Text.RegularExpressions.Match m in pattern.Matches(sb.ToString()))
+        {
+            if (m.Length == 0) continue;
+            var (start, end) = (m.Index, m.Index + m.Length);
+            var boxes = spans.Where(s => s.Start < end && s.End > start).Select(s => s.Box).ToList();
+            if (boxes.Count > 0) yield return new TextSearchResult { MatchedText = m.Value, PageIndex = pageIndex, Boxes = boxes };
+        }
+    }
+
     public Task<IReadOnlyList<TextSearchResult>> SearchAsync(
         byte[] pdf, string query, TextSearchOptions? options = null, CancellationToken ct = default)
     {

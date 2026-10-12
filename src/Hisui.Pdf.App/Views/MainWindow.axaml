@@ -69,27 +69,33 @@
         <TabControl.Template>
             <ControlTemplate>
                 <DockPanel>
-                    <Grid DockPanel.Dock="Top" Height="40" ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+                    <Grid DockPanel.Dock="Top" Height="40" ColumnDefinitions="Auto,*,Auto"
                           Background="{DynamicResource RibbonWindowBrush}">
                         <Border Width="16" Height="16" Margin="14,0,10,0" CornerRadius="4"
                                 VerticalAlignment="Center" Background="{DynamicResource RibbonAccentBrush}" />
-                        <ItemsPresenter Name="PART_ItemsPresenter" Grid.Column="1" VerticalAlignment="Center">
-                            <ItemsPresenter.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="2" />
-                                </ItemsPanelTemplate>
-                            </ItemsPresenter.ItemsPanel>
-                        </ItemsPresenter>
-                        <Button Name="PART_NewTab" Grid.Column="2" Classes="newtab"
-                                ToolTip.Tip="{loc:Tr Tab.New}" AutomationProperties.Name="{loc:Tr Tab.New}">
-                            <Path Width="12" Height="12" Data="M6 1v10 M1 6h10" Stroke="{Binding $parent[Button].Foreground}"
-                                  StrokeThickness="1.4" StrokeLineCap="Round" Stretch="Uniform" />
-                        </Button>
                         <!-- Empty strip: drags the window (native move + double-click maximize). -->
-                        <Border Grid.Column="3" Background="Transparent"
+                        <Border Grid.Column="1" Background="Transparent"
                                 chrome:WindowDecorationProperties.ElementRole="TitleBar" />
+                        <!-- Tabs take only the room left before the caption buttons and scroll beyond it; "+" stays visible. -->
+                        <DockPanel Grid.Column="1" HorizontalAlignment="Left">
+                            <Button Name="PART_NewTab" DockPanel.Dock="Right" Classes="newtab"
+                                    ToolTip.Tip="{loc:Tr Tab.New}" AutomationProperties.Name="{loc:Tr Tab.New}">
+                                <Path Width="12" Height="12" Data="M6 1v10 M1 6h10" Stroke="{Binding $parent[Button].Foreground}"
+                                      StrokeThickness="1.4" StrokeLineCap="Round" Stretch="Uniform" />
+                            </Button>
+                            <ScrollViewer Name="PART_TabScroll" HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled" VerticalAlignment="Center">
+                                <ItemsPresenter Name="PART_ItemsPresenter" VerticalAlignment="Center">
+                                    <ItemsPresenter.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="2" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsPresenter.ItemsPanel>
+                                </ItemsPresenter>
+                            </ScrollViewer>
+                        </DockPanel>
                         <!-- Room for the caption buttons (width fitted in code-behind) -->
-                        <Border Name="PART_CaptionSpacer" Grid.Column="4" Width="140"
+                        <Border Name="PART_CaptionSpacer" Grid.Column="2" Width="140"
                                 IsVisible="{Binding $parent[Window].IsExtendedIntoWindowDecorations}" />
                     </Grid>
                     <ContentPresenter Name="PART_SelectedContentHost"

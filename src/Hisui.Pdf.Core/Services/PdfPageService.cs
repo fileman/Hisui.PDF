@@ -101,11 +101,17 @@ internal sealed class PdfPageService : IPdfPageService
         return Task.Run(
             () =>
             {
+                // One source, every page exactly once: edit it in place. Keeps everything page import loses —
+                // tags (structure tree), XMP metadata, output intents, outline, links, JavaScript, attachments.
+                if (TryBuildInPlace(session) is { } inPlace) return inPlace;
+
                 // Open each source document once and reuse it across all of its page refs.
                 var importers = new Dictionary<int, PdfDocument>();
                 try
                 {
                     using var output = new PdfDocument();
+                    var placed = new Dictionary<(int Source, int Page), PdfPage>(); // first output page of each source page
+                    var pendingLinks = new List<(PdfPage Page, int AnnotIndex, int Source, int TargetPage)>();
                     foreach (var pageRef in session.Pages)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -116,12 +122,43 @@ internal sealed class PdfPageService : IPdfPageService
                         }
 
                         if (output.PageCount == 0) output.Info.CopyFrom(source.Info); // metadata of the first page's document
+                        // Internal links point at page objects of the source: detach them before the import (which would
+                        // otherwise drag the target pages along) and re-point them at the output pages afterwards.
+                        var links = DetachInternalLinks(source, source.Pages[pageRef.SourcePageIndex]);
                         var added = AddPageSafe(output, source.Pages[pageRef.SourcePageIndex]);
                         if (pageRef.Rotation != PageRotation.None)
                             added.Rotate = (added.Rotate + (int)pageRef.Rotation) % 360;
+                        placed.TryAdd((pageRef.SourceDocumentId, pageRef.SourcePageIndex), added);
+                        foreach (var (annot, target) in links) pendingLinks.Add((added, annot, pageRef.SourceDocumentId, target));
                     }
 
+                    foreach (var (page, annot, sourceId, target) in pendingLinks)
+                        if (page.Elements.GetArray("/Annots") is { } annots && annot < annots.Elements.Count &&
+                            OutlineIO.Resolve(annots.Elements[annot]) is PdfDictionary link)
+                        {
+                            // A target page left out of the output leaves the link inert.
+                            if (placed.TryGetValue((sourceId, target), out var to))
+                                link.Elements["/Dest"] = new PdfArray(output, to.Reference!, new PdfName("/Fit"));
+                        }
+
+                    // Outline: each source's bookmarks, in order of first appearance, re-targeted at the output pages.
+                    var outline = new List<PdfBookmark>();
+                    foreach (var id in session.Pages.Select(p => p.SourceDocumentId).Distinct())
+                        outline.AddRange(Retarget(OutlineIO.Read(importers[id]), id));
+                    var flatPages = outline.Count == 0 ? [] : placed.Values.ToList();
+                    if (outline.Count > 0)
+                        OutlineIO.Write(output, outline, i => i >= 0 && i < flatPages.Count ? flatPages[i] : null);
+
                     return Save(output);
+
+                    // Bookmark page indices become indices into placed.Values (insertion order = output order).
+                    IEnumerable<PdfBookmark> Retarget(IEnumerable<PdfBookmark> items, int sourceId) => items.Select(b =>
+                    {
+                        var index = -1;
+                        if (b.PageIndex >= 0 && placed.TryGetValue((sourceId, b.PageIndex), out var target))
+                            index = placed.Values.ToList().IndexOf(target);
+                        return new PdfBookmark(b.Title, index, Retarget(b.Children, sourceId).ToList());
+                    });
                 }
                 finally
                 {
@@ -130,6 +167,60 @@ internal sealed class PdfPageService : IPdfPageService
                 }
             },
             cancellationToken);
+    }
+
+    /// <summary>The fast path: a single source whose pages each appear once (reordered/rotated at most).</summary>
+    private static byte[]? TryBuildInPlace(PdfDocumentSession session)
+    {
+        if (session.Pages.Count == 0 || session.Pages.Select(p => p.SourceDocumentId).Distinct().Count() != 1) return null;
+        var source = session.GetSource(session.Pages[0].SourceDocumentId);
+        var order = session.Pages.Select(p => p.SourcePageIndex).ToList();
+        try
+        {
+            using var stream = new MemoryStream(source, writable: false);
+            using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Modify);
+            if (order.Count != doc.PageCount || order.Distinct().Count() != order.Count) return null;
+            var current = Enumerable.Range(0, doc.PageCount).ToList();
+            for (var target = 0; target < order.Count; target++)
+            {
+                var at = current.IndexOf(order[target]);
+                if (at == target) continue;
+                doc.Pages.MovePage(at, target);
+                current.RemoveAt(at);
+                current.Insert(target, order[target]);
+            }
+            for (var i = 0; i < session.Pages.Count; i++)
+                if (session.Pages[i].Rotation != PageRotation.None)
+                    doc.Pages[i].Rotate = (doc.Pages[i].Rotate + (int)session.Pages[i].Rotation) % 360;
+
+            using var output = new MemoryStream();
+            doc.SaveStamped(output);
+            return output.ToArray();
+        }
+        catch (Exception)
+        {
+            return null; // unusual structure: fall back to the page-import path
+        }
+    }
+
+    /// <summary>Removes the internal (GoTo) destinations of <paramref name="page"/>'s links; returns (annot index, target page).</summary>
+    private static List<(int Annot, int Target)> DetachInternalLinks(PdfDocument source, PdfPage page)
+    {
+        var result = new List<(int, int)>();
+        if (page.Elements.GetArray("/Annots") is not { } annots) return result;
+        Dictionary<PdfDictionary, int>? pages = null;
+        for (var i = 0; i < annots.Elements.Count; i++)
+        {
+            if (OutlineIO.Resolve(annots.Elements[i]) is not PdfDictionary a || a.Elements.GetName("/Subtype") != "/Link") continue;
+            var action = OutlineIO.Resolve(a.Elements["/A"]) as PdfDictionary;
+            var dest = a.Elements["/Dest"] ?? OutlineIO.GoToDest(action);
+            if (dest is null) continue;
+            pages ??= OutlineIO.PageIndexMap(source);
+            result.Add((i, OutlineIO.DestPage(source, dest, pages)));
+            a.Elements.Remove("/Dest");
+            if (OutlineIO.GoToDest(action) is not null) a.Elements.Remove("/A");
+        }
+        return result;
     }
 
     // PDFsharp's closure walk throws NullReferenceException when a page key (e.g. /Rotate) is an

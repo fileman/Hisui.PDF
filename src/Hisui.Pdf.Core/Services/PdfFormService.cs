@@ -14,7 +14,7 @@ namespace Hisui.Pdf.Core.Services;
 /// AcroForm read/fill backed by PDFsharp; flatten is implemented as rasterisation so it works
 /// regardless of whether the form has pre-built appearance streams.
 /// </summary>
-internal sealed class PdfFormService : IPdfFormService
+internal sealed partial class PdfFormService : IPdfFormService
 {
     private readonly IPdfRenderer _renderer;
 
@@ -54,30 +54,118 @@ internal sealed class PdfFormService : IPdfFormService
             using var stream = new MemoryStream(pdf, writable: false);
             using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Modify);
 
-            PdfAcroForm form;
-            try { form = doc.AcroForm; }
-            catch (InvalidOperationException) { return pdf; }
+            var acro = doc.Internals.Catalog.Elements.GetDictionary("/AcroForm");
+            if (acro?.Elements.GetArray("/Fields") is not { } fields) return pdf;
 
-            if (form.Fields.Count == 0) return pdf;
-
-            for (var i = 0; i < form.Fields.Count; i++)
+            var changed = false;
+            foreach (var (name, field) in WalkFields(fields, ""))
             {
-                var field = form.Fields[i];
-                if (!values.TryGetValue(field.Name, out var value)) continue;
-
-                if (field is PdfTextField textField)
-                    textField.Text = value;
-                else if (field is PdfCheckBoxField checkField)
-                    checkField.Checked = IsCheckedValue(value);
-                else if (field is PdfComboBoxField comboField)
-                    comboField.Value = new PdfString(value);
+                if (!values.TryGetValue(name, out var value)) continue;
+                var widgets = WidgetsOf(field);
+                switch (InheritedName(field, "/FT"))
+                {
+                    case "/Btn" when (InheritedInt(field, "/Ff") & RadioFlag) != 0:
+                        var choice = SafeName(value, "Off");
+                        field.Elements.SetName("/V", "/" + choice);
+                        foreach (var w in widgets) w.Elements.SetName("/AS", OnState(w) == choice ? "/" + choice : "/Off");
+                        break;
+                    case "/Btn":
+                        var on = IsCheckedValue(value) || widgets.Any(w => OnState(w) == value);
+                        var state = on ? widgets.Select(OnState).FirstOrDefault(st => st is not null) ?? "Yes" : "Off";
+                        field.Elements.SetName("/V", "/" + state);
+                        foreach (var w in widgets) w.Elements.SetName("/AS", on ? "/" + (OnState(w) ?? state) : "/Off");
+                        break;
+                    default: // text and choice fields; viewers regenerate the appearance (/NeedAppearances)
+                        field.Elements.SetString("/V", value);
+                        break;
+                }
+                changed = true;
             }
+            if (!changed) return pdf;
+            acro.Elements.SetBoolean("/NeedAppearances", true);
 
             using var output = new MemoryStream();
             doc.SaveStamped(output);
             return output.ToArray();
         }, ct);
     }
+
+    public Task<IReadOnlyList<PdfFormWidget>> ReadWidgetsAsync(byte[] pdf, int pageIndex, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<IReadOnlyList<PdfFormWidget>>(() =>
+        {
+            using var stream = new MemoryStream(pdf, writable: false);
+            using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+            if ((uint)pageIndex >= (uint)doc.PageCount) return [];
+            var page = doc.Pages[pageIndex];
+            var annots = page.Elements.GetArray("/Annots");
+            if (annots is null) return [];
+
+            var result = new List<PdfFormWidget>();
+            for (var i = 0; i < annots.Elements.Count; i++)
+            {
+                if (Resolve(annots.Elements[i]) is not PdfDictionary w || w.Elements.GetName("/Subtype") != "/Widget") continue;
+                var ff = InheritedInt(w, "/Ff");
+                var type = InheritedName(w, "/FT") switch
+                {
+                    "/Tx" => PdfFormFieldType.Text,
+                    "/Btn" when (ff & PushButtonFlag) != 0 => PdfFormFieldType.Unknown,
+                    "/Btn" when (ff & RadioFlag) != 0 => PdfFormFieldType.RadioButton,
+                    "/Btn" => PdfFormFieldType.CheckBox,
+                    "/Ch" => (ff & ComboFlag) != 0 ? PdfFormFieldType.ComboBox : PdfFormFieldType.ListBox,
+                    "/Sig" => PdfFormFieldType.Signature,
+                    _ => PdfFormFieldType.Unknown,
+                };
+                if (type == PdfFormFieldType.Unknown) continue;
+
+                var field = Terminal(w);
+                var v = Inherited(w, "/V");
+                var (format, decimals, pattern) = ParseFormat(
+                    ((Inherited(w, "/AA") as PdfDictionary)?.Elements.GetDictionary("/F")?.Elements.GetString("/JS")) ?? "");
+                string? value = type switch
+                {
+                    PdfFormFieldType.CheckBox => (w.Elements.GetName("/AS") is { Length: > 0 } a && a != "/Off") ? "true" : "false",
+                    PdfFormFieldType.RadioButton => v is PdfName n && n.Value != "/Off" ? n.Value[1..] : null,
+                    _ => v switch
+                    {
+                        PdfString str => str.Value,
+                        PdfName n => n.Value[1..],
+                        PdfArray arr when arr.Elements.Count > 0 => (Resolve(arr.Elements[0]) as PdfString)?.Value,
+                        _ => null,
+                    },
+                };
+
+                result.Add(new PdfFormWidget
+                {
+                    Name = FullName(field),
+                    Type = type,
+                    PageIndex = pageIndex,
+                    AnnotIndex = i,
+                    Rect = ToVisual(page, w.Elements.GetRectangle("/Rect")),
+                    Value = value,
+                    OnState = OnState(w),
+                    Options = Inherited(w, "/Opt") is PdfArray opt ? OptionValues(opt) : [],
+                    IsReadOnly = (ff & 1) != 0,
+                    Tooltip = field.Elements.GetString("/TU") is { Length: > 0 } tu ? tu : null,
+                    IsRequired = (ff & RequiredFlag) != 0,
+                    IsMultiline = type == PdfFormFieldType.Text && (ff & MultilineFlag) != 0,
+                    MaxLength = Inherited(w, "/MaxLen") is PdfInteger { Value: > 0 } ml ? ml.Value : null,
+                    Alignment = (FieldAlignment)Math.Clamp(InheritedInt(w, "/Q"), 0, 2),
+                    Format = format,
+                    Decimals = decimals,
+                    DatePattern = pattern,
+                });
+            }
+            return result;
+        }, ct);
+    }
+
+    public Task<byte[]> SetWidgetRectAsync(byte[] pdf, int pageIndex, int annotIndex, PdfRect rect, CancellationToken ct = default) =>
+        SetWidgetRectsAsync(pdf, pageIndex, new Dictionary<int, PdfRect> { [annotIndex] = rect }, ct);
+
+    public Task<byte[]> DeleteWidgetAsync(byte[] pdf, int pageIndex, int annotIndex, CancellationToken ct = default) =>
+        DeleteWidgetsAsync(pdf, pageIndex, [annotIndex], ct);
 
     public Task<byte[]> AddFieldAsync(byte[] pdf, int pageIndex, PdfRect rect, PdfFormFieldType type,
         string? name = null, IReadOnlyList<string>? options = null, CancellationToken ct = default) =>
@@ -148,7 +236,7 @@ internal sealed class PdfFormService : IPdfFormService
         var page = doc.Pages[pageIndex];
 
         // A radio button joins the group of the same name; any other duplicate is an error.
-        const int RadioFlags = (1 << 15) | (1 << 14); // Radio + NoToggleToOff
+        const int RadioFlags = RadioFlag | (1 << 14); // Radio + NoToggleToOff
         name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
         PdfDictionary? group = null;
         if (name is null)
@@ -171,22 +259,11 @@ internal sealed class PdfFormService : IPdfFormService
                 throw new ArgumentException($"A form field named '{name}' already exists.", nameof(name));
         }
 
-        // Visual (rendered) rect → raw PDF user space (origin bottom-left), honouring the page's /Rotate.
         var rotation = PageGeometry.Rotation(page);
         var (vw, vh) = PageGeometry.VisualSize(page);
         var boxW = rect.Width * vw;
         var boxH = rect.Height * vh;
-        var corner1 = new XPoint(rect.Left * vw, rect.Top * vh);
-        var corner2 = new XPoint(rect.Right * vw, rect.Bottom * vh);
-        if (PageGeometry.VisualToRaw(page) is { } toRaw)
-        {
-            corner1 = toRaw.Transform(corner1);
-            corner2 = toRaw.Transform(corner2);
-        }
-        var pageH = page.Height.Point;
-        var rawRect = new PdfRectangle(
-            new XPoint(Math.Min(corner1.X, corner2.X), pageH - Math.Max(corner1.Y, corner2.Y)),
-            new XPoint(Math.Max(corner1.X, corner2.X), pageH - Math.Min(corner1.Y, corner2.Y)));
+        var rawRect = ToRaw(page, rect);
 
         var widget = new PdfDictionary(doc);
         doc.Internals.AddObject(widget); // indirect before any array references it
@@ -347,6 +424,85 @@ internal sealed class PdfFormService : IPdfFormService
                $"{n(cx - rx)} {n(cy - ry * k)} {n(cx - rx * k)} {n(cy - ry)} {n(cx)} {n(cy - ry)} c " +
                $"{n(cx + rx * k)} {n(cy - ry)} {n(cx + rx)} {n(cy - ry * k)} {n(cx + rx)} {n(cy)} c h";
     }
+
+    // ── field tree helpers ───────────────────────────────────────────────────
+
+    private const int RadioFlag = 1 << 15, PushButtonFlag = 1 << 16, ComboFlag = 1 << 17;
+
+    private static PdfRectangle ToRaw(PdfPage page, PdfRect rect) => PageGeometry.ToRaw(page, rect);
+    private static PdfRect ToVisual(PdfPage page, PdfRectangle raw) => PageGeometry.ToVisual(page, raw);
+
+    /// <summary>Every named field below <paramref name="fields"/>, with its fully qualified name.</summary>
+    private static IEnumerable<(string Name, PdfDictionary Field)> WalkFields(PdfArray fields, string prefix)
+    {
+        for (var i = 0; i < fields.Elements.Count; i++)
+        {
+            if (Resolve(fields.Elements[i]) is not PdfDictionary f || f.Elements.GetString("/T") is not { Length: > 0 } t) continue;
+            var name = prefix.Length == 0 ? t : prefix + "." + t;
+            yield return (name, f);
+            if (f.Elements.GetArray("/Kids") is { } kids)
+                foreach (var child in WalkFields(kids, name)) yield return child;
+        }
+    }
+
+    /// <summary>The widgets of a field: itself when merged, else its unnamed kids.</summary>
+    private static List<PdfDictionary> WidgetsOf(PdfDictionary field)
+    {
+        if (field.Elements.GetName("/Subtype") == "/Widget") return [field];
+        var kids = field.Elements.GetArray("/Kids");
+        if (kids is null) return [];
+        return kids.Elements.Select(Resolve).OfType<PdfDictionary>()
+            .Where(k => k.Elements.GetName("/Subtype") == "/Widget" && k.Elements.GetString("/T").Length == 0).ToList();
+    }
+
+    /// <summary>The field a widget belongs to: the nearest dictionary (itself or a parent) with a /T.</summary>
+    private static PdfDictionary Terminal(PdfDictionary widget)
+    {
+        for (PdfDictionary? d = widget; d is not null; d = Parent(d))
+            if (d.Elements.GetString("/T").Length > 0) return d;
+        return widget;
+    }
+
+    private static string FullName(PdfDictionary field)
+    {
+        var parts = new List<string>();
+        for (PdfDictionary? d = field; d is not null; d = Parent(d))
+            if (d.Elements.GetString("/T") is { Length: > 0 } t) parts.Add(t);
+        parts.Reverse();
+        return string.Join('.', parts);
+    }
+
+    private static PdfDictionary? Parent(PdfDictionary d) => Resolve(d.Elements["/Parent"]) as PdfDictionary;
+
+    private static PdfItem? Inherited(PdfDictionary d, string key)
+    {
+        for (PdfDictionary? x = d; x is not null; x = Parent(x))
+            if (x.Elements.ContainsKey(key)) return Resolve(x.Elements[key]);
+        return null;
+    }
+
+    private static string InheritedName(PdfDictionary d, string key) => (Inherited(d, key) as PdfName)?.Value ?? "";
+
+    private static int InheritedInt(PdfDictionary d, string key) => Inherited(d, key) switch
+    {
+        PdfInteger i => i.Value,
+        PdfReal r => (int)r.Value,
+        _ => 0,
+    };
+
+    /// <summary>The widget's "on" appearance state (its export value), without the leading slash.</summary>
+    private static string? OnState(PdfDictionary widget) =>
+        (Resolve(widget.Elements.GetDictionary("/AP")?.Elements["/N"]) as PdfDictionary)?.Elements.Keys
+            .FirstOrDefault(k => k != "/Off")?[1..];
+
+    private static IReadOnlyList<string> OptionValues(PdfArray optArray) =>
+        optArray.Elements.Select(Resolve).Select(item => item switch
+        {
+            PdfString s => s.Value,
+            PdfName n => n.Value,
+            PdfArray a when a.Elements.Count >= 2 => (Resolve(a.Elements[1]) as PdfString)?.Value ?? "",
+            _ => item?.ToString() ?? "",
+        }).ToList();
 
     private static PdfItem? Resolve(PdfItem? item) => item is PdfReference r ? r.Value : item;
 
