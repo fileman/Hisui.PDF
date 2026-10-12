@@ -138,9 +138,10 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenAsync()
     {
-        var path = await _dialogs.OpenPdfAsync();
-        if (path is null) return;
-        await OpenPathAsync(path);
+        var paths = await _dialogs.OpenPdfsAsync();
+        if (paths.Count == 0) return;
+        await OpenPathAsync(paths[0]);
+        foreach (var extra in paths.Skip(1)) _windows.OpenWindow(extra); // one window per additional file
     }
 
     /// <summary>Opens a new, empty document window (multi-window).</summary>
@@ -151,9 +152,8 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenInNewWindowAsync()
     {
-        var path = await _dialogs.OpenPdfAsync();
-        if (path is null) return;
-        _windows.OpenWindow(path);
+        foreach (var path in await _dialogs.OpenPdfsAsync())
+            _windows.OpenWindow(path);
     }
 
     [RelayCommand]
