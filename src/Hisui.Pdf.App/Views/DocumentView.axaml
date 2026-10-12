@@ -615,6 +615,24 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
                                     </StackPanel>
                                 </Button>
+                                <Button Classes="ribbon-small" Command="{Binding VerifySignaturesCommand}" ToolTip.Tip="{loc:Tr Sign.Verify.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2l5 2v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4z M5.8 8l1.6 1.6 3-3" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Sign.Verify}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ChooseOcrLanguagesCommand}" ToolTip.Tip="{loc:Tr Ocr.Button.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2a6 6 0 1 0 .01 0 M2 8h12 M8 2c2 2 2 10 0 12 M8 2c-2 2-2 10 0 12" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Ocr.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding BatchCommand}" ToolTip.Tip="{loc:Tr Batch.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M5 2h7v9H5z M3 4v9h7 M7 5h3 M7 7h3" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Batch.Button}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding SaveAsProfileCommand}" ToolTip.Tip="{loc:Tr Conf.Button.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="9">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M4 2h6l2.5 2.5V14H4z M6 9l1.5 1.5L10.5 7" />
@@ -656,6 +674,13 @@
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph-tool" Width="15" Height="15" Data="M6.5 9.5l3-3 M7 4.5l1.5-1.5a2.5 2.5 0 0 1 3.5 3.5L10.5 8 M9 11.5L7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8" />
                                         <TextBlock Text="{loc:Tr Tool.Link}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.DigitalSignature.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=DigitalSignature, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="M3 2h7l3 3v9H3z M5.5 11c1-2 2-2 2.5 0s1.5 1 2.5-.5 M8.5 6.5l1.5 1.5 2.5-3" />
+                                        <TextBlock Text="{loc:Tr Tool.DigitalSignature}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
                                 <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Highlight.Tooltip}"

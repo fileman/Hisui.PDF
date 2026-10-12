@@ -33,6 +33,9 @@ public partial class App : Application
             builder.Services.AddSingleton<IPrintService, PrintService>();
             builder.Services.AddSingleton<IWindowService, WindowService>();
             builder.Services.AddSingleton<IUpdateService, UpdateService>();
+            builder.Services.AddSingleton<Hisui.Pdf.Core.Abstractions.IOcrLanguageStore>(_ => new Hisui.Pdf.Core.Services.OcrLanguageStore(
+                System.IO.Path.Combine(AppContext.BaseDirectory, "tessdata"), AppDataPaths.TessDataDir,
+                new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(5) }));
             builder.Services.AddSingleton<ILocalizer>(Localizer.Instance);
             // Transient so each window owns an independent view model + document session (multi-window).
             builder.Services.AddTransient<MainViewModel>();

@@ -14,4 +14,7 @@ internal static class AppDataPaths
     /// <summary>Folder holding the reusable signature library (PNG files + manifest).</summary>
     public static readonly string SignaturesDir      = Path.Combine(BaseDir, "signatures");
     public static readonly string SignaturesManifest = Path.Combine(SignaturesDir, "signatures.json");
+
+    /// <summary>OCR languages the user downloaded or imported (the bundled ones stay beside the executable).</summary>
+    public static readonly string TessDataDir = Path.Combine(BaseDir, "tessdata");
 }

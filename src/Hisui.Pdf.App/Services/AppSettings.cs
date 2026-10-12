@@ -20,4 +20,7 @@ public sealed class AppSettings
 
     /// <summary>Page view: false = one page at a time (wheel flips pages), true = pages stacked in one scroll.</summary>
     public bool ContinuousScroll { get; set; }
+
+    /// <summary>OCR languages joined with '+', e.g. "ita+eng" (Tesseract syntax).</summary>
+    public string? OcrLanguages { get; set; } = "ita+eng";
 }

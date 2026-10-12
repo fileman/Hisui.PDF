@@ -22,6 +22,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPdfNavigationService, PdfNavigationService>();
         services.AddSingleton<IPdfCompareService, PdfCompareService>();
         services.AddSingleton<IPdfConformanceService, PdfConformanceService>();
+        services.AddSingleton<IPdfOfficeExporter, PdfOfficeExporter>();
+        services.AddSingleton<IPdfSignatureService>(_ => new PdfSignatureService(new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) }));
         services.AddSingleton<IPdfTextExtractor, PdfTextExtractor>();
         services.AddSingleton<IPdfImageExtractor, PdfImageExtractor>();
         services.AddSingleton<IPdfWordExporter, PdfWordExporter>();

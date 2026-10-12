@@ -124,6 +124,8 @@ public partial class MainViewModel
         RedactPatternsCommand.NotifyCanExecuteChanged();
         SaveAsProfileCommand.NotifyCanExecuteChanged();
         CheckAccessibilityCommand.NotifyCanExecuteChanged();
+        SignInvisibleCommand.NotifyCanExecuteChanged();
+        VerifySignaturesCommand.NotifyCanExecuteChanged();
     }
 
     public bool IsAnnotationActive => ActiveTool != AnnotationTool.None;
@@ -213,6 +215,13 @@ public partial class MainViewModel
         if (ActiveTool is AnnotationTool.StickyNote or AnnotationTool.Comment)
             normRect = PdfRect.FromLTWH(C(_dragStart.X / w), C(_dragStart.Y / h), 0, 0);
 
+        if (ActiveTool == AnnotationTool.DigitalSignature)
+        {
+            ActiveTool = AnnotationTool.None;
+            await SignAreaAsync(normRect);
+            return;
+        }
+
         if (ActiveTool == AnnotationTool.Link)
         {
             ActiveTool = AnnotationTool.None; // one-shot: back to viewing, where the new link is clickable
@@ -252,7 +261,7 @@ public partial class MainViewModel
             {
                 var current = await _pageService.BuildFromSessionAsync(_session!, ct);
                 // The region is in the unrotated-preview space; the built document has the page rotation baked in.
-                var text = await _ocr.RecognizeRegionAsync(current, pageIndex, region.RotateClockwise(PageTurns), options: null, ct);
+                var text = await _ocr.RecognizeRegionAsync(current, pageIndex, region.RotateClockwise(PageTurns), CurrentOcrOptions(), ct);
                 if (text.Length == 0) { StatusMessage = _loc["Status.OcrSelectionEmpty"]; return; }
                 if (GetMainWindow()?.Clipboard is { } cb) await cb.SetTextAsync(text);
                 StatusMessage = _loc.Format("Status.OcrSelectionCopied", text.Length);
