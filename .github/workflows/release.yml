@@ -95,7 +95,7 @@ jobs:
           "ASSET=$name.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # Unsigned MSI: the in-app updater downloads and runs it (MajorUpgrade replaces the old build).
-      - name: Build MSI
+      - name: Build MSI + Setup.exe
         if: matrix.rid == 'win-x64'
         shell: pwsh
         run: |
@@ -103,10 +103,13 @@ jobs:
           # the updater reads the version from the MSI name
           $v = $env:BUILD_VERSION
           dotnet publish $env:PROJECT /p:PublishProfile=win-x64 -p:Version="$v"
-          dotnet build src/Hisui.Pdf.Installer.Win/Hisui.Pdf.Installer.Win.wixproj -c Release -p:Version="$v"
+          # Setup.exe elevates before running the MSI (AppLocker blocks unsigned MSIs for standard users);
+          # it builds the MSI too via ProjectReference
+          dotnet build src/Hisui.Pdf.Setup.Win/Hisui.Pdf.Setup.Win.wixproj -c Release -p:Version="$v"
           # copy to the root so upload-artifact doesn't keep the bin/installer/ directory structure
-          Copy-Item "bin/installer/HisuiPDF-$v-win-x64.msi" .
+          Copy-Item "bin/installer/HisuiPDF-$v-win-x64.msi", "bin/installer/HisuiPDF-Setup-$v-win-x64.exe" .
           "MSI=HisuiPDF-$v-win-x64.msi" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SETUP=HisuiPDF-Setup-$v-win-x64.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -115,6 +118,7 @@ jobs:
           path: |
             ${{ env.ASSET }}
             ${{ env.MSI }}
+            ${{ env.SETUP }}
           retention-days: 5
 
   release:
@@ -138,7 +142,7 @@ jobs:
           ### Downloads
           | Platform | File |
           |---|---|
-          | Windows x64 | `Hisui.Pdf-v__VERSION__-win-x64.zip` or installer `HisuiPDF-__VERSION__-win-x64.msi` (needed by in-app updates) |
+          | Windows x64 | installer `HisuiPDF-Setup-__VERSION__-win-x64.exe` (recommended), `HisuiPDF-__VERSION__-win-x64.msi` (needed by in-app updates) or portable `Hisui.Pdf-v__VERSION__-win-x64.zip` |
           | Linux x64 | `Hisui.Pdf-v__VERSION__-linux-x64.tar.gz` |
           | macOS (Intel) | `Hisui.Pdf-v__VERSION__-osx-x64.tar.gz` |
           | macOS (Apple Silicon) | `Hisui.Pdf-v__VERSION__-osx-arm64.tar.gz` |

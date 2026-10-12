@@ -13,7 +13,7 @@ binaries are self-contained, so **no .NET install is required**.
 
 | Platform | Asset |
 |---|---|
-| Windows x64 (installer) | `HisuiPDF-X.Y.N-win-x64.msi` |
+| Windows x64 (installer) | `HisuiPDF-Setup-X.Y.N-win-x64.exe` (asks for UAC up front; works where AppLocker blocks unsigned MSIs) or `HisuiPDF-X.Y.N-win-x64.msi` |
 | Windows x64 (portable) | `Hisui.Pdf-vX.Y.N-win-x64.zip` |
 | Linux x64 | `Hisui.Pdf-vX.Y.N-linux-x64.tar.gz` |
 | macOS (Intel) | `Hisui.Pdf-vX.Y.N-osx-x64.tar.gz` |
