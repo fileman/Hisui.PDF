@@ -13,6 +13,7 @@ internal sealed class SettingsService : ISettingsService
     {
         Settings.RecentFiles.Remove(path);
         if (!Settings.PinnedFiles.Contains(path)) Settings.RecentFiles.Insert(0, path);
+        Settings.RecentOpened[path] = DateTime.Now;
         TrimRecentFiles();
         Save();
     }
@@ -21,6 +22,7 @@ internal sealed class SettingsService : ISettingsService
     {
         Settings.RecentFiles.Remove(path);
         Settings.PinnedFiles.Remove(path);
+        Settings.RecentOpened.Remove(path);
         Save();
     }
 
@@ -37,6 +39,7 @@ internal sealed class SettingsService : ISettingsService
     public void ClearRecentFiles()
     {
         Settings.RecentFiles.Clear();
+        TrimRecentFiles();
         Save();
     }
 
@@ -44,6 +47,8 @@ internal sealed class SettingsService : ISettingsService
     {
         while (Settings.RecentFiles.Count > Math.Max(1, Settings.MaxRecentFiles))
             Settings.RecentFiles.RemoveAt(Settings.RecentFiles.Count - 1);
+        foreach (var gone in Settings.RecentOpened.Keys.Where(p => !Settings.RecentFiles.Contains(p) && !Settings.PinnedFiles.Contains(p)).ToList())
+            Settings.RecentOpened.Remove(gone);
     }
 
     public void Save()

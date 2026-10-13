@@ -1,66 +1,77 @@
 using System.Collections.ObjectModel;
 using System.IO;
-using CommunityToolkit.Mvvm.ComponentModel;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using Hisui.Pdf.App.Imaging;
 
 namespace Hisui.Pdf.App.ViewModels;
 
 public partial class MainViewModel
 {
-    private const int RecentPageSize = 8;
+    /// <summary>Thumbnails by path and last write time, shared by every tab and window.
+    /// ponytail: unbounded, but holds at most the recent list (30 + pinned) of small bitmaps.</summary>
+    private static readonly Dictionary<(string Path, DateTime Written), Bitmap?> ThumbnailCache = [];
 
-    /// <summary>Pinned files (in pin order) followed by the most recent ones: the whole list.</summary>
-    public IReadOnlyList<RecentFileEntry> AllRecentFiles { get; private set; } = [];
+    private CancellationTokenSource? _thumbnailsCts;
 
-    /// <summary>The page of <see cref="AllRecentFiles"/> shown in the empty state.</summary>
+    /// <summary>Pinned files (in pin order) followed by the most recent ones.</summary>
     public ObservableCollection<RecentFileEntry> RecentFiles { get; } = [];
 
-    [ObservableProperty] private int _recentPage;
-
-    public int RecentPageCount => Math.Max(1, (AllRecentFiles.Count + RecentPageSize - 1) / RecentPageSize);
-    public string RecentPageLabel => $"{RecentPage + 1} / {RecentPageCount}";
-    public bool HasRecentFiles => AllRecentFiles.Count > 0;
-    public bool HasRecentPages => RecentPageCount > 1;
-    public bool HasUnpinnedRecentFiles => AllRecentFiles.Any(r => !r.IsPinned);
-
-    partial void OnRecentPageChanged(int value) => ShowRecentPage();
+    public IReadOnlyList<RecentFileEntry> AllRecentFiles => RecentFiles;
+    public bool HasRecentFiles => RecentFiles.Count > 0;
+    public bool HasUnpinnedRecentFiles => RecentFiles.Any(r => !r.IsPinned);
 
     /// <summary>Re-reads the list from the settings, which every tab and window shares (called when a view shows it).</summary>
     public void RefreshRecentFiles()
     {
         var settings = _settings.Settings;
-        AllRecentFiles = settings.PinnedFiles.Select(p => new RecentFileEntry(p, IsPinned: true))
-            .Concat(settings.RecentFiles.Where(p => !settings.PinnedFiles.Contains(p)).Select(p => new RecentFileEntry(p)))
-            .ToList();
-        OnPropertyChanged(nameof(AllRecentFiles));
-        OnPropertyChanged(nameof(RecentPageCount));
-        OnPropertyChanged(nameof(HasRecentFiles));
-        OnPropertyChanged(nameof(HasRecentPages));
-        OnPropertyChanged(nameof(HasUnpinnedRecentFiles));
-
-        var page = Math.Clamp(RecentPage, 0, RecentPageCount - 1);
-        if (page != RecentPage) RecentPage = page; // shows that page
-        else ShowRecentPage();
-    }
-
-    private void ShowRecentPage()
-    {
         RecentFiles.Clear();
-        foreach (var entry in AllRecentFiles.Skip(RecentPage * RecentPageSize).Take(RecentPageSize))
-            RecentFiles.Add(entry);
-        OnPropertyChanged(nameof(RecentPageLabel));
-        PreviousRecentPageCommand.NotifyCanExecuteChanged();
-        NextRecentPageCommand.NotifyCanExecuteChanged();
+        foreach (var (path, pinned) in settings.PinnedFiles.Select(p => (p, true))
+                     .Concat(settings.RecentFiles.Where(p => !settings.PinnedFiles.Contains(p)).Select(p => (p, false))))
+        {
+            DateTime? opened = settings.RecentOpened.TryGetValue(path, out var at) ? at : null;
+            RecentFiles.Add(new RecentFileEntry(path, pinned, opened, OpenedText(opened), _loc["Recent.Missing"]));
+        }
+        OnPropertyChanged(nameof(AllRecentFiles));
+        OnPropertyChanged(nameof(HasRecentFiles));
+        OnPropertyChanged(nameof(HasUnpinnedRecentFiles));
+        _ = LoadThumbnailsAsync([.. RecentFiles]);
     }
 
-    private bool CanPreviousRecentPage() => RecentPage > 0;
-    private bool CanNextRecentPage() => RecentPage < RecentPageCount - 1;
+    private string OpenedText(DateTime? opened) => opened switch
+    {
+        null => "",
+        { } t when t.Date == DateTime.Today => _loc.Format("Recent.Today", t.ToString("HH:mm")),
+        { } t when t.Date == DateTime.Today.AddDays(-1) => _loc.Format("Recent.Yesterday", t.ToString("HH:mm")),
+        { } t => t.ToString("d"),
+    };
 
-    [RelayCommand(CanExecute = nameof(CanPreviousRecentPage))]
-    private void PreviousRecentPage() => RecentPage--;
-
-    [RelayCommand(CanExecute = nameof(CanNextRecentPage))]
-    private void NextRecentPage() => RecentPage++;
+    /// <summary>Renders the first page of each listed file, one at a time, off the UI thread; a newer refresh cancels it.</summary>
+    private async Task LoadThumbnailsAsync(IReadOnlyList<RecentFileEntry> entries)
+    {
+        _thumbnailsCts?.Cancel();
+        var cts = _thumbnailsCts = new CancellationTokenSource();
+        foreach (var entry in entries)
+        {
+            if (cts.IsCancellationRequested) return;
+            if (!entry.Exists) continue;
+            var key = (entry.FullPath, entry.LastWriteTime);
+            if (!ThumbnailCache.TryGetValue(key, out var bitmap))
+            {
+                try
+                {
+                    var bytes = await File.ReadAllBytesAsync(entry.FullPath, cts.Token);
+                    var page = await _renderer.RenderPageAsync(bytes, 0, 24, cts.Token);
+                    bitmap = await Dispatcher.UIThread.InvokeAsync(() => BitmapConversions.ToFrozenBitmap(page));
+                }
+                catch (OperationCanceledException) { return; }
+                catch (Exception) { bitmap = null; } // encrypted, damaged or locked: the icon stays
+                ThumbnailCache[key] = bitmap;
+            }
+            entry.Thumbnail = bitmap;
+        }
+    }
 
     /// <summary>Pins a file to the top of the list (like a favourite), or unpins it back among the recent ones.</summary>
     [RelayCommand]
@@ -83,7 +94,6 @@ public partial class MainViewModel
     {
         if (ChooseAsync is not null && await ChooseAsync(_loc["Recent.ClearConfirm"], [_loc["Dialog.Cancel"], _loc["Recent.Clear"]]) != 1) return;
         _settings.ClearRecentFiles();
-        RecentPage = 0;
         RefreshRecentFiles();
     }
 
