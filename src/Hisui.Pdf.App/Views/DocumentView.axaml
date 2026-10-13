@@ -491,6 +491,10 @@
                         <TextBlock Text="{Binding PageInfo}" FontSize="12" Margin="10,0,0,0"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                        <Border Width="1" Height="18" Background="{DynamicResource RibbonDividerBrush}" Margin="10,0,6,0" />
+                        <!-- Help in plain sight: report, request, share, updates, about. -->
+                        <Button Classes="ribbon-filepill" Content="{loc:Tr Ribbon.Help}" Click="OnHelpClick"
+                                ToolTip.Tip="{loc:Tr Ribbon.Help.Tooltip}" />
                     </StackPanel>
                 </Grid>
             </Border>
