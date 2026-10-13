@@ -5,6 +5,7 @@
         xmlns:vm="clr-namespace:Hisui.Pdf.App.ViewModels"
         xmlns:views="clr-namespace:Hisui.Pdf.App.Views"
         x:Class="Hisui.Pdf.App.Views.DocumentView"
+        x:DataType="vm:MainViewModel"
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
         Background="{DynamicResource RibbonWindowBrush}">
 
@@ -677,7 +678,6 @@
                                     </StackPanel>
                                 </RadioButton>
                                 <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.DigitalSignature.Tooltip}"
-                                            
                                              IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=DigitalSignature, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph-tool" Width="15" Height="15" Data="M3 2h7l3 3v9H3z M5.5 11c1-2 2-2 2.5 0s1.5 1 2.5-.5 M8.5 6.5l1.5 1.5 2.5-3" />
@@ -785,7 +785,7 @@
                                 <ListBox ItemsSource="{Binding BookmarkRows}" SelectedItem="{Binding SelectedBookmark, Mode=TwoWay}"
                                          Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListBox.ItemTemplate>
-                                        <DataTemplate>
+                                        <DataTemplate x:DataType="vm:BookmarkRow">
                                             <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent}">
                                                 <TextBlock Text="{Binding Title}" FontSize="12" TextWrapping="Wrap" />
                                                 <TextBlock Grid.Column="1" Text="{Binding PageLabel}" FontSize="10.5" Margin="6,0,0,0"
@@ -821,7 +821,7 @@
                                 <ListBox ItemsSource="{Binding CommentList}" SelectedItem="{Binding SelectedComment, Mode=TwoWay}"
                                          Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListBox.ItemTemplate>
-                                        <DataTemplate>
+                                        <DataTemplate x:DataType="vm:CommentItem">
                                             <StackPanel Margin="{Binding Indent}" Spacing="1">
                                                 <TextBlock Text="{Binding Header}" FontSize="10.5" Foreground="{DynamicResource RibbonSubtleTextBrush}" />
                                                 <TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" MaxHeight="64" />
@@ -965,7 +965,7 @@
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="vm:PageItemViewModel">
                                     <StackPanel HorizontalAlignment="Center" Spacing="6">
                                         <Border Background="{DynamicResource RibbonPageBrush}"
                                                 BorderBrush="#22000000" BorderThickness="1"
@@ -1000,7 +1000,7 @@
                                   HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Pages}" Margin="16" HorizontalAlignment="Center">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="vm:PageItemViewModel">
                                     <LayoutTransformControl Margin="0,0,0,12" HorizontalAlignment="Center">
                                         <LayoutTransformControl.LayoutTransform>
                                             <RotateTransform Angle="{Binding RotationAngle}" />
@@ -1050,13 +1050,13 @@
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.Styles>
-                                    <Style Selector="ContentPresenter">
+                                    <Style Selector="ContentPresenter" x:DataType="vm:HighlightBox">
                                         <Setter Property="Canvas.Left" Value="{Binding Left}" />
                                         <Setter Property="Canvas.Top" Value="{Binding Top}" />
                                     </Style>
                                 </ItemsControl.Styles>
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="vm:HighlightBox">
                                         <Rectangle Width="{Binding Width}" Height="{Binding Height}"
                                                    Fill="{Binding Fill}" Stroke="{Binding Stroke}"
                                                    StrokeThickness="{Binding StrokeThickness}"
@@ -1141,11 +1141,11 @@
                                        HorizontalAlignment="Center" Margin="0,0,0,4" />
                             <ItemsControl ItemsSource="{Binding RecentFiles}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="vm:RecentFileEntry">
                                         <Button Classes="recent-link" HorizontalAlignment="Center"
                                                 Content="{Binding DisplayName}" ToolTip.Tip="{Binding FullPath}"
                                                 CommandParameter="{Binding FullPath}"
-                                                Command="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenRecentCommand}" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

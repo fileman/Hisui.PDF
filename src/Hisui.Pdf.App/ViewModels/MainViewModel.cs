@@ -687,8 +687,8 @@ public partial class MainViewModel : ObservableObject
             if (!_thumbCache.TryGetValue(key, out var thumb))
             {
                 var source = _session.GetSource(item.SourceDocumentId);
-                var png = await _renderer.RenderPageToPngAsync(source, item.SourcePageIndex, ThumbnailDpi, ct);
-                thumb = BitmapConversions.ToFrozenBitmap(png);
+                var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, ThumbnailDpi, ct);
+                thumb = BitmapConversions.ToFrozenBitmap(page);
                 _thumbCache[key] = thumb;
             }
 
@@ -727,8 +727,8 @@ public partial class MainViewModel : ObservableObject
         if (!_renderingPreviews.Add(key)) return;
         try
         {
-            var png = await _renderer.RenderPageToPngAsync(_session.GetSource(item.SourceDocumentId), item.SourcePageIndex, _settings.Settings.PreviewDpi);
-            var preview = BitmapConversions.ToFrozenBitmap(png);
+            var page = await _renderer.RenderPageAsync(_session.GetSource(item.SourceDocumentId), item.SourcePageIndex, _settings.Settings.PreviewDpi);
+            var preview = BitmapConversions.ToFrozenBitmap(page);
             _previewCache[key] = preview;
             item.Preview = preview;
             item.SetBaseSize(preview.Size);
@@ -757,8 +757,8 @@ public partial class MainViewModel : ObservableObject
             {
                 var source = _session.GetSource(item.SourceDocumentId);
                 var previewDpi = _settings.Settings.PreviewDpi;
-                var png = await _renderer.RenderPageToPngAsync(source, item.SourcePageIndex, previewDpi);
-                preview = BitmapConversions.ToFrozenBitmap(png);
+                var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, previewDpi);
+                preview = BitmapConversions.ToFrozenBitmap(page);
                 _previewCache[key] = preview;
             }
             catch (Exception ex)

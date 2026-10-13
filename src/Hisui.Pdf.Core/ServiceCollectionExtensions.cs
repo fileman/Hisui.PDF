@@ -12,7 +12,9 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddPdfCore(this IServiceCollection services)
     {
-        services.AddSingleton<IPdfRenderer, PdfiumRenderer>();
+        services.AddSingleton<PdfiumRenderer>();
+        services.AddSingleton<IPdfRenderer>(sp => sp.GetRequiredService<PdfiumRenderer>());
+        services.AddSingleton<IPdfiumDocumentHost>(sp => sp.GetRequiredService<PdfiumRenderer>());
         services.AddSingleton<IPdfPageService, PdfPageService>();
         services.AddSingleton<IPdfAnnotationService, PdfAnnotationService>();
         services.AddSingleton<IPdfRedactionService, PdfRedactionService>();

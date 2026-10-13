@@ -1,6 +1,5 @@
 using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
-using PDFtoImage;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
@@ -36,7 +35,7 @@ internal sealed class PdfRedactionService : IPdfRedactionService
             .GroupBy(r => r.PageIndex)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<PdfRect>)g.Select(r => r.Rect).ToList());
 
-        var pageCount = Conversion.GetPageCount(pdf);
+        var pageCount = await _renderer.GetPageCountAsync(pdf, ct);
         foreach (var idx in byPage.Keys)
         {
             if ((uint)idx >= (uint)pageCount)
