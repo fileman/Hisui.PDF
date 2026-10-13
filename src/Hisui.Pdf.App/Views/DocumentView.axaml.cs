@@ -211,7 +211,7 @@ public partial class DocumentView : UserControl
 
         vm.RefreshRecentFiles(); // another tab or window may have changed the shared list
         var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
-        foreach (var entry in vm.AllRecentFiles.Take(15)) // the full list is paged in the empty state
+        foreach (var entry in vm.AllRecentFiles.Take(15)) // the full list is in the empty state
         {
             var item = new MenuItem
             {

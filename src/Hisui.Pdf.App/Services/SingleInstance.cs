@@ -11,7 +11,12 @@ namespace Hisui.Pdf.App.Services;
 /// </summary>
 internal static class SingleInstance
 {
+#if DEBUG
+    // A development build runs beside the installed app instead of handing its files to it.
+    private static readonly string Id = $"HisuiPDF.Debug.{Environment.UserName}.{Process.GetCurrentProcess().SessionId}";
+#else
     private static readonly string Id = $"HisuiPDF.{Environment.UserName}.{Process.GetCurrentProcess().SessionId}";
+#endif
     private static readonly object Gate = new();
     private static List<string[]>? _pending = [];
     private static Action<string[]>? _received;

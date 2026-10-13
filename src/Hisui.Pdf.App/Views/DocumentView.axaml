@@ -310,13 +310,16 @@
         <Style Selector="Button.recent-action:disabled /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
         </Style>
-        <Style Selector="Grid.recent-row > Button.recent-action">
+        <Style Selector="Grid.recent-row Button.recent-action">
             <Setter Property="Opacity" Value="0" />
         </Style>
-        <Style Selector="Grid.recent-row:pointerover > Button.recent-action, Grid.recent-row > Button.recent-action:focus-within">
+        <Style Selector="Grid.recent-row:pointerover Button.recent-action, Grid.recent-row Button.recent-action:focus-within">
             <Setter Property="Opacity" Value="1" />
         </Style>
-        <Style Selector="Grid.recent-row > Button.recent-action.pinned">
+        <Style Selector="Grid.recent-row.missing > Button.recent-item">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Grid.recent-row Button.recent-action.pinned">
             <Setter Property="Opacity" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
         </Style>
@@ -1182,74 +1185,122 @@
                         </Grid>
                     </ScrollViewer>
 
-                    <!-- Empty state / onboarding (shown when no document is open) -->
-                    <StackPanel IsVisible="{Binding ShowEmptyState}" MaxWidth="440" Spacing="14"
-                                HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Border Width="76" Height="76" CornerRadius="16" HorizontalAlignment="Center"
-                                Background="{DynamicResource RibbonAccentSoftBrush}">
-                            <Path Classes="glyph glyph-accent" Width="34" Height="34"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                  Data="{StaticResource IconOpen}" />
-                        </Border>
-                        <TextBlock Text="{loc:Tr Empty.Title}" FontSize="19" FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" Foreground="{DynamicResource RibbonTextBrush}" />
-                        <TextBlock Text="{loc:Tr Empty.Subtitle}" Classes="dialog-hint"
-                                   TextAlignment="Center" />
-                        <Button Content="{loc:Tr Empty.OpenButton}" Command="{Binding OpenCommand}"
-                                Classes="primary" Padding="22,9" HorizontalAlignment="Center" />
+                    <!-- Empty state (shown when no document is open). Without recent files: a centred open prompt.
+                         With recent files: a compact header, then the recent files as a full-width table. -->
+                    <Panel IsVisible="{Binding ShowEmptyState}">
+                        <StackPanel IsVisible="{Binding !HasRecentFiles}" MaxWidth="440" Spacing="14"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border Width="76" Height="76" CornerRadius="16" HorizontalAlignment="Center"
+                                    Background="{DynamicResource RibbonAccentSoftBrush}">
+                                <Path Classes="glyph glyph-accent" Width="34" Height="34"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Data="{StaticResource IconOpen}" />
+                            </Border>
+                            <TextBlock Text="{loc:Tr Empty.Title}" FontSize="19" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" Foreground="{DynamicResource RibbonTextBrush}" />
+                            <TextBlock Text="{loc:Tr Empty.Subtitle}" Classes="dialog-hint"
+                                       TextAlignment="Center" />
+                            <Button Content="{loc:Tr Empty.OpenButton}" Command="{Binding OpenCommand}"
+                                    Classes="primary" Padding="22,9" HorizontalAlignment="Center" />
+                        </StackPanel>
 
-                        <!-- Recent files, one click away: pinned first (star), paged, each removable -->
-                        <StackPanel IsVisible="{Binding HasRecentFiles}" Spacing="2" Margin="0,10,0,0" Width="420">
-                            <Grid ColumnDefinitions="*,Auto" Margin="8,0,0,4">
-                                <TextBlock Text="{loc:Tr Empty.Recent}" Classes="caption" VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Classes="recent-link" FontSize="11.5"
+                        <Grid IsVisible="{Binding HasRecentFiles}" RowDefinitions="Auto,Auto,Auto,*" Margin="28,20,28,8">
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,18">
+                                <Border Width="44" Height="44" CornerRadius="10" VerticalAlignment="Center"
+                                        Background="{DynamicResource RibbonAccentSoftBrush}">
+                                    <Path Classes="glyph glyph-accent" Width="22" Height="22"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Data="{StaticResource IconOpen}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{loc:Tr Empty.Title}" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource RibbonTextBrush}" />
+                                    <TextBlock Text="{loc:Tr Empty.Subtitle}" Classes="dialog-hint" />
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="{loc:Tr Empty.OpenButton}" Command="{Binding OpenCommand}"
+                                        Classes="primary" Padding="22,9" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                                <TextBlock Text="{loc:Tr Recent.Title}" FontSize="17" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource RibbonTextBrush}" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="recent-link" FontSize="12"
                                         Content="{loc:Tr Recent.Clear}" Command="{Binding ClearRecentCommand}"
                                         IsVisible="{Binding HasUnpinnedRecentFiles}" />
                             </Grid>
-                            <ItemsControl ItemsSource="{Binding RecentFiles}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:RecentFileEntry">
-                                        <Grid Classes="recent-row" ColumnDefinitions="*,Auto,Auto" Background="Transparent">
-                                            <Button Classes="recent-item" ToolTip.Tip="{Binding FullPath}"
-                                                    CommandParameter="{Binding FullPath}"
-                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenRecentCommand}">
-                                                <StackPanel Spacing="1">
-                                                    <TextBlock Text="{Binding DisplayName}" FontSize="12.5"
-                                                               Foreground="{DynamicResource RibbonAccentBrush}"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding Folder}" FontSize="11"
-                                                               Foreground="{DynamicResource RibbonSubtleTextBrush}"
-                                                               TextTrimming="LeadingCharacterEllipsis" />
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Grid.Column="1" Classes="recent-action" Classes.pinned="{Binding IsPinned}"
-                                                    ToolTip.Tip="{loc:Tr Recent.Pin.Tooltip}"
-                                                    CommandParameter="{Binding FullPath}"
-                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).TogglePinRecentCommand}">
-                                                <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconStar}" />
-                                            </Button>
-                                            <Button Grid.Column="2" Classes="recent-action" ToolTip.Tip="{loc:Tr Recent.Remove.Tooltip}"
-                                                    CommandParameter="{Binding FullPath}"
-                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).RemoveRecentCommand}">
-                                                <Path Classes="glyph" Width="10" Height="10" Data="M2 2l8 8 M10 2l-8 8" />
-                                            </Button>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,4,0,0"
-                                        IsVisible="{Binding HasRecentPages}">
-                                <Button Classes="recent-action" Command="{Binding PreviousRecentPageCommand}"
-                                        ToolTip.Tip="{loc:Tr Recent.PreviousPage}">
-                                    <Path Classes="glyph" Width="10" Height="10" Data="M7 1L3 5l4 4" /></Button>
-                                <TextBlock Text="{Binding RecentPageLabel}" FontSize="12" VerticalAlignment="Center"
-                                           Foreground="{DynamicResource RibbonSubtleTextBrush}" />
-                                <Button Classes="recent-action" Command="{Binding NextRecentPageCommand}"
-                                        ToolTip.Tip="{loc:Tr Recent.NextPage}">
-                                    <Path Classes="glyph" Width="10" Height="10" Data="M3 1l4 4-4 4" /></Button>
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
+
+                            <!-- Column header; the widths match the rows below -->
+                            <Border Grid.Row="2" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource RibbonDividerBrush}"
+                                    Padding="0,0,0,6">
+                                <Grid ColumnDefinitions="64,*,170,110,72" Margin="8,0">
+                                    <TextBlock Grid.Column="1" Classes="caption" Text="{loc:Tr Recent.Column.Name}" />
+                                    <TextBlock Grid.Column="2" Classes="caption" Text="{loc:Tr Recent.Column.Opened}" />
+                                    <TextBlock Grid.Column="3" Classes="caption" Text="{loc:Tr Recent.Column.Size}" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Recent files: pinned first (star), each removable; a row opens its file -->
+                            <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding RecentFiles}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RecentFileEntry">
+                                            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource RibbonDividerBrush}">
+                                                <Grid Classes="recent-row" Classes.missing="{Binding !Exists}"
+                                                      ColumnDefinitions="*,72" Background="Transparent">
+                                                    <Button Classes="recent-item" HorizontalContentAlignment="Stretch" ToolTip.Tip="{Binding FullPath}"
+                                                            CommandParameter="{Binding FullPath}"
+                                                            Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenRecentCommand}">
+                                                        <Grid ColumnDefinitions="64,*,170,110">
+                                                            <!-- First page once rendered; a document glyph until then -->
+                                                            <Border Width="38" Height="48" HorizontalAlignment="Center"
+                                                                    BorderThickness="1" BorderBrush="{DynamicResource RibbonPageBorderBrush}"
+                                                                    Background="{DynamicResource RibbonPageBrush}">
+                                                                <Panel>
+                                                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="1"
+                                                                                IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
+                                                                        <Path Classes="glyph" Width="16" Height="16" Data="M4 2h5l3 3v9H4z M9 2v3h3" />
+                                                                        <TextBlock Text="PDF" FontSize="8" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                                                    </StackPanel>
+                                                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                                                </Panel>
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" Margin="0,0,12,0">
+                                                                <TextBlock Text="{Binding DisplayName}" FontSize="13"
+                                                                           Foreground="{DynamicResource RibbonTextBrush}"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding Folder}" FontSize="11"
+                                                                           Foreground="{DynamicResource RibbonSubtleTextBrush}"
+                                                                           TextTrimming="LeadingCharacterEllipsis" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2" Text="{Binding OpenedText}" FontSize="12.5" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource RibbonTextBrush}" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="12.5" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource RibbonTextBrush}" />
+                                                        </Grid>
+                                                    </Button>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                                                HorizontalAlignment="Right" Spacing="2" Margin="0,0,6,0">
+                                                        <Button Classes="recent-action" Classes.pinned="{Binding IsPinned}"
+                                                                ToolTip.Tip="{loc:Tr Recent.Pin.Tooltip}"
+                                                                CommandParameter="{Binding FullPath}"
+                                                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).TogglePinRecentCommand}">
+                                                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconStar}" />
+                                                        </Button>
+                                                        <Button Classes="recent-action" ToolTip.Tip="{loc:Tr Recent.Remove.Tooltip}"
+                                                                CommandParameter="{Binding FullPath}"
+                                                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).RemoveRecentCommand}">
+                                                            <Path Classes="glyph" Width="10" Height="10" Data="M2 2l8 8 M10 2l-8 8" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Panel>
 
                     <!-- Drag-over drop affordance -->
                     <Border IsVisible="{Binding IsDragOver}" IsHitTestVisible="False" Margin="10"

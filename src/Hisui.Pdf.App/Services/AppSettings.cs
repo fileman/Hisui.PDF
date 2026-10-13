@@ -7,6 +7,9 @@ public sealed class AppSettings
     /// <summary>Files pinned to the top of the recent list, in pin order. Never trimmed.</summary>
     public List<string> PinnedFiles { get; set; } = [];
 
+    /// <summary>When each recent or pinned file was last opened (shown in the recent list).</summary>
+    public Dictionary<string, DateTime> RecentOpened { get; set; } = [];
+
     /// <summary>Cap on the (unpinned) recent files; the list is paged, so it can be long.</summary>
     public int MaxRecentFiles { get; set; } = 30;
     public int PreviewDpi { get; set; } = 150;

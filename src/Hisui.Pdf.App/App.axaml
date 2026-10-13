@@ -23,7 +23,7 @@
                     <SolidColorBrush x:Key="RibbonPreviewBrush"     Color="#E8E8E8" />
                     <SolidColorBrush x:Key="RibbonTextBrush"        Color="#1A2B26" />
                     <SolidColorBrush x:Key="RibbonSubtleTextBrush"  Color="#5D5D5D" />
-                    <SolidColorBrush x:Key="RibbonCaptionBrush"     Color="#6A6A66" />
+                    <SolidColorBrush x:Key="RibbonCaptionBrush"     Color="#60605C" />
                     <SolidColorBrush x:Key="RibbonDividerBrush"     Color="#0F000000" />
                     <SolidColorBrush x:Key="RibbonHoverBrush"       Color="#0A000000" />
                     <SolidColorBrush x:Key="RibbonDisabledBrush"    Color="#9A9A9A" />
