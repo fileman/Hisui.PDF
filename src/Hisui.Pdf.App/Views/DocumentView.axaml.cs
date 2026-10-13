@@ -4,6 +4,7 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Reactive;
@@ -186,34 +187,9 @@ public partial class DocumentView : UserControl
         var loc = Localizer.Instance;
         var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
 
+        // Grouped the way a newcomer looks for things: open/recent, save/print/convert, tools,
+        // then preferences and help as submenus so the top level stays short.
         flyout.Items.Add(MakeItem(loc["Menu.Open"], vm.OpenCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.OpenInNewWindow"], vm.OpenInNewWindowCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.Save"], vm.SaveCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.SaveAsProfile"], vm.SaveAsProfileCommand));
-        flyout.Items.Add(new Separator());
-
-        // Document tools (Acrobat-parity)
-        flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
-        var convert = new MenuItem { Header = loc["Menu.Convert"], IsEnabled = vm.IsDocumentLoaded };
-        foreach (var (key, format) in new[] { ("Menu.ConvertWord", "docx"), ("Menu.ConvertExcel", "xlsx"), ("Menu.ConvertPowerPoint", "pptx"), ("Menu.ConvertText", "txt"), ("Menu.ConvertImages", "png") })
-            convert.Items.Add(new MenuItem { Header = loc[key], Command = vm.ConvertCommand, CommandParameter = format });
-        flyout.Items.Add(convert);
-        var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
-        propsItem.Click += OnDocumentPropertiesClick;
-        flyout.Items.Add(propsItem);
-        var protectItem = new MenuItem { Header = loc["Menu.Protect"], IsEnabled = vm.IsDocumentLoaded };
-        protectItem.Click += OnProtectClick;
-        flyout.Items.Add(protectItem);
-        flyout.Items.Add(MakeItem(loc["Menu.RemovePassword"], vm.RemovePasswordCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.SignInvisible"], vm.SignInvisibleCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.VerifySignatures"], vm.VerifySignaturesCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.Batch"], vm.BatchCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.OcrLanguages"], vm.ChooseOcrLanguagesCommand));
-        flyout.Items.Add(new Separator());
-
         vm.RefreshRecentFiles(); // another tab or window may have changed the shared list
         var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
         foreach (var entry in vm.AllRecentFiles.Take(15)) // the full list is in the empty state
@@ -235,8 +211,41 @@ public partial class DocumentView : UserControl
             recent.Items.Add(MakeItem(loc["Recent.Clear"], vm.ClearRecentCommand));
         }
         flyout.Items.Add(recent);
+        flyout.Items.Add(MakeItem(loc["Menu.OpenInNewWindow"], vm.OpenInNewWindowCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
         flyout.Items.Add(new Separator());
 
+        flyout.Items.Add(MakeItem(loc["Menu.Save"], vm.SaveCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.SaveAsProfile"], vm.SaveAsProfileCommand));
+        var print = new MenuItem { Header = loc["Menu.Print"], IsEnabled = vm.IsDocumentLoaded, InputGesture = new KeyGesture(Key.P, KeyModifiers.Control) };
+        print.Click += OnPrintClick;
+        flyout.Items.Add(print);
+        var convert = new MenuItem { Header = loc["Menu.Convert"], IsEnabled = vm.IsDocumentLoaded };
+        foreach (var (key, format) in new[] { ("Menu.ConvertWord", "docx"), ("Menu.ConvertExcel", "xlsx"), ("Menu.ConvertPowerPoint", "pptx"), ("Menu.ConvertText", "txt"), ("Menu.ConvertImages", "png") })
+            convert.Items.Add(new MenuItem { Header = loc[key], Command = vm.ConvertCommand, CommandParameter = format });
+        flyout.Items.Add(convert);
+        flyout.Items.Add(new Separator());
+
+        // Document tools (Acrobat-parity)
+        var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
+        propsItem.Click += OnDocumentPropertiesClick;
+        flyout.Items.Add(propsItem);
+        flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
+        var security = new MenuItem { Header = loc["Menu.Security"] };
+        var protectItem = new MenuItem { Header = loc["Menu.Protect"], IsEnabled = vm.IsDocumentLoaded };
+        protectItem.Click += OnProtectClick;
+        security.Items.Add(protectItem);
+        security.Items.Add(MakeItem(loc["Menu.RemovePassword"], vm.RemovePasswordCommand));
+        security.Items.Add(new Separator());
+        security.Items.Add(MakeItem(loc["Menu.SignInvisible"], vm.SignInvisibleCommand));
+        security.Items.Add(MakeItem(loc["Menu.VerifySignatures"], vm.VerifySignaturesCommand));
+        flyout.Items.Add(security);
+        flyout.Items.Add(MakeItem(loc["Menu.Batch"], vm.BatchCommand));
+        flyout.Items.Add(new Separator());
+
+        var preferences = new MenuItem { Header = loc["Menu.Preferences"] };
         var language = new MenuItem { Header = loc["Menu.Language"] };
         foreach (var option in vm.Languages)
         {
@@ -250,7 +259,7 @@ public partial class DocumentView : UserControl
             };
             language.Items.Add(item);
         }
-        flyout.Items.Add(language);
+        preferences.Items.Add(language);
 
         var theme = new MenuItem { Header = loc["Menu.Theme"] };
         foreach (var option in vm.Themes)
@@ -265,7 +274,8 @@ public partial class DocumentView : UserControl
             };
             theme.Items.Add(item);
         }
-        flyout.Items.Add(theme);
+        preferences.Items.Add(theme);
+        preferences.Items.Add(MakeItem(loc["Menu.OcrLanguages"], vm.ChooseOcrLanguagesCommand));
 
         // Re-enables the prompt a "Don't ask again" turned off.
         var confirmClose = new MenuItem
@@ -278,20 +288,13 @@ public partial class DocumentView : UserControl
             _settings.Settings.ConfirmCloseLastTab = !_settings.Settings.ConfirmCloseLastTab;
             _settings.Save();
         };
-        flyout.Items.Add(confirmClose);
+        preferences.Items.Add(confirmClose);
+        flyout.Items.Add(preferences);
+
+        var help = new MenuItem { Header = loc["Menu.Help"] };
+        foreach (var item in BuildHelpItems()) help.Items.Add(item);
+        flyout.Items.Add(help);
         flyout.Items.Add(new Separator());
-
-        var updates = new MenuItem { Header = loc["Menu.CheckUpdates"] };
-        updates.Click += async (_, _) => await CheckForUpdatesAsync(manual: true);
-        flyout.Items.Add(updates);
-
-        var log = new MenuItem { Header = loc["Menu.ViewLog"] };
-        log.Click += async (_, _) => await new LogViewerDialog().ShowDialog(Owner);
-        flyout.Items.Add(log);
-
-        var info = new MenuItem { Header = loc["Menu.About"] };
-        info.Click += OnAboutClick;
-        flyout.Items.Add(info);
 
         flyout.Items.Add(MakeItem(loc["Menu.Exit"], vm.ExitCommand));
 
@@ -617,6 +620,61 @@ public partial class DocumentView : UserControl
         catch (Exception ex)
         {
             if (manual && DataContext is MainViewModel vm) vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+        }
+    }
+
+    // ── Help menu ────────────────────────────────────────────────────────────
+
+    private const string RepoUrl = "https://github.com/fileman/Hisui.PDF";
+
+    // Same items behind the visible Help button and under File > Help.
+    private void OnHelpClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control anchor) return;
+        var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+        foreach (var item in BuildHelpItems()) flyout.Items.Add(item);
+        flyout.ShowAt(anchor);
+    }
+
+    private List<Control> BuildHelpItems()
+    {
+        var loc = Localizer.Instance;
+        var version = _updates.CurrentVersion.ToString(3);
+
+        // GitHub's new-issue form; the label sorts bugs from requests, the body carries what a triager needs first.
+        var report = new MenuItem { Header = loc["Menu.ReportProblem"] };
+        report.Click += (_, _) => OpenUrl($"{RepoUrl}/issues/new?labels=bug&body="
+            + Uri.EscapeDataString($"Version: {version}\nOS: {System.Runtime.InteropServices.RuntimeInformation.OSDescription}\n\n"));
+
+        var feature = new MenuItem { Header = loc["Menu.RequestFeature"] };
+        feature.Click += (_, _) => OpenUrl($"{RepoUrl}/issues/new?labels=enhancement");
+
+        var share = new MenuItem { Header = loc["Menu.Share"] };
+        share.Click += async (_, _) =>
+        {
+            if (TopLevel.GetTopLevel(this)?.Clipboard is not { } cb) return;
+            await cb.SetTextAsync(loc.Format("Share.Text", $"{RepoUrl}/releases/latest"));
+            if (DataContext is MainViewModel vm) vm.StatusMessage = loc["Status.ShareCopied"];
+        };
+
+        var updates = new MenuItem { Header = loc["Menu.CheckUpdates"] };
+        updates.Click += async (_, _) => await CheckForUpdatesAsync(manual: true);
+
+        var log = new MenuItem { Header = loc["Menu.ViewLog"] };
+        log.Click += async (_, _) => await new LogViewerDialog().ShowDialog(Owner);
+
+        var info = new MenuItem { Header = loc["Menu.About"] };
+        info.Click += OnAboutClick;
+
+        return [report, feature, share, new Separator(), updates, log, info];
+    }
+
+    private void OpenUrl(string url)
+    {
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch (Exception ex)
+        {
+            if (DataContext is MainViewModel vm) vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
         }
     }
 
