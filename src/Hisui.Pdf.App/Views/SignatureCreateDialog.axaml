@@ -82,10 +82,10 @@
             <!-- Text -->
             <StackPanel Name="TextPanel" Spacing="8" IsVisible="False">
                 <TextBlock Classes="caption" Text="{loc:Tr SigCreate.TextHint}" />
-                <TextBox Name="TextInput" PlaceholderText="{loc:Tr SigCreate.TextWatermark}" Padding="8,5" />
+                <TextBox Name="SigTextInput" PlaceholderText="{loc:Tr SigCreate.TextWatermark}" Padding="8,5" />
                 <Border Background="{DynamicResource RibbonPageBrush}" BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" CornerRadius="4"
                         Height="110" ClipToBounds="True">
-                    <TextBlock Name="TextPreview" Text="{Binding #TextInput.Text}"
+                    <TextBlock Name="TextPreview" Text="{Binding #SigTextInput.Text}"
                                FontFamily="Segoe Script, Brush Script MT" FontStyle="Italic"
                                FontSize="40" Foreground="Black"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />

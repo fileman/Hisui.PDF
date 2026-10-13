@@ -28,7 +28,7 @@ jobs:
     outputs:
       ver: ${{ steps.v.outputs.ver }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # full history for the commit count
       - id: v
@@ -53,10 +53,10 @@ jobs:
           - { rid: osx-x64,   os: macos-latest,   archive: targz }
           - { rid: osx-arm64, os: macos-latest,   archive: targz }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -113,7 +113,7 @@ jobs:
           "SETUP=HisuiPDF-Setup-$v-win-x64.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.rid }}
           path: |
@@ -130,7 +130,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: dist
           merge-multiple: true

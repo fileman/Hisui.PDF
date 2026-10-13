@@ -580,10 +580,10 @@ internal sealed class PdfFormDetector : IPdfFormDetector
         public int Index { get; }
         public string Value => _l.Value;
         public bool IsSpace => string.IsNullOrWhiteSpace(_l.Value);
-        public double Left => _l.GlyphRectangle.Left;
-        public double Right => _l.GlyphRectangle.Right;
-        public double Bottom => _l.GlyphRectangle.Bottom;
-        public double Top => _l.GlyphRectangle.Top;
+        public double Left => _l.BoundingBox.Left;
+        public double Right => _l.BoundingBox.Right;
+        public double Bottom => _l.BoundingBox.Bottom;
+        public double Top => _l.BoundingBox.Top;
         public double Width => Right - Left;
         public double Height => Top - Bottom;
         public double FontSize => _l.FontSize > 0 ? _l.FontSize : 10;
