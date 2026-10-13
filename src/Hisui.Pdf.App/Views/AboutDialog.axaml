@@ -3,7 +3,7 @@
         xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
         x:Class="Hisui.Pdf.App.Views.AboutDialog"
         Title="{loc:Tr About.Title}"
-        Width="490" Height="550"
+        Width="490" Height="510"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
@@ -52,7 +52,6 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="PDFsharp 6.2.4" />
@@ -67,7 +66,7 @@
                 <TextBlock Grid.Row="2" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.PdfToImage}" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia 12.1.4" Margin="0,4,0,0" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia 12.1.3" Margin="0,4,0,0" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.Avalonia}" />
 
@@ -82,21 +81,14 @@
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="DocumentFormat.OpenXml 3.3.0" Margin="0,4,0,0" />
                 <TextBlock Grid.Row="6" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.OpenXml}" />
-
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="Tesseract 5.2.0" Margin="0,4,0,0" />
-                <TextBlock Grid.Row="7" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
-                           Text="{loc:Tr About.Lib.Tesseract}" />
             </Grid>
 
         </StackPanel>
 
         <!-- Footer -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,18,0,0">
-            <Button Grid.Column="0" Name="ReportButton" Content="{loc:Tr About.ReportIssue}" />
-            <Button Grid.Column="1" Name="ShareButton" Content="{loc:Tr About.Share}" Margin="8,0,0,0" />
-            <Button Grid.Column="3" Name="CloseButton" Content="{loc:Tr About.Close}" Classes="primary"
-                    IsDefault="True" IsCancel="True" />
-        </Grid>
+        <Button Grid.Row="1" Name="CloseButton" Content="{loc:Tr About.Close}" Classes="primary"
+                IsDefault="True" IsCancel="True"
+                HorizontalAlignment="Right" Margin="0,18,0,0" />
 
     </Grid>
 </Window>
