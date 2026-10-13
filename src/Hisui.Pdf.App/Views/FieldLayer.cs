@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Controls.Shapes;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -15,8 +16,9 @@ namespace Hisui.Pdf.App.Views;
 
 /// <summary>
 /// Form-field overlay for one page, sized to the page image. Fill mode: an editor per widget. Layout mode (Forms panel,
-/// no tool): a box per widget — click/Ctrl+click selects, drag moves the selection, the right/bottom edge resizes,
-/// arrows nudge (Shift = 10 px), Del deletes, double-click opens the properties.
+/// no tool): a box per widget — click/Ctrl+click selects, dragging on the empty page draws a selection rectangle
+/// (Ctrl/Shift adds), Ctrl+A selects all, drag moves the selection, the right/bottom edge resizes, arrows nudge
+/// (Shift = 10 px), Del deletes, double-click opens the properties.
 /// </summary>
 public sealed class FieldLayer : Canvas
 {
@@ -39,6 +41,8 @@ public sealed class FieldLayer : Canvas
     private PageItemViewModel? _subscribedPage;
     private readonly Dictionary<int, Border> _boxes = [];
     private Size _builtFor;
+    private Point? _marqueeStart;
+    private Rectangle? _marquee;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -94,8 +98,12 @@ public sealed class FieldLayer : Canvas
         var hadFocus = Children.Any(c => c.IsKeyboardFocusWithin);
         Children.Clear();
         _boxes.Clear();
+        _marquee = null;
+        _marqueeStart = null;
         _builtFor = Bounds.Size;
+        Background = null;
         if (_vm is not { IsAnnotationActive: false } vm || Page is not { } page) return;
+        if (vm.IsFormLayoutMode) Background = Brushes.Transparent; // the empty page takes the selection rectangle
         var (w, h) = (Bounds.Width, Bounds.Height);
         if (w <= 0 || h <= 0) return;
 
@@ -129,6 +137,56 @@ public sealed class FieldLayer : Canvas
             box.Background = on ? SelectedFill : BoxFill;
             box.BorderThickness = new Thickness(on ? (_vm.AlignAnchor == index ? 2.5 : 2) : 1);
         }
+    }
+
+    // ── Selection rectangle (layout mode, pressed on the empty page) ──────────
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (e.Handled || _vm is not { IsFormLayoutMode: true } || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        _marqueeStart = e.GetPosition(this);
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (_marqueeStart is not { } a) return;
+        if (_marquee is null)
+        {
+            _marquee = new Rectangle { Stroke = Accent, StrokeThickness = 1, StrokeDashArray = [3, 2], Fill = BoxFill, IsHitTestVisible = false };
+            Children.Add(_marquee);
+        }
+        var r = new Rect(a, e.GetPosition(this)).Normalize();
+        SetLeft(_marquee, r.X);
+        SetTop(_marquee, r.Y);
+        _marquee.Width = r.Width;
+        _marquee.Height = r.Height;
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (_marqueeStart is not { } a) return;
+        _marqueeStart = null;
+        e.Pointer.Capture(null);
+        e.Handled = true;
+        var add = e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        if (_marquee is null) // a click on the empty page
+        {
+            if (!add) _vm?.ClearFieldSelection();
+            return;
+        }
+        var r = new Rect(a, e.GetPosition(this)).Normalize();
+        Children.Remove(_marquee);
+        _marquee = null;
+        if (_vm is null || Page is null) return;
+        var hit = _boxes.Where(kv => new Rect(GetLeft(kv.Value), GetTop(kv.Value), kv.Value.Width, kv.Value.Height).Intersects(r))
+            .Select(kv => kv.Key);
+        _vm.SelectFields(Page, hit, add);
     }
 
     // ── Fill ──────────────────────────────────────────────────────────────────
@@ -413,6 +471,10 @@ public sealed class FieldLayer : Canvas
                 case Key.Delete or Key.Back:
                     if (!vm.SelectedFields.Contains(field.AnnotIndex)) vm.SelectField(page, field.AnnotIndex, toggle: false);
                     vm.DeleteSelectedFieldsCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+                case Key.A when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                    vm.SelectAllFields(page);
                     e.Handled = true;
                     break;
                 case Key.Escape:

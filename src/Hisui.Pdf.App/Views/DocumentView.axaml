@@ -63,6 +63,14 @@
         <StreamGeometry x:Key="IconTextEdit">M3 13h6 M12 3l1.5 1.5-7 7-2 .5 .5-2z</StreamGeometry>
         <StreamGeometry x:Key="IconImage">M2.5 4h11v8h-11z M5 10l2.5-2.5 2 2 3-3 1 1 M6 7a.8 .8 0 1 0 .01 0</StreamGeometry>
         <StreamGeometry x:Key="IconWatermark">M4 2h6l2.5 2.5V14H4z M5.5 11l5-6</StreamGeometry>
+        <StreamGeometry x:Key="IconSelectAll">M2 4V2h2 M7 2h2 M12 2h2v2 M14 7v2 M14 12v2h-2 M9 14H7 M4 14H2v-2 M2 9V7</StreamGeometry>
+        <StreamGeometry x:Key="IconProperties">M3 4h10 M3 8h10 M3 12h10 M6 2.5v3 M10 6.5v3 M5 10.5v3</StreamGeometry>
+        <StreamGeometry x:Key="IconSortRows">M2.5 4h8 M2.5 8h8 M2.5 12h5 M12.5 3v10 M10.5 11l2 2 2-2</StreamGeometry>
+        <StreamGeometry x:Key="IconExport">M8 10V2.5 M5 5.5l3-3 3 3 M3 9v4.5h10V9</StreamGeometry>
+        <StreamGeometry x:Key="IconImport">M8 2.5V10 M5 7l3 3 3-3 M3 9v4.5h10V9</StreamGeometry>
+        <StreamGeometry x:Key="IconFlatten">M2 6.5l6-3 6 3-6 3z M2 10l6 3 6-3</StreamGeometry>
+        <StreamGeometry x:Key="IconAddChild">M2.5 2.5v7h6 M6.5 7.5l2 2-2 2 M12 2.5v5 M9.5 5h5</StreamGeometry>
+        <StreamGeometry x:Key="IconReply">M6 4L2.5 7.5 6 11 M2.5 7.5h6.5a4 4 0 0 1 4 4v1</StreamGeometry>
         <StreamGeometry x:Key="IconSignature">M2 10.5c1-2.5 2-2.5 3 0s2 2.5 3 0 2-2.5 3 0 M2 13.5h11</StreamGeometry>
     </UserControl.Resources>
 
@@ -123,6 +131,7 @@
         <Style Selector="Button.ribbon-small:disabled /template/ ContentPresenter#PART_ContentPresenter,
                          Button.ribbon-icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Opacity" Value="0.4" />
+            <Setter Property="Background" Value="Transparent" />
         </Style>
 
         <!-- Glyphs -->
@@ -148,7 +157,7 @@
 
         <!-- Panel labels -->
         <Style Selector="TextBlock.ribbon-label-sm">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="12.5" />
             <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
@@ -191,6 +200,7 @@
 
         <!-- Annotation tool toggles -->
         <Style Selector="RadioButton.tool">
+            <Setter Property="FontSize" Value="12.5" />
             <Setter Property="Padding" Value="8,0" />
             <Setter Property="Height" Value="30" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -605,123 +615,123 @@
                                         IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Home}">
                                 <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Pages}" />
                                 <Button Classes="ribbon-small" Command="{Binding RotateRightCommand}" ToolTip.Tip="{loc:Tr Cmd.RotateRight.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCw}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.RotateRight}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding RotateLeftCommand}" ToolTip.Tip="{loc:Tr Cmd.RotateLeft.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCcw}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.RotateLeft}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding DeleteSelectedCommand}" ToolTip.Tip="{loc:Tr Cmd.Delete.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Delete}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding MoveUpCommand}" ToolTip.Tip="{loc:Tr Cmd.MoveUp.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconUp}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.MoveUp.Tooltip}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding MoveDownCommand}" ToolTip.Tip="{loc:Tr Cmd.MoveDown.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDown}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.MoveDown.Tooltip}" />
                                     </StackPanel>
                                 </Button>
                                 <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Tools}" />
                                 <Button Classes="ribbon-small" Command="{Binding ExtractSelectedCommand}" ToolTip.Tip="{loc:Tr Cmd.Extract.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconExtract}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Extract}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding SplitToSinglePagesCommand}" ToolTip.Tip="{loc:Tr Cmd.Split.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconSplit}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Split}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding MakeSearchableCommand}" ToolTip.Tip="{loc:Tr Cmd.Ocr.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconOcr}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Ocr}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding CompressCommand}" ToolTip.Tip="{loc:Tr Cmd.Compress.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconCompress}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Compress}" />
                                     </StackPanel>
                                 </Button>
                                 <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Document}" />
                                 <Button Classes="ribbon-small" Click="OnDocumentPropertiesClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.DocumentProperties}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconInfo}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Properties}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Click="OnProtectClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.Protect}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconLock}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Protect}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ExtractImagesCommand}" ToolTip.Tip="{loc:Tr Menu.ExtractImages}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconImage}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.ExtractImages}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding AddFilesCommand}" ToolTip.Tip="{loc:Tr Cmd.Add.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAdd}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ChooseOcrLanguagesCommand}" ToolTip.Tip="{loc:Tr Ocr.Button.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M8 2a6 6 0 1 0 .01 0 M2 8h12 M8 2c2 2 2 10 0 12 M8 2c-2 2-2 10 0 12" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Ocr.Button}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding BatchCommand}" ToolTip.Tip="{loc:Tr Batch.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M5 2h7v9H5z M3 4v9h7 M7 5h3 M7 7h3" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Batch.Button}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding SaveAsProfileCommand}" ToolTip.Tip="{loc:Tr Conf.Button.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M4 2h6l2.5 2.5V14H4z M6 9l1.5 1.5L10.5 7" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Conf.Button}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding CheckAccessibilityCommand}" ToolTip.Tip="{loc:Tr Conf.A11y.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M8 2.5a1.2 1.2 0 1 0 .01 0 M3.5 5.5L8 6.5l4.5-1 M8 6.5v3 M8 9.5l-2.5 4.5 M8 9.5l2.5 4.5" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Conf.A11y}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding CompareCommand}" ToolTip.Tip="{loc:Tr Compare.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M2 3h5v10H2z M9 3h5v10H9z M3.5 6h2 M10.5 6h2 M10.5 9h2" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Compare.Button}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding RedactPatternsCommand}" ToolTip.Tip="{loc:Tr Redact.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M2 4h12 M2 8h5 M10 7h4v3h-4z M2 12h12" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Redact.Button}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding AddHeaderFooterCommand}" ToolTip.Tip="{loc:Tr Stamp.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M3 2h10v12H3z M5 4h6 M5 12h6" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Stamp.Button}" />
                                     </StackPanel>
@@ -845,16 +855,30 @@
                             <StackPanel Spacing="4"
                                         IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Bookmarks}">
                                 <TextBlock Classes="panel-caption" Text="{loc:Tr Bookmarks.Section}" />
-                                <WrapPanel Margin="4,0">
-                                    <Button Classes="ribbon-small" Command="{Binding AddBookmarkCommand}" HorizontalAlignment="Left" ToolTip.Tip="{loc:Tr Bookmarks.Add.Tooltip}">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Add}" /></Button>
-                                    <Button Classes="ribbon-small" Command="{Binding AddChildBookmarkCommand}" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.AddChild}" /></Button>
-                                    <Button Classes="ribbon-small" Command="{Binding RenameBookmarkCommand}" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Rename}" /></Button>
-                                    <Button Classes="ribbon-small" Command="{Binding DeleteBookmarkCommand}" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Delete}" /></Button>
-                                </WrapPanel>
+                                <Button Classes="ribbon-small" Command="{Binding AddBookmarkCommand}" ToolTip.Tip="{loc:Tr Bookmarks.Add.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAdd}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Add}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding AddChildBookmarkCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAddChild}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.AddChild}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding RenameBookmarkCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconTextEdit}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Rename}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteBookmarkCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Delete}" />
+                                    </StackPanel>
+                                </Button>
                                 <WrapPanel Margin="4,0">
                                     <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="up" ToolTip.Tip="{loc:Tr Bookmarks.Up}">
                                         <Path Classes="glyph" Width="13" Height="13" Data="{StaticResource IconUp}" /></Button>
@@ -893,14 +917,24 @@
                                     </StackPanel>
                                 </RadioButton>
                                 <TextBlock Classes="dialog-hint" Text="{loc:Tr Comments.Hint}" TextWrapping="Wrap" FontSize="11" Margin="8,0,4,2" />
-                                <WrapPanel Margin="4,0">
-                                    <Button Classes="ribbon-small" Command="{Binding ReplyToCommentCommand}" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Reply}" /></Button>
-                                    <Button Classes="ribbon-small" Command="{Binding EditCommentCommand}" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Edit}" /></Button>
-                                    <Button Classes="ribbon-small" Command="{Binding DeleteCommentCommand}" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Delete}" /></Button>
-                                </WrapPanel>
+                                <Button Classes="ribbon-small" Command="{Binding ReplyToCommentCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconReply}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Reply}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding EditCommentCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconTextEdit}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Edit}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteCommentCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Delete}" />
+                                    </StackPanel>
+                                </Button>
                                 <TextBlock Classes="dialog-hint" Text="{loc:Tr Comments.Empty}" TextWrapping="Wrap" FontSize="11" Margin="8,4"
                                            IsVisible="{Binding !CommentList.Count}" />
                                 <ListBox ItemsSource="{Binding CommentList}" SelectedItem="{Binding SelectedComment, Mode=TwoWay}"
@@ -971,7 +1005,7 @@
                                 </RadioButton>
 
                                 <!-- Layout of the selected fields (layout mode: click / Ctrl+click on the page) -->
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.Layout}" Margin="0,10,0,0" />
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.Layout}" />
                                 <TextBlock Classes="dialog-hint" Text="{loc:Tr Fields.SelectHint}" TextWrapping="Wrap" FontSize="11" Margin="8,0,4,4" />
                                 <!-- Which selected field the others align to and take the size of -->
                                 <StackPanel Orientation="Horizontal" Margin="8,0,4,2">
@@ -1003,31 +1037,73 @@
                                     <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="size" ToolTip.Tip="{loc:Tr Fields.SameSize}">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M2 2h11v11h-11z M5 5h5v5h-5z" /></Button>
                                 </WrapPanel>
+                                <Button Classes="ribbon-small" Command="{Binding SelectAllPageFieldsCommand}" ToolTip.Tip="{loc:Tr Fields.SelectAll.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconSelectAll}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.SelectAll}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding EditFieldPropertiesCommand}" ToolTip.Tip="{loc:Tr Fields.Properties.Tooltip}">
-                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Properties}" /></Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconProperties}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Properties}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding DeleteSelectedFieldsCommand}">
-                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Delete}" /></Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Delete}" />
+                                    </StackPanel>
+                                </Button>
 
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.TabOrder}" Margin="0,10,0,0" />
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.TabOrder}" />
                                 <CheckBox Content="{loc:Tr Fields.ShowTabOrder}" IsChecked="{Binding ShowTabOrder}" Margin="8,0" FontSize="12.5" />
-                                <StackPanel Orientation="Horizontal" Margin="4,0">
-                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="up" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabEarlier}" /></Button>
-                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="down" HorizontalAlignment="Left">
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabLater}" /></Button>
-                                </StackPanel>
+                                <Grid ColumnDefinitions="*,*">
+                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="up">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconUp}" />
+                                            <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabEarlier}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="down" Grid.Column="1">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDown}" />
+                                            <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabLater}" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
                                 <Button Classes="ribbon-small" Command="{Binding SortTabOrderCommand}" ToolTip.Tip="{loc:Tr Fields.SortTabOrder.Tooltip}">
-                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.SortTabOrder}" /></Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconSortRows}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.SortTabOrder}" />
+                                    </StackPanel>
+                                </Button>
 
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr FormData.Section}" Margin="0,10,0,0" />
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr FormData.Section}" />
                                 <Button Classes="ribbon-small" Command="{Binding ExportFormDataCommand}">
-                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Export}" /></Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconExport}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Export}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ImportFormDataCommand}">
-                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Import}" /></Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconImport}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Import}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ResetFormCommand}">
-                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Reset}" /></Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCcw}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Reset}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding FlattenFieldsCommand}" ToolTip.Tip="{loc:Tr FormData.Flatten.Tooltip}">
-                                    <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Flatten}" /></Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconFlatten}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Flatten}" />
+                                    </StackPanel>
+                                </Button>
                                 <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
                                 <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
                                         IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
