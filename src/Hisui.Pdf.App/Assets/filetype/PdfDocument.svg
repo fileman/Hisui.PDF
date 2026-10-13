@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hisui PDF document icon (file-type icon for .pdf when Hisui PDF is the default app).
+     Original artwork, MIT like the rest of the project: a generic page with a red "PDF" label, the
+     convention most viewers follow. It deliberately contains no Adobe mark (no Acrobat ribbon/swirl logo). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1F1F1"/>
+    </linearGradient>
+    <linearGradient id="band" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E5322D"/>
+      <stop offset="1" stop-color="#C4201B"/>
+    </linearGradient>
+  </defs>
+  <!-- Page with folded corner -->
+  <path d="M60 12h104l56 56v164a12 12 0 0 1-12 12H60a12 12 0 0 1-12-12V24a12 12 0 0 1 12-12z"
+        fill="url(#page)" stroke="#B9B9B9" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M164 12v44a12 12 0 0 0 12 12h44z" fill="#DADADA" stroke="#B9B9B9" stroke-width="4" stroke-linejoin="round"/>
+  <!-- Text lines -->
+  <g fill="#D3D3D3">
+    <rect x="72" y="44" width="72" height="10" rx="5"/>
+    <rect x="72" y="68" width="72" height="10" rx="5"/>
+    <rect x="72" y="92" width="124" height="10" rx="5"/>
+    <rect x="72" y="212" width="124" height="10" rx="5"/>
+  </g>
+  <!-- Red label sticking out on the left -->
+  <rect x="20" y="118" width="196" height="82" rx="10" fill="url(#band)"/>
+  <!-- "PDF" drawn as strokes (no font dependency) -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linejoin="round">
+    <path d="M48 183V139h17a14.5 14.5 0 0 1 0 29H48"/>
+    <path d="M104 139v44h14a22 22 0 0 0 0-44z"/>
+    <path d="M163 183V139h31 M163 162h25"/>
+  </g>
+</svg>

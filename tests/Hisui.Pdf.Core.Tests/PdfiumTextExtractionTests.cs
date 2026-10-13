@@ -25,7 +25,7 @@ public class PdfiumTextExtractionTests
 
     private static byte[] TextPdf(int rotate = 0, XRect? crop = null, string[]? lines = null)
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         using var doc = new PdfSharp.Pdf.PdfDocument();
         var page = doc.AddPage();
         page.Size = PdfSharp.PageSize.A4;
@@ -155,7 +155,7 @@ public class PdfiumTextExtractionTests
 
     private static byte[] VerticalHeaderPdf(int pageRotate)
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         using var doc = new PdfSharp.Pdf.PdfDocument();
         var page = doc.AddPage();
         using (var gfx = XGraphics.FromPdfPage(page))

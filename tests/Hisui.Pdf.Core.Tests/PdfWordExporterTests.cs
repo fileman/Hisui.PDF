@@ -13,7 +13,7 @@ public class PdfWordExporterTests
     [Fact]
     public async Task Export_ProducesDocxWithThePageText()
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         using var doc = new PdfDocument();
         var page = doc.AddPage();
         using (var gfx = XGraphics.FromPdfPage(page))

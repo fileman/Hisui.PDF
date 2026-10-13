@@ -89,6 +89,7 @@ public partial class MainViewModel : ObservableObject
         _dialogs = dialogs;
         _settings = settings;
         _isContinuousView = settings.Settings.ContinuousScroll;
+        _alignToLast = settings.Settings.AlignToLastSelected;
         _annotations = annotations;
         _forms = forms;
         _formDetector = formDetector;
@@ -125,11 +126,10 @@ public partial class MainViewModel : ObservableObject
         };
 
         Pages.CollectionChanged += (_, _) => { RaisePageInfoChanged(); InvalidateSearch(); };
-        RefreshRecentFilesMenu();
+        RefreshRecentFiles();
     }
 
     public ObservableCollection<PageItemViewModel> Pages { get; } = [];
-    public ObservableCollection<RecentFileEntry> RecentFiles { get; } = [];
 
     [ObservableProperty] private string _title = "Hisui PDF";
     [ObservableProperty] private string _statusMessage = "Pronto";
@@ -141,8 +141,6 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>True while a file is being dragged over the window — drives the drop-target highlight.</summary>
     [ObservableProperty] private bool _isDragOver;
-
-    public bool HasRecentFiles => RecentFiles.Count > 0;
 
     private bool HasDocument => _session is not null && Pages.Count > 0;
 
@@ -185,22 +183,6 @@ public partial class MainViewModel : ObservableObject
             _windows.OpenWindow(path);
     }
 
-    [RelayCommand]
-    private async Task OpenRecentAsync(string path)
-    {
-        if (!File.Exists(path))
-        {
-            var stale = RecentFiles.FirstOrDefault(r => r.FullPath == path);
-            if (stale is not null) RecentFiles.Remove(stale);
-            _settings.Settings.RecentFiles.Remove(path);
-            _settings.Save();
-            OnPropertyChanged(nameof(HasRecentFiles));
-            StatusMessage = _loc["Status.FileNotFound"];
-            return;
-        }
-        await OpenPathAsync(path);
-    }
-
     /// <summary>Opens a specific file. Used by the Open command, command-line args and drag-drop.</summary>
     public async Task OpenPathAsync(string path)
     {
@@ -223,7 +205,7 @@ public partial class MainViewModel : ObservableObject
             _currentPath = path; // before Title: the tab tooltip reads it when Title changes
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
             _settings.AddRecentFile(path);
-            RefreshRecentFilesMenu();
+            RefreshRecentFiles();
             await RenderThumbnailsAsync(ct);
             SelectedPage = Pages.FirstOrDefault();
         });
@@ -770,14 +752,6 @@ public partial class MainViewModel : ObservableObject
 
         PreviewImage = preview;
         await LoadFieldsAsync(item);
-    }
-
-    private void RefreshRecentFilesMenu()
-    {
-        RecentFiles.Clear();
-        foreach (var path in _settings.Settings.RecentFiles)
-            RecentFiles.Add(new RecentFileEntry(path));
-        OnPropertyChanged(nameof(HasRecentFiles));
     }
 
     private void Renumber()

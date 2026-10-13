@@ -514,7 +514,7 @@ internal sealed partial class PdfFormService
     public Task<byte[]> FlattenFieldsAsync(byte[] pdf, IReadOnlyCollection<string>? names = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         return Task.Run(() =>
         {
             using var stream = new MemoryStream(pdf, writable: false);

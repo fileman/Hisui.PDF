@@ -12,10 +12,38 @@ internal sealed class SettingsService : ISettingsService
     public void AddRecentFile(string path)
     {
         Settings.RecentFiles.Remove(path);
-        Settings.RecentFiles.Insert(0, path);
-        while (Settings.RecentFiles.Count > Settings.MaxRecentFiles)
-            Settings.RecentFiles.RemoveAt(Settings.RecentFiles.Count - 1);
+        if (!Settings.PinnedFiles.Contains(path)) Settings.RecentFiles.Insert(0, path);
+        TrimRecentFiles();
         Save();
+    }
+
+    public void RemoveRecentFile(string path)
+    {
+        Settings.RecentFiles.Remove(path);
+        Settings.PinnedFiles.Remove(path);
+        Save();
+    }
+
+    public void SetPinned(string path, bool pinned)
+    {
+        Settings.RecentFiles.Remove(path);
+        Settings.PinnedFiles.Remove(path);
+        if (pinned) Settings.PinnedFiles.Add(path);
+        else Settings.RecentFiles.Insert(0, path);
+        TrimRecentFiles();
+        Save();
+    }
+
+    public void ClearRecentFiles()
+    {
+        Settings.RecentFiles.Clear();
+        Save();
+    }
+
+    private void TrimRecentFiles()
+    {
+        while (Settings.RecentFiles.Count > Math.Max(1, Settings.MaxRecentFiles))
+            Settings.RecentFiles.RemoveAt(Settings.RecentFiles.Count - 1);
     }
 
     public void Save()

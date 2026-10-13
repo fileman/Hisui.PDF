@@ -18,7 +18,7 @@ dotnet build Hisui.Pdf.slnx
 dotnet run --project src\Hisui.Pdf.App
 ```
 
-Publish profiles exist for `win-x64`, `linux-x64`, `osx-x64` (Linux/macOS need a Liberation/DejaVu font installed;
+Publish profiles exist for `win-x64`, `linux-x64`, `osx-x64` (PDF text uses the bundled Liberation Sans, so no system font is needed;
 macOS Apple Silicon → use `osx-arm64` RID).
 
 ## What this session delivered

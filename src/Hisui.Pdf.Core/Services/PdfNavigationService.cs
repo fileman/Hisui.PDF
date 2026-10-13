@@ -94,7 +94,7 @@ internal sealed class PdfNavigationService : IPdfNavigationService
 
     public Task<byte[]> StampAsync(byte[] pdf, IReadOnlyList<PageStamp> stamps, CancellationToken ct = default)
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         return Modify(pdf, ct, doc =>
         {
             foreach (var s in stamps)
