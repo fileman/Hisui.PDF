@@ -6,6 +6,7 @@
         xmlns:views="clr-namespace:Hisui.Pdf.App.Views"
         xmlns:app="clr-namespace:Hisui.Pdf.App"
         x:Class="Hisui.Pdf.App.Views.DocumentView"
+        x:DataType="vm:MainViewModel"
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
         Background="{DynamicResource RibbonWindowBrush}">
 
@@ -837,7 +838,7 @@
                                 <ListBox ItemsSource="{Binding BookmarkRows}" SelectedItem="{Binding SelectedBookmark, Mode=TwoWay}"
                                          Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListBox.ItemTemplate>
-                                        <DataTemplate>
+                                        <DataTemplate x:DataType="vm:BookmarkRow">
                                             <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent}">
                                                 <TextBlock Text="{Binding Title}" FontSize="12" TextWrapping="Wrap" />
                                                 <TextBlock Grid.Column="1" Text="{Binding PageLabel}" FontSize="10.5" Margin="6,0,0,0"
@@ -873,7 +874,7 @@
                                 <ListBox ItemsSource="{Binding CommentList}" SelectedItem="{Binding SelectedComment, Mode=TwoWay}"
                                          Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListBox.ItemTemplate>
-                                        <DataTemplate>
+                                        <DataTemplate x:DataType="vm:CommentItem">
                                             <StackPanel Margin="{Binding Indent}" Spacing="1">
                                                 <TextBlock Text="{Binding Header}" FontSize="10.5" Foreground="{DynamicResource RibbonSubtleTextBrush}" />
                                                 <TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" MaxHeight="64" />
@@ -1027,7 +1028,7 @@
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="vm:PageItemViewModel">
                                     <StackPanel HorizontalAlignment="Center" Spacing="6">
                                         <Border Background="{DynamicResource RibbonPageBrush}"
                                                 BorderBrush="#22000000" BorderThickness="1"
@@ -1062,7 +1063,7 @@
                                   HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Pages}" Margin="16" HorizontalAlignment="Center">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="vm:PageItemViewModel">
                                     <LayoutTransformControl Margin="0,0,0,12" HorizontalAlignment="Center">
                                         <LayoutTransformControl.LayoutTransform>
                                             <RotateTransform Angle="{Binding RotationAngle}" />
@@ -1112,13 +1113,13 @@
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.Styles>
-                                    <Style Selector="ContentPresenter">
+                                    <Style Selector="ContentPresenter" x:DataType="vm:HighlightBox">
                                         <Setter Property="Canvas.Left" Value="{Binding Left}" />
                                         <Setter Property="Canvas.Top" Value="{Binding Top}" />
                                     </Style>
                                 </ItemsControl.Styles>
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="vm:HighlightBox">
                                         <Rectangle Width="{Binding Width}" Height="{Binding Height}"
                                                    Fill="{Binding Fill}" Stroke="{Binding Stroke}"
                                                    StrokeThickness="{Binding StrokeThickness}"
@@ -1207,11 +1208,11 @@
                             </Grid>
                             <ItemsControl ItemsSource="{Binding RecentFiles}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="vm:RecentFileEntry">
                                         <Grid Classes="recent-row" ColumnDefinitions="*,Auto,Auto" Background="Transparent">
                                             <Button Classes="recent-item" ToolTip.Tip="{Binding FullPath}"
                                                     CommandParameter="{Binding FullPath}"
-                                                    Command="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenRecentCommand}">
                                                 <StackPanel Spacing="1">
                                                     <TextBlock Text="{Binding DisplayName}" FontSize="12.5"
                                                                Foreground="{DynamicResource RibbonAccentBrush}"
@@ -1224,12 +1225,12 @@
                                             <Button Grid.Column="1" Classes="recent-action" Classes.pinned="{Binding IsPinned}"
                                                     ToolTip.Tip="{loc:Tr Recent.Pin.Tooltip}"
                                                     CommandParameter="{Binding FullPath}"
-                                                    Command="{Binding DataContext.TogglePinRecentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).TogglePinRecentCommand}">
                                                 <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconStar}" />
                                             </Button>
                                             <Button Grid.Column="2" Classes="recent-action" ToolTip.Tip="{loc:Tr Recent.Remove.Tooltip}"
                                                     CommandParameter="{Binding FullPath}"
-                                                    Command="{Binding DataContext.RemoveRecentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).RemoveRecentCommand}">
                                                 <Path Classes="glyph" Width="10" Height="10" Data="M2 2l8 8 M10 2l-8 8" />
                                             </Button>
                                         </Grid>
