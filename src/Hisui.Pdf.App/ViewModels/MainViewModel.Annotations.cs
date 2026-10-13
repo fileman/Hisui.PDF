@@ -283,17 +283,25 @@ public partial class MainViewModel
 
         var owner = GetMainWindow();
         if (owner is null) return;
+        // A watermark added earlier is edited (the dialog starts from its text and settings) rather than stacked.
+        var sourceIds = _session!.Pages.Select(p => p.SourceDocumentId).Distinct().ToList();
+        WatermarkInfo? existing = null;
+        foreach (var id in sourceIds)
+            if ((existing = await _annotations.ReadWatermarkAsync(_session.GetSource(id))) is not null) break;
+
         var dialog = new AnnotationInputDialog(AnnotationTool.Watermark);
+        if (existing is not null) dialog.LoadWatermark(existing);
         var result = await dialog.ShowDialog<bool>(owner);
-        if (!result || dialog.Result is null || dialog.Result.WatermarkOptions is null) return;
+        if (!result) return;
+        var remove = dialog.RemoveRequested;
+        if (!remove && dialog.Result?.WatermarkOptions is null) return;
 
         var model = dialog.Result;
 
-        await RunBusyAsync(_loc["Status.ApplyingWatermark"], async ct =>
+        await RunBusyAsync(_loc[remove ? "Status.RemovingWatermark" : "Status.ApplyingWatermark"], async ct =>
         {
             // Apply to every distinct source document, not just the selected page's source —
             // a merged document spans multiple sources and all of them must be watermarked.
-            var sourceIds = _session!.Pages.Select(p => p.SourceDocumentId).Distinct().ToList();
 
             // Render every watermarked buffer first — this is the only cancellable phase. Then commit
             // them together inside one transaction (a single undo step). Doing the slow work up front
@@ -303,8 +311,9 @@ public partial class MainViewModel
             {
                 ct.ThrowIfCancellationRequested();
                 var source = _session.GetSource(id);
-                updates.Add((id, await _annotations.AddTextWatermarkAsync(
-                    source, model.Text, model.WatermarkOptions, ct)));
+                updates.Add((id, remove
+                    ? await _annotations.RemoveWatermarkAsync(source, ct)
+                    : await _annotations.AddTextWatermarkAsync(source, model!.Text, model.WatermarkOptions, ct)));
             }
 
             using (_session.BeginTransaction())
