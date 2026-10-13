@@ -131,8 +131,8 @@ public partial class PrintDialog : Window
         {
             try
             {
-                var png = await _renderer.RenderPageToPngAsync(_pdf, index, PreviewDpi);
-                bitmap = BitmapConversions.ToFrozenBitmap(png);
+                var page = await _renderer.RenderPageAsync(_pdf, index, PreviewDpi);
+                bitmap = BitmapConversions.ToFrozenBitmap(page);
                 _previewCache[index] = bitmap;
             }
             catch
