@@ -208,7 +208,7 @@ public partial class DocumentView : UserControl
         protectItem.Click += OnProtectClick;
         flyout.Items.Add(protectItem);
         flyout.Items.Add(MakeItem(loc["Menu.RemovePassword"], vm.RemovePasswordCommand));
-        if (FeatureFlags.DigitalSigning) flyout.Items.Add(MakeItem(loc["Menu.SignInvisible"], vm.SignInvisibleCommand));
+        flyout.Items.Add(MakeItem(loc["Menu.SignInvisible"], vm.SignInvisibleCommand));
         flyout.Items.Add(MakeItem(loc["Menu.VerifySignatures"], vm.VerifySignaturesCommand));
         flyout.Items.Add(MakeItem(loc["Menu.Batch"], vm.BatchCommand));
         flyout.Items.Add(MakeItem(loc["Menu.OcrLanguages"], vm.ChooseOcrLanguagesCommand));

@@ -4,7 +4,6 @@
         xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
         xmlns:vm="clr-namespace:Hisui.Pdf.App.ViewModels"
         xmlns:views="clr-namespace:Hisui.Pdf.App.Views"
-        xmlns:app="clr-namespace:Hisui.Pdf.App"
         x:Class="Hisui.Pdf.App.Views.DocumentView"
         x:DataType="vm:MainViewModel"
         FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
@@ -550,6 +549,20 @@
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Sign}"
+                                      ToolTip.Tip="{loc:Tr Rail.Sign}" AutomationProperties.Name="{loc:Tr Rail.Sign}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Sign" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconSignature}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Sign}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
                                       CommandParameter="{x:Static vm:RibbonTab.Comments}"
                                       ToolTip.Tip="{loc:Tr Rail.Comments}" AutomationProperties.Name="{loc:Tr Rail.Comments}">
                             <ToggleButton.IsChecked>
@@ -671,12 +684,6 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
                                     </StackPanel>
                                 </Button>
-                                <Button Classes="ribbon-small" Command="{Binding VerifySignaturesCommand}" ToolTip.Tip="{loc:Tr Sign.Verify.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="9">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2l5 2v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4z M5.8 8l1.6 1.6 3-3" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Sign.Verify}" />
-                                    </StackPanel>
-                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ChooseOcrLanguagesCommand}" ToolTip.Tip="{loc:Tr Ocr.Button.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="9">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M8 2a6 6 0 1 0 .01 0 M2 8h12 M8 2c2 2 2 10 0 12 M8 2c-2 2-2 10 0 12" />
@@ -732,14 +739,6 @@
                                         <TextBlock Text="{loc:Tr Tool.Link}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
-                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.DigitalSignature.Tooltip}"
-                                             IsVisible="{x:Static app:FeatureFlags.DigitalSigning}"
-                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=DigitalSignature, Mode=TwoWay}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="M3 2h7l3 3v9H3z M5.5 11c1-2 2-2 2.5 0s1.5 1 2.5-.5 M8.5 6.5l1.5 1.5 2.5-3" />
-                                        <TextBlock Text="{loc:Tr Tool.DigitalSignature}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </RadioButton>
                                 <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Highlight.Tooltip}"
                                              IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Highlight, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
@@ -789,6 +788,26 @@
                                         <TextBlock Text="{loc:Tr Tool.ImageOverlay}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
+                                <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
+                                <Button Classes="ribbon-small" Command="{Binding AddWatermarkCommand}" ToolTip.Tip="{loc:Tr Tool.Watermark.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconWatermark}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Watermark}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
+                                        IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M1 1l9 9M10 1l-9 9" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Clear}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- SIGN: handwritten and certificate signatures, and their verification -->
+                            <StackPanel Spacing="2"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Sign}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Sign}" />
                                 <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Signature.Tooltip}"
                                              IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Signature, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
@@ -796,11 +815,21 @@
                                         <TextBlock Text="{loc:Tr Tool.Signature}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
-                                <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
-                                <Button Classes="ribbon-small" Command="{Binding AddWatermarkCommand}" ToolTip.Tip="{loc:Tr Tool.Watermark.Tooltip}">
+                                <RadioButton Classes="tool" GroupName="AnnotTools" Height="38" ToolTip.Tip="{loc:Tr Tool.DigitalSignature.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=DigitalSignature, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconWatermark}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Watermark}" />
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="M3 2h7l3 3v9H3z M5.5 11c1-2 2-2 2.5 0s1.5 1 2.5-.5 M8.5 6.5l1.5 1.5 2.5-3" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{loc:Tr Tool.DigitalSignature}" />
+                                            <TextBlock Text="{loc:Tr Sign.Experimental}" FontSize="11" FontStyle="Italic" Opacity="0.85" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </RadioButton>
+                                <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
+                                <Button Classes="ribbon-small" Command="{Binding VerifySignaturesCommand}" ToolTip.Tip="{loc:Tr Sign.Verify.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2l5 2v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4z M5.8 8l1.6 1.6 3-3" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Sign.Verify}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"

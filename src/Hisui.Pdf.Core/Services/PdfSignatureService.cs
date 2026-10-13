@@ -18,16 +18,13 @@ namespace Hisui.Pdf.Core.Services;
 
 /// <summary>
 /// PAdES signatures (ETSI.CAdES.detached, SHA-256, ESS signing-certificate-v2, optional RFC 3161 time-stamp) on top of
-/// PDFsharp's signature handler, plus verification of the signatures a document carries.
-/// ponytail: PDFsharp saves the whole file (no incremental update), so signatures already present stop being valid —
-/// the UI warns before signing such a document. No LTV (DSS / revocation data) yet.
+/// an incremental update written by hand, plus verification of the signatures a document carries.
+/// Signing appends an incremental update, so the signatures already in the file stay valid.
+/// ponytail: no LTV (DSS / revocation data) and no certification (DocMDP) signatures yet.
 /// </summary>
 internal sealed class PdfSignatureService : IPdfSignatureService
 {
-    // PDFsharp writes adbe.pkcs7.detached; PAdES wants ETSI.CAdES.detached. Same length, so the swap moves no offset:
-    // it is applied to the bytes being signed and then to the saved file, keeping both identical.
-    private static readonly byte[] PdfSharpSubFilter = Encoding.ASCII.GetBytes("/adbe.pkcs7.detached");
-    private static readonly byte[] PadesSubFilter = Encoding.ASCII.GetBytes("/ETSI.CAdES.detached");
+    private const string ByteRangePlaceholder = "0 0000000000 0000000000 0000000000";
 
     private readonly HttpClient _http;
 
@@ -40,108 +37,273 @@ internal sealed class PdfSignatureService : IPdfSignatureService
         if (!request.Certificate.HasPrivateKey) throw new ArgumentException("The certificate has no private key.", nameof(request));
         GlobalFontSettings.FontResolver ??= new BundledFontResolver();
 
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
-            using var input = new MemoryStream(pdf, writable: false);
-            using var doc = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
-            var page = doc.Pages[request.PageIndex];
-            var name = request.Certificate.GetNameInfo(X509NameType.SimpleName, false);
-
-            var options = new DigitalSignatureOptions
+            try { return await SignIncrementalAsync(pdf, request, ct); }
+            catch (InvalidDataException)
             {
-                Reason = request.Reason ?? "",
-                Location = request.Location ?? "",
-                ContactInfo = request.ContactInfo ?? "",
-                AppName = "Hisui PDF",
-                PageIndex = request.PageIndex,
-                Rectangle = request.Rect is { } r ? SignatureRect(page, r) : new XRect(0, 0, 0, 0),
-                AppearanceHandler = new Appearance(name, request.Reason, request.Location, request.Image),
-            };
-            DigitalSignatureHandler.ForDocument(doc, new PadesSigner(request.Certificate, request.TimestampServer, _http, ct), options);
-            // Printable signature widget (PDF/A requires it); PDFsharp leaves /F unset.
-            foreach (var widget in (page.Elements.GetArray("/Annots")?.Elements.Select(Resolve) ?? []).OfType<PdfDictionary>())
-                if (widget.Elements.GetName("/FT") == "/Sig" && !widget.Elements.ContainsKey("/V")) widget.Elements.SetInteger("/F", 4);
-
-            using var output = new MemoryStream();
-            doc.SaveStamped(output);
-            var bytes = output.ToArray();
-            Replace(bytes, PdfSharpSubFilter, PadesSubFilter);
-            return bytes;
+                // Damaged cross-reference data: let PDFsharp rebuild the file, then append to that.
+                using var input = new MemoryStream(pdf, writable: false);
+                using var doc = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
+                using var output = new MemoryStream();
+                doc.Save(output);
+                return await SignIncrementalAsync(output.ToArray(), request, ct);
+            }
         }, ct);
     }
 
-    /// <summary>PDFsharp's signature rectangle is in raw page space with the origin at the bottom-left.</summary>
-    private static XRect SignatureRect(PdfPage page, PdfRect visual)
+    public Task<IReadOnlyList<string>> ListEmptySignatureFieldsAsync(byte[] pdf, CancellationToken ct = default)
     {
-        var raw = PageGeometry.ToRaw(page, visual);
-        return new XRect(raw.X1, raw.Y1, raw.Width, raw.Height);
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<IReadOnlyList<string>>(() =>
+        {
+            using var stream = new MemoryStream(pdf, writable: false);
+            using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+            return doc.Internals.Catalog.Elements.GetDictionary("/AcroForm")?.Elements.GetArray("/Fields") is { } fields
+                ? SignatureFields(fields, "").Where(f => f.Field.Elements["/V"] is null).Select(f => f.Name).ToList()
+                : [];
+        }, ct);
     }
 
-    internal static void Replace(byte[] data, byte[] find, byte[] with)
+    private async Task<byte[]> SignIncrementalAsync(byte[] pdf, SignRequest request, CancellationToken ct)
     {
-        for (var i = data.AsSpan().IndexOf(find); i >= 0;)
+        var update = new PdfIncrementalUpdate(pdf);
+        // Two readers: PDFsharp flattens the page tree as soon as Pages is touched, which rewrites /Parent and /Kids.
+        // The objects written back come from `raw`, whose page tree is walked by hand; `geo` only measures pages.
+        using var geoStream = new MemoryStream(pdf, writable: false);
+        using var geo = PdfReader.Open(geoStream, PdfDocumentOpenMode.Import);
+        using var rawStream = new MemoryStream(pdf, writable: false);
+        using var raw = PdfReader.Open(rawStream, PdfDocumentOpenMode.Import);
+        var catalog = raw.Internals.Catalog;
+        var pages = PageTree(catalog).ToList();
+        var signer = request.Certificate.GetNameInfo(X509NameType.SimpleName, false);
+
+        PdfDictionary? field = null, widget = null;
+        PdfDictionary page;
+        PdfRectangle rect;
+        if (request.FieldName is { } fieldName)
         {
-            with.CopyTo(data, i);
-            var next = data.AsSpan(i + find.Length).IndexOf(find);
-            i = next < 0 ? -1 : i + find.Length + next;
+            var fields = catalog.Elements.GetDictionary("/AcroForm")?.Elements.GetArray("/Fields");
+            field = (fields is null ? null : SignatureFields(fields, "").FirstOrDefault(f => f.Name == fieldName && f.Field.Elements["/V"] is null).Field)
+                ?? throw new ArgumentException($"No empty signature field named {fieldName}.", nameof(request));
+            widget = field.Elements.GetName("/Subtype") == "/Widget" ? field
+                : field.Elements.GetArray("/Kids")?.Elements.Select(Resolve).OfType<PdfDictionary>().FirstOrDefault()
+                ?? throw new ArgumentException("The signature field has no widget.", nameof(request));
+            page = PageOf(widget, pages) ?? throw new ArgumentException("The signature field is not on a page.", nameof(request));
+            rect = widget.Elements.GetRectangle("/Rect");
         }
+        else
+        {
+            page = pages[request.PageIndex];
+            rect = request.Rect is { } r ? PageGeometry.ToRaw(geo.Pages[request.PageIndex], r) : new PdfRectangle();
+        }
+
+        var visible = rect.Width > 0 && rect.Height > 0;
+        var appearance = WriteAppearance(update, Math.Abs(rect.Width), Math.Abs(rect.Height),
+            visible ? new Appearance(signer, request.Reason, request.Location, request.Image) : null);
+
+        // Signature dictionary with room for the CMS; /ByteRange and /Contents are filled in once the file is complete.
+        var size = request.TimestampServer is null ? 16_384 : 28_672;
+        var sigNum = update.Allocate();
+        var now = DateTimeOffset.Now;
+        var date = $"D:{now:yyyyMMddHHmmss}{(now.Offset < TimeSpan.Zero ? '-' : '+')}{now.Offset:hh}'{now.Offset:mm}'";
+        var sig = new StringBuilder("<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /ETSI.CAdES.detached /ByteRange [")
+            .Append(ByteRangePlaceholder).Append("] /Contents <").Append('0', size * 2).Append("> /M ")
+            .Append(PdfIncrementalUpdate.Str(date))
+            .Append(" /Name ").Append(PdfIncrementalUpdate.Str(signer));
+        if (request.Reason is { Length: > 0 } reason) sig.Append(" /Reason ").Append(PdfIncrementalUpdate.Str(reason));
+        if (request.Location is { Length: > 0 } location) sig.Append(" /Location ").Append(PdfIncrementalUpdate.Str(location));
+        if (request.ContactInfo is { Length: > 0 } contact) sig.Append(" /ContactInfo ").Append(PdfIncrementalUpdate.Str(contact));
+        sig.Append(" /Prop_Build << /App << /Name /HisuiPDF >> >> >>");
+        var sigText = sig.ToString();
+        var sigAt = update.WriteObject(sigNum, 0, sigText);
+        var byteRangeAt = sigAt + sigText.IndexOf(ByteRangePlaceholder, StringComparison.Ordinal);
+        var contentsAt = sigAt + sigText.IndexOf("/Contents <", StringComparison.Ordinal) + "/Contents ".Length;
+
+        var form = catalog.Elements["/AcroForm"] is PdfReference formRef ? (PdfDictionary)formRef.Value : catalog.Elements["/AcroForm"] as PdfDictionary;
+        if (form is null) catalog.Elements["/AcroForm"] = form = new PdfDictionary();
+        form.Elements.SetInteger("/SigFlags", 3); // signatures exist, append only
+        if (field is null)
+        {
+            // New field merged with its widget; printable (/F 4), as PDF/A requires.
+            var fieldNum = update.Allocate();
+            var name = UniqueFieldName(form);
+            update.WriteObject(fieldNum, 0,
+                $"<< /Type /Annot /Subtype /Widget /FT /Sig /T {PdfIncrementalUpdate.Str(name)} /F 4 " +
+                $"/Rect {PdfIncrementalUpdate.Serialize(rect, PdfIncrementalUpdate.Identity)} /P {PdfIncrementalUpdate.Identity(page.Reference!)} " +
+                $"/V {sigNum} 0 R /AP << /N {appearance} 0 R >> >>");
+            var fieldRef = new PdfLiteral($"{fieldNum} 0 R");
+            if (page.Elements["/Annots"] is PdfReference { Value: PdfArray sharedAnnots })
+            {
+                sharedAnnots.Elements.Add(fieldRef);
+                update.Rewrite(sharedAnnots);
+            }
+            else
+            {
+                if (page.Elements["/Annots"] is not PdfArray annots) page.Elements["/Annots"] = annots = new PdfArray();
+                annots.Elements.Add(fieldRef);
+                update.Rewrite(page);
+            }
+            if (form.Elements["/Fields"] is PdfReference { Value: PdfArray sharedFields })
+            {
+                sharedFields.Elements.Add(fieldRef);
+                update.Rewrite(sharedFields);
+            }
+            else
+            {
+                if (form.Elements["/Fields"] is not PdfArray list) form.Elements["/Fields"] = list = new PdfArray();
+                list.Elements.Add(fieldRef);
+            }
+        }
+        else
+        {
+            field.Elements["/V"] = new PdfLiteral($"{sigNum} 0 R");
+            widget!.Elements["/AP"] = new PdfLiteral($"<< /N {appearance} 0 R >>");
+            if (!widget.Elements.ContainsKey("/F")) widget.Elements.SetInteger("/F", 4);
+            update.Rewrite(field);
+            if (!ReferenceEquals(widget, field)) update.Rewrite(widget);
+        }
+        update.Rewrite(form.Reference is null ? catalog : form);
+
+        // Sign everything but the /Contents hex string.
+        var bytes = update.Finish();
+        var a = (int)contentsAt;
+        var b = a + size * 2 + 2;
+        Encoding.ASCII.GetBytes($"0 {a:D10} {b:D10} {bytes.Length - b:D10}").CopyTo(bytes, byteRangeAt);
+        var signed = new byte[a + bytes.Length - b];
+        Array.Copy(bytes, 0, signed, 0, a);
+        Array.Copy(bytes, b, signed, a, bytes.Length - b);
+        var cms = await CreateCmsAsync(signed, request.Certificate, request.TimestampServer, ct);
+        if (cms.Length > size) throw new InvalidOperationException("The signature does not fit the space reserved for it.");
+        Encoding.ASCII.GetBytes(Convert.ToHexString(cms)).CopyTo(bytes, a + 1);
+        return bytes;
+    }
+
+    /// <summary>Leaf pages in document order, read without letting PDFsharp restructure the tree.</summary>
+    private static IEnumerable<PdfDictionary> PageTree(PdfDictionary catalog)
+    {
+        var stack = new Stack<PdfDictionary>();
+        if (Resolve(catalog.Elements["/Pages"]) is PdfDictionary root) stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node.Elements.GetName("/Type") == "/Page" || Resolve(node.Elements["/Kids"]) is not PdfArray kids) { yield return node; continue; }
+            for (var i = kids.Elements.Count - 1; i >= 0; i--)
+                if (Resolve(kids.Elements[i]) is PdfDictionary kid) stack.Push(kid);
+        }
+    }
+
+    private static PdfDictionary? PageOf(PdfDictionary widget, List<PdfDictionary> pages)
+    {
+        if (widget.Elements["/P"] is PdfReference p && pages.FirstOrDefault(x => x.Reference?.ObjectNumber == p.ObjectNumber) is { } byP) return byP;
+        var id = widget.Reference?.ObjectNumber;
+        return pages.FirstOrDefault(pg => Resolve(pg.Elements["/Annots"]) is PdfArray annots &&
+            annots.Elements.Any(e => e is PdfReference r ? r.ObjectNumber == id : ReferenceEquals(e, widget)));
+    }
+
+    private static string UniqueFieldName(PdfDictionary form)
+    {
+        var taken = (Resolve(form.Elements["/Fields"]) as PdfArray)?.Elements.Select(Resolve).OfType<PdfDictionary>()
+            .Select(f => f.Elements.GetString("/T")).ToHashSet() ?? [];
+        for (var n = 1; ; n++)
+            if (!taken.Contains($"Firma{n}")) return $"Firma{n}";
+    }
+
+    /// <summary>
+    /// Writes the signature's appearance (a form XObject) and returns its object number. PDFsharp draws it on a scratch
+    /// page; the page's content becomes the form's stream and its resources (fonts, images) are copied over.
+    /// ponytail: drawn upright in raw page space, so on a rotated page it looks rotated (no /MK /R handling).
+    /// </summary>
+    private static int WriteAppearance(PdfIncrementalUpdate update, double width, double height, Appearance? look)
+    {
+        var num = update.Allocate();
+        if (look is null || width <= 0 || height <= 0)
+        {
+            update.WriteObject(num, 0, "<< /Type /XObject /Subtype /Form /BBox [0 0 0 0] /Length 0 >>", []);
+            return num;
+        }
+        using var scratchOut = new MemoryStream();
+        using (var scratch = new PdfDocument())
+        {
+            var p = scratch.AddPage();
+            p.Width = XUnit.FromPoint(width);
+            p.Height = XUnit.FromPoint(height);
+            using (var gfx = XGraphics.FromPdfPage(p)) look.DrawAppearance(gfx, new XRect(0, 0, width, height));
+            scratch.Save(scratchOut);
+        }
+        scratchOut.Position = 0;
+        using var doc = PdfReader.Open(scratchOut, PdfDocumentOpenMode.Import);
+        var page = doc.Pages[0];
+        var content = new MemoryStream();
+        foreach (var part in page.Contents.Elements.Select(Resolve).OfType<PdfDictionary>())
+        {
+            content.Write(part.Stream.UnfilteredValue);
+            content.WriteByte((byte)'\n');
+        }
+
+        // Objects of the scratch document get fresh numbers in the update, each written once.
+        var numbers = new Dictionary<int, int>();
+        var pending = new Queue<(int Num, PdfObject Obj)>();
+        string Map(PdfReference r)
+        {
+            if (!numbers.TryGetValue(r.ObjectNumber, out var n))
+            {
+                numbers[r.ObjectNumber] = n = update.Allocate();
+                pending.Enqueue((n, r.Value));
+            }
+            return $"{n} 0 R";
+        }
+        var resources = PdfIncrementalUpdate.Serialize(page.Elements["/Resources"], Map);
+        update.WriteObject(num, 0,
+            $"<< /Type /XObject /Subtype /Form /BBox [0 0 {PdfIncrementalUpdate.Num(width)} {PdfIncrementalUpdate.Num(height)}] /Resources {resources} /Length {content.Length} >>",
+            content.ToArray());
+        while (pending.TryDequeue(out var item))
+        {
+            var (body, stream) = PdfIncrementalUpdate.Serialize(item.Obj, Map);
+            update.WriteObject(item.Num, 0, body, stream);
+        }
+        return num;
     }
 
     // ── signer ───────────────────────────────────────────────────────────────
 
-    private sealed class PadesSigner(X509Certificate2 cert, Uri? tsa, HttpClient http, CancellationToken ct) : IDigitalSigner
+    /// <summary>Detached CAdES over the signed bytes: SHA-256, ESS signing-certificate-v2, optional RFC 3161 time-stamp.</summary>
+    private async Task<byte[]> CreateCmsAsync(byte[] data, X509Certificate2 cert, Uri? tsa, CancellationToken ct)
     {
-        public string CertificateName => cert.GetNameInfo(X509NameType.SimpleName, false);
-
-        // Room for the CMS with the whole chain (and the time-stamp token); unused space stays zero-padded.
-        public Task<int> GetSignatureSizeAsync() => Task.FromResult(tsa is null ? 16_384 : 28_672);
-
-        public async Task<byte[]> GetSignatureAsync(Stream stream)
+        var cms = new SignedCms(new ContentInfo(data), detached: true);
+        var signer = new CmsSigner(SubjectIdentifierType.IssuerAndSerialNumber, cert)
         {
-            // PDFsharp's RangedStream throws on CanSeek, which Stream.CopyTo queries: read it by hand.
-            using var ms = new MemoryStream();
-            var buffer = new byte[81_920];
-            stream.Position = 0; // the handler hands the stream over positioned at its end
-            for (int n; (n = stream.Read(buffer, 0, buffer.Length)) > 0;) ms.Write(buffer, 0, n);
-            await Task.CompletedTask;
-            var data = ms.ToArray();
-            Replace(data, PdfSharpSubFilter, PadesSubFilter);
+            DigestAlgorithm = new Oid("2.16.840.1.101.3.4.2.1"), // SHA-256
+            IncludeOption = X509IncludeOption.WholeChain,
+        };
+        // PAdES baseline: ESS signing-certificate-v2, and no CMS signing-time (the time is /M or the time-stamp).
+        signer.SignedAttributes.Add(new AsnEncodedData("1.2.840.113549.1.9.16.2.47", SigningCertificateV2(cert)));
+        cms.ComputeSignature(signer, silent: false); // smart cards may prompt for the PIN here
 
-            var cms = new SignedCms(new ContentInfo(data), detached: true);
-            var signer = new CmsSigner(SubjectIdentifierType.IssuerAndSerialNumber, cert)
-            {
-                DigestAlgorithm = new Oid("2.16.840.1.101.3.4.2.1"), // SHA-256
-                IncludeOption = X509IncludeOption.WholeChain,
-            };
-            // PAdES baseline: ESS signing-certificate-v2, and no CMS signing-time (the time is /M or the time-stamp).
-            signer.SignedAttributes.Add(new AsnEncodedData("1.2.840.113549.1.9.16.2.47", SigningCertificateV2(cert)));
-            cms.ComputeSignature(signer, silent: false); // smart cards may prompt for the PIN here
-
-            if (tsa is not null)
-            {
-                var si = cms.SignerInfos[0];
-                var request = Rfc3161TimestampRequest.CreateFromSignerInfo(si, HashAlgorithmName.SHA256, requestSignerCertificates: true,
-                    nonce: RandomNumberGenerator.GetBytes(8));
-                using var content = new ByteArrayContent(request.Encode());
-                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/timestamp-query");
-                using var response = await http.PostAsync(tsa, content, ct);
-                response.EnsureSuccessStatusCode();
-                var token = request.ProcessResponse(await response.Content.ReadAsByteArrayAsync(ct), out _);
-                si.AddUnsignedAttribute(new AsnEncodedData("1.2.840.113549.1.9.16.2.14", token.AsSignedCms().Encode()));
-            }
-            return cms.Encode();
-        }
-
-        /// <summary>DER of SigningCertificateV2 { certs: SEQUENCE OF ESSCertIDv2 { certHash (SHA-256 default, so no algorithm) } }.</summary>
-        private static byte[] SigningCertificateV2(X509Certificate2 c)
+        if (tsa is not null)
         {
-            var w = new System.Formats.Asn1.AsnWriter(System.Formats.Asn1.AsnEncodingRules.DER);
-            using (w.PushSequence())
-            using (w.PushSequence())
-            using (w.PushSequence())
-                w.WriteOctetString(SHA256.HashData(c.RawData));
-            return w.Encode();
+            var si = cms.SignerInfos[0];
+            var request = Rfc3161TimestampRequest.CreateFromSignerInfo(si, HashAlgorithmName.SHA256, requestSignerCertificates: true,
+                nonce: RandomNumberGenerator.GetBytes(8));
+            using var content = new ByteArrayContent(request.Encode());
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/timestamp-query");
+            using var response = await _http.PostAsync(tsa, content, ct);
+            response.EnsureSuccessStatusCode();
+            var token = request.ProcessResponse(await response.Content.ReadAsByteArrayAsync(ct), out _);
+            si.AddUnsignedAttribute(new AsnEncodedData("1.2.840.113549.1.9.16.2.14", token.AsSignedCms().Encode()));
         }
+        return cms.Encode();
+    }
+
+    /// <summary>DER of SigningCertificateV2 { certs: SEQUENCE OF ESSCertIDv2 { certHash (SHA-256 default, so no algorithm) } }.</summary>
+    private static byte[] SigningCertificateV2(X509Certificate2 c)
+    {
+        var w = new System.Formats.Asn1.AsnWriter(System.Formats.Asn1.AsnEncodingRules.DER);
+        using (w.PushSequence())
+        using (w.PushSequence())
+        using (w.PushSequence())
+            w.WriteOctetString(SHA256.HashData(c.RawData));
+        return w.Encode();
     }
 
     /// <summary>Visible signature: optional image on the left, signer / date / reason / location on the right.</summary>

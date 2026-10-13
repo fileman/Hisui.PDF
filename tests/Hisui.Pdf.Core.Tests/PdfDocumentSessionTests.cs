@@ -272,4 +272,25 @@ public class PdfDocumentSessionTests
         session.Redo();
         Assert.NotEqual(saved, session.Version);
     }
+
+    [Fact]
+    public void UnchangedSingleSource_OnlyWhilePagesAreTheFileAsIs()
+    {
+        var bytes = new byte[] { 1, 2, 3 };
+        var session = new PdfDocumentSession();
+        session.AddSource(bytes, 3);
+        Assert.Same(bytes, session.UnchangedSingleSource());
+
+        session.Rotate(1, PageRotation.Clockwise90);
+        Assert.Null(session.UnchangedSingleSource());
+        session.Undo();
+        session.Move(0, 2);
+        Assert.Null(session.UnchangedSingleSource());
+        session.Undo();
+        session.RemoveAt(2);
+        Assert.Null(session.UnchangedSingleSource());
+        session.Undo();
+        session.AddSource([4], 1);
+        Assert.Null(session.UnchangedSingleSource());
+    }
 }
