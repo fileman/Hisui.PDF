@@ -40,6 +40,7 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentGroupRef Id="LicenseFiles" />
       <ComponentGroupRef Id="TessdataFiles" />
+      <ComponentRef Id="PdfDocumentIcon" />
       <ComponentRef Id="OpenWithPdf" />
       <ComponentRef Id="ContextMenuPdf" />
       <ComponentRef Id="StartMenuShortcut" />
@@ -74,8 +75,11 @@
        PDF: a document icon (red PDF label, original artwork) rather than the app logo. The Capabilities +
        RegisteredApplications values list Hisui PDF in Settings > Default apps. -->
   <Fragment>
+    <!-- The icon is a component of its own: WiX cannot derive a GUID for one holding both a file and registry values. -->
+    <Component Id="PdfDocumentIcon" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="PdfDocumentIco" Source="..\Hisui.Pdf.App\Assets\filetype\PdfDocument.ico" KeyPath="yes" />
+    </Component>
     <Component Id="OpenWithPdf" Directory="INSTALLFOLDER" Guid="*">
-      <File Id="PdfDocumentIco" Source="..\Hisui.Pdf.App\Assets\filetype\PdfDocument.ico" />
       <RegistryValue Root="HKLM" Key="Software\Classes\.pdf\OpenWithProgids" Name="HisuiPDF.Document" Type="string" Value="" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document" Type="string" Value="PDF Document" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\DefaultIcon" Type="string" Value="[INSTALLFOLDER]PdfDocument.ico" />
