@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
+        xmlns:views="clr-namespace:Hisui.Pdf.App.Views"
         x:Class="Hisui.Pdf.App.Views.SignatureManagerDialog"
         Title="{loc:Tr SigManager.Title}"
         Width="560" Height="470"
@@ -36,7 +37,7 @@
                     </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="views:SignatureListItem">
                         <StackPanel Width="156" Margin="4">
                             <Border Background="{DynamicResource RibbonPageBrush}"
                                     BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1"

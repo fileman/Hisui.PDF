@@ -2,7 +2,7 @@ using Hisui.Pdf.Core.Model;
 
 namespace Hisui.Pdf.Core.Abstractions;
 
-/// <summary>Text extraction and search backed by PdfPig.</summary>
+/// <summary>Text extraction and search backed by PDFium's text API (shares the renderer's open document).</summary>
 public interface IPdfTextExtractor
 {
     /// <summary>

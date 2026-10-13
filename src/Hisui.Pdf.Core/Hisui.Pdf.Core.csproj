@@ -10,6 +10,8 @@
     <!-- CA1416: PDFtoImage annotates its API as "not supported on all platforms" but it explicitly
          supports Windows / Linux / macOS (all our targets). Suppress to avoid false positives. -->
     <NoWarn>CA1416</NoWarn>
+    <!-- Required by the [LibraryImport] source generator (direct PDFium bindings). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,7 +21,8 @@
     <PackageReference Include="PdfPig" />
     <!-- Writes .docx for PDF-to-Word export (MIT). -->
     <PackageReference Include="DocumentFormat.OpenXml" />
-    <!-- Page rendering to PNG (PDFium + SkiaSharp). -->
+    <!-- Supplies the native PDFium binaries (bblanchon.PDFium.*) and SkiaSharp; rendering itself
+         goes through PdfiumNative, so PDFium is parsed once per document rather than per page. -->
     <PackageReference Include="PDFtoImage" />
     <!-- OCR engine for scanned-PDF conversion (Tesseract 5). -->
     <PackageReference Include="Tesseract" />

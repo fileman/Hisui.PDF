@@ -1,7 +1,6 @@
 using System.Globalization;
 using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
-using PDFtoImage;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.AcroForms;
@@ -510,7 +509,7 @@ internal sealed partial class PdfFormService : IPdfFormService
     {
         ArgumentNullException.ThrowIfNull(pdf);
 
-        var pageCount = await Task.Run(() => Conversion.GetPageCount(pdf), ct);
+        var pageCount = await _renderer.GetPageCountAsync(pdf, ct);
         var pageImages = new List<byte[]>(pageCount);
 
         for (var i = 0; i < pageCount; i++)
