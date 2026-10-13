@@ -42,7 +42,7 @@ public partial class DocumentView : UserControl
             return await dialog.ShowDialog<bool>(Owner) ? dialog.Password : null;
         };
 
-        viewModel.ShowFieldPropertiesDialog = props => FieldPropertiesDialog.ShowAsync(Owner, props);
+        viewModel.ShowFieldPropertiesDialog = (props, count) => FieldPropertiesDialog.ShowAsync(Owner, props, count);
         viewModel.PromptTextAsync = async (title, initial, multiline) =>
         {
             var dialog = new FormDialog(title);

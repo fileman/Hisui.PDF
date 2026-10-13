@@ -7,15 +7,20 @@ namespace Hisui.Pdf.App.Views;
 /// <summary>Form field properties (name, tooltip, flags, font, alignment, format, options), built on <see cref="FormDialog"/>.</summary>
 internal static class FieldPropertiesDialog
 {
-    public static async Task<FormFieldProperties?> ShowAsync(Window owner, FormFieldProperties p)
+    /// <param name="count">Selected fields: above 1 name and description are hidden and changes go to all.</param>
+    public static async Task<FormFieldProperties?> ShowAsync(Window owner, FormFieldProperties p, int count = 1)
     {
         var loc = Localizer.Instance;
-        var dialog = new FormDialog(loc.Format("FieldProps.Title", p.Name), 440);
+        var multi = count > 1;
+        var dialog = new FormDialog(multi ? loc.Format("FieldProps.TitleMulti", count) : loc.Format("FieldProps.Title", p.Name), 440);
         var isText = p.Type == PdfFormFieldType.Text;
         var isChoice = p.Type is PdfFormFieldType.ComboBox or PdfFormFieldType.ListBox;
 
-        var name = dialog.Add(loc["FieldProps.Name"], new TextBox { Text = p.Name });
-        var tooltip = dialog.Add(loc["FieldProps.Tooltip"], new TextBox { Text = p.Tooltip ?? "" });
+        var name = new TextBox { Text = p.Name };
+        if (!multi) dialog.Add(loc["FieldProps.Name"], name);
+        // Name and description belong to one field: hidden when editing several (each keeps its own).
+        var tooltip = new TextBox { Text = p.Tooltip ?? "" };
+        if (!multi) dialog.Add(loc["FieldProps.Tooltip"], tooltip);
         var required = dialog.Add(null, new CheckBox { Content = loc["FieldProps.Required"], IsChecked = p.Required });
         var readOnly = dialog.Add(null, new CheckBox { Content = loc["FieldProps.ReadOnly"], IsChecked = p.ReadOnly });
 

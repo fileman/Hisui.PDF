@@ -70,8 +70,31 @@ public partial class MainViewModel
         if (!IsFormLayoutMode) ClearFieldSelection();
     }
 
-    /// <summary>Set by the view: edits field properties in a dialog (null = cancelled).</summary>
-    public Func<FormFieldProperties, Task<FormFieldProperties?>>? ShowFieldPropertiesDialog { get; set; }
+    /// <summary>Set by the view: edits field properties in a dialog for the given number of selected fields
+    /// (null = cancelled).</summary>
+    public Func<FormFieldProperties, int, Task<FormFieldProperties?>>? ShowFieldPropertiesDialog { get; set; }
+
+    /// <summary>Copies onto <paramref name="target"/> only what changed from <paramref name="before"/> to
+    /// <paramref name="after"/>; the name stays the target's own (field names are unique).</summary>
+    internal static FormFieldProperties ApplyChanges(FormFieldProperties before, FormFieldProperties after, FormFieldProperties target)
+    {
+        T Pick<T>(Func<FormFieldProperties, T> get) => EqualityComparer<T>.Default.Equals(get(before), get(after)) ? get(target) : get(after);
+        return target with
+        {
+            Tooltip = Pick(p => p.Tooltip),
+            Required = Pick(p => p.Required),
+            ReadOnly = Pick(p => p.ReadOnly),
+            Multiline = Pick(p => p.Multiline),
+            MaxLength = Pick(p => p.MaxLength),
+            FontName = Pick(p => p.FontName),
+            FontSize = Pick(p => p.FontSize),
+            Alignment = Pick(p => p.Alignment),
+            Format = Pick(p => p.Format),
+            Decimals = Pick(p => p.Decimals),
+            DatePattern = Pick(p => p.DatePattern),
+            Options = before.Options.SequenceEqual(after.Options) ? target.Options : after.Options,
+        };
+    }
 
     /// <summary>Set by the view: a message with choices; returns the chosen index or -1.</summary>
     public Func<string, string[], Task<int>>? ChooseAsync { get; set; }
@@ -188,6 +211,23 @@ public partial class MainViewModel
         SetSelection(current.Count > 0 ? page : null, current);
     }
 
+    /// <summary>Selects <paramref name="annotIndices"/> (in page order), replacing the selection or adding to it.</summary>
+    public void SelectFields(PageItemViewModel page, IEnumerable<int> annotIndices, bool add)
+    {
+        var current = add && ReferenceEquals(page, SelectionPage) ? SelectedFields.ToList() : [];
+        current.AddRange(annotIndices.Where(i => !current.Contains(i)));
+        SetSelection(current.Count > 0 ? page : null, current);
+    }
+
+    public void SelectAllFields(PageItemViewModel page) => SelectFields(page, page.Fields.Select(f => f.AnnotIndex), add: false);
+
+    /// <summary>Selects every field of the current page (layout mode).</summary>
+    [RelayCommand]
+    private void SelectAllPageFields()
+    {
+        if (IsFormLayoutMode && (SelectionPage ?? SelectedPage) is { } page) SelectAllFields(page);
+    }
+
     public void ClearFieldSelection()
     {
         if (SelectedFields.Count > 0) SetSelection(null, []);
@@ -283,7 +323,8 @@ public partial class MainViewModel
     private Task ReorderAsync(PageItemViewModel page, List<int> order) =>
         EditFieldsAsync(page, src => _forms.ReorderWidgetsAsync(src, page.SourcePageIndex, order), rebuild: true);
 
-    /// <summary>Opens the properties of the anchor field (double-click or the panel button).</summary>
+    /// <summary>Opens the properties of the first selected field (double-click or the panel button). With several
+    /// fields selected, what the user changes is applied to all of them — one undo step.</summary>
     [RelayCommand(CanExecute = nameof(HasFieldSelection))]
     private async Task EditFieldPropertiesAsync() => await EditFieldPropertiesCoreAsync();
 
@@ -291,11 +332,25 @@ public partial class MainViewModel
     {
         if (_session is null || SelectionPage is not { } page || SelectedFields.Count == 0 || ShowFieldPropertiesDialog is null) return;
         var index = SelectedFields[0];
+        var indices = SelectedFields.ToList();
         try
         {
             var props = await _forms.ReadPropertiesAsync(_session.GetSource(page.SourceDocumentId), page.SourcePageIndex, index);
-            if (await ShowFieldPropertiesDialog(props) is not { } edited || edited == props) return;
-            await EditFieldsAsync(page, src => _forms.SetPropertiesAsync(src, page.SourcePageIndex, index, edited), rebuild: true);
+            if (await ShowFieldPropertiesDialog(props, indices.Count) is not { } edited || edited == props) return;
+            if (indices.Count == 1)
+            {
+                await EditFieldsAsync(page, src => _forms.SetPropertiesAsync(src, page.SourcePageIndex, index, edited), rebuild: true);
+                return;
+            }
+            await EditFieldsAsync(page, async src =>
+            {
+                foreach (var i in indices)
+                {
+                    var target = await _forms.ReadPropertiesAsync(src, page.SourcePageIndex, i);
+                    src = await _forms.SetPropertiesAsync(src, page.SourcePageIndex, i, ApplyChanges(props, edited, target));
+                }
+                return src;
+            }, rebuild: true);
         }
         catch (Exception ex)
         {
