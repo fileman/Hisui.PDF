@@ -6,6 +6,7 @@ public enum RibbonTab
     Home,
     Annota,
     Forms,
+    Sign,
     Comments,
     Bookmarks,
 }
