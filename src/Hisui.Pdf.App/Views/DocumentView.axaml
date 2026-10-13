@@ -728,11 +728,14 @@
                                         <TextBlock Text="{loc:Tr Tool.Link}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
-                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.DigitalSignature.Tooltip}"
+                                <RadioButton Classes="tool" GroupName="AnnotTools" Height="38" ToolTip.Tip="{loc:Tr Tool.DigitalSignature.Tooltip}"
                                              IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=DigitalSignature, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph-tool" Width="15" Height="15" Data="M3 2h7l3 3v9H3z M5.5 11c1-2 2-2 2.5 0s1.5 1 2.5-.5 M8.5 6.5l1.5 1.5 2.5-3" />
-                                        <TextBlock Text="{loc:Tr Tool.DigitalSignature}" VerticalAlignment="Center" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{loc:Tr Tool.DigitalSignature}" />
+                                            <TextBlock Text="{loc:Tr Sign.Experimental}" FontSize="11" FontStyle="Italic" Opacity="0.85" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </RadioButton>
                                 <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Highlight.Tooltip}"
