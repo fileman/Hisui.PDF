@@ -326,7 +326,7 @@
         <!-- Form-field editors sit on the white page: same light fill in every theme and state -->
         <Style Selector="TextBox.field /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="#E8F0FE" />
-            <Setter Property="BorderBrush" Value="#7FA6E6" />
+            <Setter Property="BorderBrush" Value="#5A86D0" />
             <Setter Property="BorderThickness" Value="0.5" />
             <Setter Property="CornerRadius" Value="0" />
             <Setter Property="MinHeight" Value="0" />
@@ -347,7 +347,7 @@
         </Style>
         <Style Selector="ToggleButton.field /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="#E8F0FE" />
-            <Setter Property="BorderBrush" Value="#7FA6E6" />
+            <Setter Property="BorderBrush" Value="#5A86D0" />
             <Setter Property="BorderThickness" Value="0.5" />
             <Setter Property="CornerRadius" Value="0" />
         </Style>

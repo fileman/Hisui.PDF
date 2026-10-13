@@ -121,6 +121,24 @@ public partial class MainViewModel
             : EditFieldsAsync(page, src => _forms.FillFieldsAsync(src, new Dictionary<string, string> { [field.Name] = value }),
                 rebuild: field.Type is PdfFormFieldType.CheckBox or PdfFormFieldType.RadioButton);
 
+    /// <summary>Set by the view: picks a handwritten signature image from the library (null = cancelled).</summary>
+    public Func<Task<byte[]?>>? PickSignatureImageAsync { get; set; }
+
+    /// <summary>
+    /// Signs an empty signature field with the user's handwritten signature: the image is drawn in the field's box and
+    /// the field, now filled, is removed — one undo step.
+    /// ponytail: a visual signature only; a certificate (PAdES) signature into the field is a separate feature.
+    /// </summary>
+    public async Task SignFieldAsync(PageItemViewModel page, PdfFormWidget field)
+    {
+        if (PickSignatureImageAsync is null || await PickSignatureImageAsync() is not { } image) return;
+        await EditFieldsAsync(page, async src =>
+        {
+            var signed = await _annotations.AddImageOverlayAsync(src, page.SourcePageIndex, image, field.Rect);
+            return await _forms.DeleteWidgetsAsync(signed, page.SourcePageIndex, [field.AnnotIndex]);
+        }, rebuild: true);
+    }
+
     public Task MoveFieldsAsync(PageItemViewModel page, IReadOnlyDictionary<int, PdfRect> rects) =>
         rects.Count == 0 ? Task.CompletedTask
             : EditFieldsAsync(page, src => _forms.SetWidgetRectsAsync(src, page.SourcePageIndex, rects), rebuild: true);

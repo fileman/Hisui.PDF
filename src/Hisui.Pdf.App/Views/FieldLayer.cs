@@ -240,7 +240,30 @@ public sealed class FieldLayer : Canvas
                 };
                 return combo;
 
-            default: // signature fields are signed with the Firma tool, not typed into
+            // An empty signature field shows where to sign; a click places the user's signature in it.
+            case PdfFormFieldType.Signature when field.Value is null:
+                var sign = new Button
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xC1, 0x07)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0xC7, 0x8A, 0x00)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(0),
+                    Padding = new Thickness(4, 0),
+                    MinHeight = 0,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    Cursor = new Cursor(StandardCursorType.Hand),
+                    Content = new TextBlock
+                    {
+                        Text = "✍ " + Localizer.Instance["Field.SignHere"],
+                        FontSize = Math.Min(fontSize, 12),
+                        Foreground = new SolidColorBrush(Color.FromRgb(0x6B, 0x4A, 0x00)),
+                    },
+                };
+                sign.Click += async (_, _) => await vm.SignFieldAsync(page, field);
+                return sign;
+
+            default: // a signed signature field shows its own appearance
                 return null;
         }
     }

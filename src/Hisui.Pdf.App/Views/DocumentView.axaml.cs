@@ -62,6 +62,11 @@ public partial class DocumentView : UserControl
         viewModel.PromptOcrLanguagesAsync = (store, current) => ToolDialogs.PromptOcrLanguagesAsync(Owner, store, current);
         viewModel.PromptBatchAsync = () => ToolDialogs.PromptBatchAsync(Owner);
         viewModel.ChooseAsync = (message, choices) => FormDialog.ChooseAsync(Owner, "Hisui PDF", message, choices);
+        viewModel.PickSignatureImageAsync = async () =>
+        {
+            var picker = new SignatureManagerDialog(_signatures);
+            return await picker.ShowDialog<bool>(Owner) ? picker.SelectedImage : null;
+        };
 
         AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
         AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
