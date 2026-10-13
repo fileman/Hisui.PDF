@@ -70,11 +70,19 @@
   </Fragment>
 
   <!-- ─── "Open with" entry for .pdf (does not take over the default app) ─ -->
+  <!-- Once the user makes Hisui PDF the default app for .pdf, Explorer shows the ProgId's DefaultIcon on every
+       PDF: a document icon (red PDF label, original artwork) rather than the app logo. The Capabilities +
+       RegisteredApplications values list Hisui PDF in Settings > Default apps. -->
   <Fragment>
     <Component Id="OpenWithPdf" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="PdfDocumentIco" Source="..\Hisui.Pdf.App\Assets\filetype\PdfDocument.ico" />
       <RegistryValue Root="HKLM" Key="Software\Classes\.pdf\OpenWithProgids" Name="HisuiPDF.Document" Type="string" Value="" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document" Type="string" Value="PDF Document" />
-      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\DefaultIcon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\DefaultIcon" Type="string" Value="[INSTALLFOLDER]PdfDocument.ico" />
+      <RegistryValue Root="HKLM" Key="Software\HisuiPDF\Capabilities" Name="ApplicationName" Type="string" Value="Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\HisuiPDF\Capabilities" Name="ApplicationDescription" Type="string" Value="PDF editor: merge, split, annotate, redact, sign" />
+      <RegistryValue Root="HKLM" Key="Software\HisuiPDF\Capabilities\FileAssociations" Name=".pdf" Type="string" Value="HisuiPDF.Document" />
+      <RegistryValue Root="HKLM" Key="Software\RegisteredApplications" Name="Hisui PDF" Type="string" Value="Software\HisuiPDF\Capabilities" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\shell\open" Name="FriendlyAppName" Type="string" Value="Hisui PDF" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; &quot;%1&quot;" KeyPath="yes" />
     </Component>
@@ -114,6 +122,10 @@
 
       <Component Id="LicenseOfl" Directory="LicensesFolder" Guid="*">
         <File Source="..\..\licenses\OFL.txt" />
+      </Component>
+
+      <Component Id="LicenseOflLiberation" Directory="LicensesFolder" Guid="*">
+        <File Source="..\..\licenses\OFL-Liberation.txt" />
       </Component>
 
     </ComponentGroup>

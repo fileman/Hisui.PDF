@@ -18,7 +18,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
     // The static constructor runs once per AppDomain, including in test hosts.
     static PdfAnnotationService()
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
     }
     public Task<byte[]> AddTextWatermarkAsync(byte[] pdf, string text, WatermarkOptions? options = null, CancellationToken ct = default)
     {

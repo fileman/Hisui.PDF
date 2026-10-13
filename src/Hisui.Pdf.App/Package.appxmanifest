@@ -44,6 +44,7 @@
               <uap:FileType>.pdf</uap:FileType>
             </uap:SupportedFileTypes>
             <uap:DisplayName>PDF Document</uap:DisplayName>
+            <uap:Logo>Assets\PdfFileLogo.png</uap:Logo>
           </uap:FileTypeAssociation>
         </uap:Extension>
       </Extensions>

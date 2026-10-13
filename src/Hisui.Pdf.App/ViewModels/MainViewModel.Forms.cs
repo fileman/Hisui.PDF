@@ -161,8 +161,21 @@ public partial class MainViewModel
     /// <summary>Page of the selected fields (selection never spans pages).</summary>
     public PageItemViewModel? SelectionPage { get; private set; }
 
-    /// <summary>/Annots indices of the selected widgets; the first is the anchor that alignment follows.</summary>
+    /// <summary>/Annots indices of the selected widgets, in selection order.</summary>
     public IReadOnlyList<int> SelectedFields { get; private set; } = [];
+
+    /// <summary>Alignment follows the last selected field instead of the first (remembered across sessions).</summary>
+    [ObservableProperty] private bool _alignToLast;
+
+    partial void OnAlignToLastChanged(bool value)
+    {
+        _settings.Settings.AlignToLastSelected = value;
+        _settings.Save();
+        OnPropertyChanged(nameof(AlignAnchor));
+    }
+
+    /// <summary>The field that alignment and sizing follow: the first or the last selected.</summary>
+    public int? AlignAnchor => SelectedFields.Count == 0 ? null : AlignToLast ? SelectedFields[^1] : SelectedFields[0];
 
     public bool HasFieldSelection => SelectedFields.Count > 0;
     public bool HasMultiFieldSelection => SelectedFields.Count > 1;
@@ -185,6 +198,7 @@ public partial class MainViewModel
         SelectionPage = page;
         SelectedFields = fields;
         OnPropertyChanged(nameof(SelectedFields));
+        OnPropertyChanged(nameof(AlignAnchor));
         OnPropertyChanged(nameof(HasFieldSelection));
         OnPropertyChanged(nameof(HasMultiFieldSelection));
         AlignFieldsCommand.NotifyCanExecuteChanged();
@@ -195,17 +209,17 @@ public partial class MainViewModel
 
     private bool CanAlign(string? mode) => HasMultiFieldSelection;
 
-    /// <summary>Aligns / sizes the selection to its anchor (first selected): left, right, top, bottom, hcenter,
-    /// vcenter, width, height, size.</summary>
+    /// <summary>Aligns / sizes the selection to its anchor (<see cref="AlignAnchor"/>): left, right, top, bottom,
+    /// hcenter, vcenter, width, height, size.</summary>
     [RelayCommand(CanExecute = nameof(CanAlign))]
     private async Task AlignFieldsAsync(string mode)
     {
-        if (SelectionPage is not { } page || SelectedFields.Count < 2) return;
+        if (SelectionPage is not { } page || SelectedFields.Count < 2 || AlignAnchor is not { } anchor) return;
         var byIndex = page.Fields.ToDictionary(f => f.AnnotIndex);
-        if (!byIndex.TryGetValue(SelectedFields[0], out var anchorField)) return;
+        if (!byIndex.TryGetValue(anchor, out var anchorField)) return;
         var a = anchorField.Rect;
         var rects = new Dictionary<int, PdfRect>();
-        foreach (var index in SelectedFields.Skip(1))
+        foreach (var index in SelectedFields.Where(i => i != anchor))
         {
             if (!byIndex.TryGetValue(index, out var f)) continue;
             var r = f.Rect;

@@ -56,6 +56,9 @@ else
     echo "  iconutil -c icns AppIcon.iconset -o src/Hisui.Pdf.App/Assets/osx/AppIcon.icns"
 fi
 
+# PDF document icon, shown on PDFs while Hisui PDF is their default app (original artwork, no Adobe mark)
+cp "$ROOT/src/Hisui.Pdf.App/Assets/filetype/PdfDocument.icns" "$CONTENTS/Resources/PdfDocument.icns"
+
 # Info.plist
 cat > "$CONTENTS/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -89,6 +92,8 @@ cat > "$CONTENTS/Info.plist" << PLIST
         <dict>
             <key>CFBundleTypeName</key>
             <string>PDF Document</string>
+            <key>CFBundleTypeIconFile</key>
+            <string>PdfDocument</string>
             <key>CFBundleTypeExtensions</key>
             <array><string>pdf</string></array>
             <key>CFBundleTypeMIMETypes</key>

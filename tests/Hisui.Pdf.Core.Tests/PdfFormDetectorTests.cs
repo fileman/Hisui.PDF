@@ -15,7 +15,7 @@ public class PdfFormDetectorTests
 
     private static byte[] Build(Action<XGraphics> draw, int rotate = 0)
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
         using var doc = new PdfDocument();
         var page = doc.AddPage();
         page.Size = PdfSharp.PageSize.A4;

@@ -38,7 +38,7 @@ internal sealed class PdfSignatureService : IPdfSignatureService
         ArgumentNullException.ThrowIfNull(pdf);
         ArgumentNullException.ThrowIfNull(request);
         if (!request.Certificate.HasPrivateKey) throw new ArgumentException("The certificate has no private key.", nameof(request));
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
 
         return Task.Run(() =>
         {

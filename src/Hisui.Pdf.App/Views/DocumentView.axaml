@@ -29,6 +29,7 @@
         <conv:EnumToBoolConverter x:Key="EnumToBool" />
 
         <!-- Ribbon glyphs (16-unit coordinate space, stroked, no fill) -->
+        <StreamGeometry x:Key="IconStar">M8 1.8l1.85 3.9 4.25.5-3.15 2.9.85 4.2L8 11.2l-3.8 2.1.85-4.2L1.9 6.2l4.25-.5z</StreamGeometry>
         <StreamGeometry x:Key="IconOpen">M2 4.5h4l1.2 1.6H14V13H2z</StreamGeometry>
         <StreamGeometry x:Key="IconAdd">M8 3v10M3 8h10</StreamGeometry>
         <StreamGeometry x:Key="IconSave">M3.5 3h7l2.5 2.5V13H3.5z M6 3v3.5h4V3 M5.5 9h5v4h-5z</StreamGeometry>
@@ -271,6 +272,56 @@
         </Style>
         <Style Selector="Button.recent-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <!-- Recent-file rows: name + folder, then pin (star) and remove; actions show on hover or when pinned -->
+        <Style Selector="Button.recent-item">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Button.recent-item /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.recent-item:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.recent-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action:disabled">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="Button.recent-action:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Grid.recent-row > Button.recent-action">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Grid.recent-row:pointerover > Button.recent-action, Grid.recent-row > Button.recent-action:focus-within">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Grid.recent-row > Button.recent-action.pinned">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action.pinned Path.glyph">
+            <Setter Property="Fill" Value="{DynamicResource RibbonAccentBrush}" />
         </Style>
 
         <!-- Form-field editors sit on the white page: same light fill in every theme and state -->
@@ -890,6 +941,16 @@
                                 <!-- Layout of the selected fields (layout mode: click / Ctrl+click on the page) -->
                                 <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.Layout}" Margin="0,10,0,0" />
                                 <TextBlock Classes="dialog-hint" Text="{loc:Tr Fields.SelectHint}" TextWrapping="Wrap" FontSize="11" Margin="8,0,4,4" />
+                                <!-- Which selected field the others align to and take the size of -->
+                                <StackPanel Orientation="Horizontal" Margin="8,0,4,2">
+                                    <TextBlock Text="{loc:Tr Fields.AlignTo}" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <RadioButton GroupName="AlignAnchor" FontSize="12.5" MinWidth="0" Padding="4,0,8,0" Content="{loc:Tr Fields.AlignToFirst}"
+                                                 ToolTip.Tip="{loc:Tr Fields.AlignToFirst.Tooltip}"
+                                                 IsChecked="{Binding !AlignToLast, Mode=OneWay}" />
+                                    <RadioButton GroupName="AlignAnchor" FontSize="12.5" MinWidth="0" Padding="4,0,8,0" Content="{loc:Tr Fields.AlignToLast}"
+                                                 ToolTip.Tip="{loc:Tr Fields.AlignToLast.Tooltip}"
+                                                 IsChecked="{Binding AlignToLast}" />
+                                </StackPanel>
                                 <WrapPanel Margin="4,0">
                                     <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="left" ToolTip.Tip="{loc:Tr Fields.AlignLeft}">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M1 0v15 M4 3h9v3h-9z M4 9h6v3h-6z" /></Button>
@@ -1137,20 +1198,56 @@
                         <Button Content="{loc:Tr Empty.OpenButton}" Command="{Binding OpenCommand}"
                                 Classes="primary" Padding="22,9" HorizontalAlignment="Center" />
 
-                        <!-- Recent files, one click away -->
-                        <StackPanel IsVisible="{Binding HasRecentFiles}" Spacing="2" Margin="0,10,0,0">
-                            <TextBlock Text="{loc:Tr Empty.Recent}" Classes="caption"
-                                       HorizontalAlignment="Center" Margin="0,0,0,4" />
+                        <!-- Recent files, one click away: pinned first (star), paged, each removable -->
+                        <StackPanel IsVisible="{Binding HasRecentFiles}" Spacing="2" Margin="0,10,0,0" Width="420">
+                            <Grid ColumnDefinitions="*,Auto" Margin="8,0,0,4">
+                                <TextBlock Text="{loc:Tr Empty.Recent}" Classes="caption" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="recent-link" FontSize="11.5"
+                                        Content="{loc:Tr Recent.Clear}" Command="{Binding ClearRecentCommand}"
+                                        IsVisible="{Binding HasUnpinnedRecentFiles}" />
+                            </Grid>
                             <ItemsControl ItemsSource="{Binding RecentFiles}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:RecentFileEntry">
-                                        <Button Classes="recent-link" HorizontalAlignment="Center"
-                                                Content="{Binding DisplayName}" ToolTip.Tip="{Binding FullPath}"
-                                                CommandParameter="{Binding FullPath}"
-                                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenRecentCommand}" />
+                                        <Grid Classes="recent-row" ColumnDefinitions="*,Auto,Auto" Background="Transparent">
+                                            <Button Classes="recent-item" ToolTip.Tip="{Binding FullPath}"
+                                                    CommandParameter="{Binding FullPath}"
+                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenRecentCommand}">
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="{Binding DisplayName}" FontSize="12.5"
+                                                               Foreground="{DynamicResource RibbonAccentBrush}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Folder}" FontSize="11"
+                                                               Foreground="{DynamicResource RibbonSubtleTextBrush}"
+                                                               TextTrimming="LeadingCharacterEllipsis" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Grid.Column="1" Classes="recent-action" Classes.pinned="{Binding IsPinned}"
+                                                    ToolTip.Tip="{loc:Tr Recent.Pin.Tooltip}"
+                                                    CommandParameter="{Binding FullPath}"
+                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).TogglePinRecentCommand}">
+                                                <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconStar}" />
+                                            </Button>
+                                            <Button Grid.Column="2" Classes="recent-action" ToolTip.Tip="{loc:Tr Recent.Remove.Tooltip}"
+                                                    CommandParameter="{Binding FullPath}"
+                                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).RemoveRecentCommand}">
+                                                <Path Classes="glyph" Width="10" Height="10" Data="M2 2l8 8 M10 2l-8 8" />
+                                            </Button>
+                                        </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6" Margin="0,4,0,0"
+                                        IsVisible="{Binding HasRecentPages}">
+                                <Button Classes="recent-action" Command="{Binding PreviousRecentPageCommand}"
+                                        ToolTip.Tip="{loc:Tr Recent.PreviousPage}">
+                                    <Path Classes="glyph" Width="10" Height="10" Data="M7 1L3 5l4 4" /></Button>
+                                <TextBlock Text="{Binding RecentPageLabel}" FontSize="12" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                <Button Classes="recent-action" Command="{Binding NextRecentPageCommand}"
+                                        ToolTip.Tip="{loc:Tr Recent.NextPage}">
+                                    <Path Classes="glyph" Width="10" Height="10" Data="M3 1l4 4-4 4" /></Button>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
 

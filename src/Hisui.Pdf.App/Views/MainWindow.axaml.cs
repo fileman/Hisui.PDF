@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Reactive;
 using Avalonia.VisualTree;
+using Hisui.Pdf.App.Services;
 using Hisui.Pdf.App.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -154,13 +155,37 @@ public partial class MainWindow : Window
         return view;
     }
 
-    /// <summary>Closes a tab after offering to save unsaved changes; false when the user cancels.</summary>
+    /// <summary>Closes a tab after offering to save unsaved changes; false when the user cancels. Closing the last tab
+    /// closes the application, so that asks first (and offers to keep the window with an empty tab instead).</summary>
     private async Task<bool> CloseTabAsync(TabItem item)
     {
+        var keepWindow = false;
+        if (Tabs.ItemCount == 1 && _services.GetRequiredService<ISettingsService>() is { Settings.ConfirmCloseLastTab: true } settings)
+        {
+            var loc = Localization.Localizer.Instance;
+            var hasDocument = item.Content is DocumentView { DataContext: MainViewModel { IsDocumentLoaded: true } };
+            string[] choices = hasDocument
+                ? [loc["Dialog.Cancel"], loc["CloseLast.KeepOpen"], loc["CloseLast.Exit"]]
+                : [loc["Dialog.Cancel"], loc["CloseLast.Exit"]];
+            var (choice, dontAsk) = await FormDialog.ChooseWithCheckAsync(this, "Hisui PDF", loc["CloseLast.Message"],
+                loc["CloseLast.DontAsk"], choices);
+            if (choice < 1) return false;
+            keepWindow = hasDocument && choice == 1;
+            if (dontAsk)
+            {
+                settings.Settings.ConfirmCloseLastTab = false;
+                settings.Save();
+            }
+        }
+
         if (!await ConfirmDiscardAsync(item)) return false;
         Tabs.Items.Remove(item);
         if (item.Content is DocumentView v) _claimed.Remove(v);
-        if (Tabs.ItemCount == 0) { _closeConfirmed = true; Close(); }
+        if (Tabs.ItemCount == 0)
+        {
+            if (keepWindow) AddTab();
+            else { _closeConfirmed = true; Close(); }
+        }
         return true;
     }
 
