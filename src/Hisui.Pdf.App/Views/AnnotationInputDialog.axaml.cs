@@ -13,6 +13,25 @@ public partial class AnnotationInputDialog : Window
 
     public AnnotationInputModel? Result { get; private set; }
 
+    /// <summary>The user chose to remove the existing watermark (the dialog closes with true and no Result).</summary>
+    public bool RemoveRequested { get; private set; }
+
+    /// <summary>Edits the document's watermark: its text and settings fill the form, and it can be removed.</summary>
+    public void LoadWatermark(WatermarkInfo existing)
+    {
+        SetText("ToolLabel", Localizer.Instance["DialogTool.WatermarkEdit"]);
+        SetText("AnnotTextBox", existing.Text);
+        SetText("ColorInput", existing.Options.ColorHex);
+        SetNumber("OpacityInput", existing.Options.Opacity);
+        SetNumber("WmFontSizeInput", existing.Options.FontSizePoints);
+        SetNumber("WmRotationInput", existing.Options.RotationDegrees);
+        if (this.FindControl<Button>("RemoveButton") is { } remove)
+        {
+            remove.IsVisible = true;
+            remove.Click += (_, _) => { RemoveRequested = true; Close(true); };
+        }
+    }
+
     /// <summary>The current text in the editor — used by the TextEdit replacement flow.</summary>
     public string InputText => GetText("AnnotTextBox") ?? string.Empty;
 

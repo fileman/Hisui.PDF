@@ -126,6 +126,7 @@ internal sealed partial class PdfFormService : IPdfFormService
                 {
                     PdfFormFieldType.CheckBox => (w.Elements.GetName("/AS") is { Length: > 0 } a && a != "/Off") ? "true" : "false",
                     PdfFormFieldType.RadioButton => v is PdfName n && n.Value != "/Off" ? n.Value[1..] : null,
+                    PdfFormFieldType.Signature => v is null ? null : "signed", // /V is the signature dictionary
                     _ => v switch
                     {
                         PdfString str => str.Value,
