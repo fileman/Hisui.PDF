@@ -5,7 +5,7 @@ namespace Hisui.Pdf.Core.Native;
 /// <summary>
 /// Minimal P/Invoke surface over the PDFium binary shipped by the <c>bblanchon.PDFium.*</c> packages
 /// (the same <c>pdfium</c> library PDFtoImage loads). Only what <see cref="Services.PdfiumRenderer"/>
-/// needs is declared. PDFium is not thread-safe: every call must happen under
+/// and <see cref="Services.PdfTextExtractor"/> need is declared. PDFium is not thread-safe: every call must happen under
 /// <see cref="Services.PdfiumRenderer"/>'s process-wide gate.
 /// </summary>
 internal static partial class PdfiumNative
@@ -70,4 +70,41 @@ internal static partial class PdfiumNative
     [LibraryImport(Lib)]
     public static partial void FPDF_FFLDraw(
         IntPtr formHandle, IntPtr bitmap, IntPtr page, int startX, int startY, int sizeX, int sizeY, int rotate, int flags);
+
+    // ── text API (fpdf_text.h) ───────────────────────────────────────────────
+
+    [LibraryImport(Lib)]
+    public static partial IntPtr FPDFText_LoadPage(IntPtr page);
+
+    [LibraryImport(Lib)]
+    public static partial void FPDFText_ClosePage(IntPtr textPage);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFText_CountChars(IntPtr textPage);
+
+    [LibraryImport(Lib)]
+    public static partial uint FPDFText_GetUnicode(IntPtr textPage, int index);
+
+    [LibraryImport(Lib)]
+    public static partial double FPDFText_GetFontSize(IntPtr textPage, int index);
+
+    /// <summary>Glyph box in unrotated page space (origin bottom-left, y up). Returns 0 on failure.</summary>
+    [LibraryImport(Lib)]
+    public static partial int FPDFText_GetCharBox(IntPtr textPage, int index, out double left, out double right, out double bottom, out double top);
+
+    /// <summary>Rotation of the glyph's text matrix in radians, counter-clockwise in page space; -1 on failure.</summary>
+    [LibraryImport(Lib)]
+    public static partial float FPDFText_GetCharAngle(IntPtr textPage, int index);
+
+    /// <summary>Copies up to <paramref name="count"/> UTF-16 units (plus a terminating NUL) into <paramref name="result"/>; returns units written including the NUL.</summary>
+    [LibraryImport(Lib)]
+    public static unsafe partial int FPDFText_GetText(IntPtr textPage, int startIndex, int count, char* result);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFPage_GetRotation(IntPtr page);
+
+    /// <summary>Maps page-space coordinates to device space (integers, hence the caller-chosen large size for precision).</summary>
+    [LibraryImport(Lib)]
+    public static partial int FPDF_PageToDevice(
+        IntPtr page, int startX, int startY, int sizeX, int sizeY, int rotate, double pageX, double pageY, out int deviceX, out int deviceY);
 }

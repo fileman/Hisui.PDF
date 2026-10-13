@@ -13,10 +13,11 @@ namespace Hisui.Pdf.Core.Services;
 /// </summary>
 /// <remarks>
 /// PDFium is not thread-safe, so every native call in the process runs under <see cref="Gate"/>.
-/// Rendering is CPU-bound and runs on the thread pool to keep the UI thread free. Nothing else in Core
+/// Rendering is CPU-bound and runs on the thread pool to keep the UI thread free. Other Core services (text
+/// extraction) reach PDFium only through <see cref="WithDocument{T}"/>, which holds the same gate. Nothing else in Core
 /// may call PDFium (or PDFtoImage, which wraps the same library) outside this class.
 /// </remarks>
-internal sealed class PdfiumRenderer : IPdfRenderer, IDisposable
+internal sealed class PdfiumRenderer : IPdfRenderer, IPdfiumDocumentHost, IDisposable
 {
     /// <summary>Maximum number of simultaneously open documents; the least recently used is closed first.</summary>
     internal const int MaxOpenDocuments = 8;
@@ -74,6 +75,18 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IDisposable
                 }
             },
             cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public T WithDocument<T>(byte[] pdf, Func<IntPtr, int, T> work)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        ArgumentNullException.ThrowIfNull(work);
+        lock (Gate)
+        {
+            var doc = GetDocument(pdf);
+            return work(doc.Handle, doc.PageCount);
+        }
     }
 
     public void Release(byte[] pdf)
@@ -163,6 +176,8 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IDisposable
         public byte[] Buffer { get; }
 
         public int PageCount { get; }
+
+        public IntPtr Handle => _document;
 
         public static PdfiumDocument Open(byte[] buffer)
         {
@@ -274,4 +289,18 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IDisposable
             _ => $"error {code}",
         };
     }
+}
+
+/// <summary>
+/// Lets other Core services run native PDFium work against the renderer's already-open document
+/// for a buffer, under the process-wide PDFium gate.
+/// </summary>
+internal interface IPdfiumDocumentHost
+{
+    /// <summary>
+    /// Runs <paramref name="work"/> with the raw <c>FPDF_DOCUMENT</c> handle and page count of
+    /// <paramref name="pdf"/> (opened on demand and cached like a render would). The gate is held for
+    /// the duration, so keep it short, and neither keep the handle nor close it after returning.
+    /// </summary>
+    T WithDocument<T>(byte[] pdf, Func<IntPtr, int, T> work);
 }
