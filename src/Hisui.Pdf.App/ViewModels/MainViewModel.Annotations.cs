@@ -36,7 +36,7 @@ public partial class MainViewModel
         _settings.Save();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasDocument))]
     private void SetContinuousView(bool continuous) => IsContinuousView = continuous;
 
     public bool ShowContinuous => IsContinuousView && !IsAnnotationActive;
@@ -126,6 +126,14 @@ public partial class MainViewModel
         CheckAccessibilityCommand.NotifyCanExecuteChanged();
         SignInvisibleCommand.NotifyCanExecuteChanged();
         VerifySignaturesCommand.NotifyCanExecuteChanged();
+        ZoomInCommand.NotifyCanExecuteChanged();
+        ZoomOutCommand.NotifyCanExecuteChanged();
+        ZoomActualCommand.NotifyCanExecuteChanged();
+        SetZoomPercentCommand.NotifyCanExecuteChanged();
+        FitWidthCommand.NotifyCanExecuteChanged();
+        FitHeightCommand.NotifyCanExecuteChanged();
+        SetContinuousViewCommand.NotifyCanExecuteChanged();
+        SelectAllPageFieldsCommand.NotifyCanExecuteChanged();
     }
 
     public bool IsAnnotationActive => ActiveTool != AnnotationTool.None;

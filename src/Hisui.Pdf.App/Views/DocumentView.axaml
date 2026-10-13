@@ -199,7 +199,9 @@
         </Style>
 
         <!-- Annotation tool toggles -->
+        <!-- Tools act on a page: unavailable until a document is open. -->
         <Style Selector="RadioButton.tool">
+            <Setter Property="IsEnabled" Value="{Binding IsDocumentLoaded}" />
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="Padding" Value="8,0" />
             <Setter Property="Height" Value="30" />
@@ -220,6 +222,9 @@
         </Style>
         <Style Selector="RadioButton.tool:checked /template/ Border#root">
             <Setter Property="Background" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="RadioButton.tool:disabled">
+            <Setter Property="Opacity" Value="0.4" />
         </Style>
         <Style Selector="RadioButton.tool:checked">
             <Setter Property="Foreground" Value="{DynamicResource RibbonOnAccentBrush}" />

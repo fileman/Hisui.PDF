@@ -246,7 +246,7 @@ public partial class MainViewModel
     public void SelectAllFields(PageItemViewModel page) => SelectFields(page, page.Fields.Select(f => f.AnnotIndex), add: false);
 
     /// <summary>Selects every field of the current page (layout mode).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasDocument))]
     private void SelectAllPageFields()
     {
         if (IsFormLayoutMode && (SelectionPage ?? SelectedPage) is { } page) SelectAllFields(page);
