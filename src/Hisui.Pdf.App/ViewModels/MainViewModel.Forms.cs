@@ -125,13 +125,19 @@ public partial class MainViewModel
     public Func<Task<byte[]?>>? PickSignatureImageAsync { get; set; }
 
     /// <summary>
-    /// Signs an empty signature field with the user's handwritten signature: the image is drawn in the field's box and
-    /// the field, now filled, is removed — one undo step.
-    /// ponytail: a visual signature only; a certificate (PAdES) signature into the field is a separate feature.
+    /// Signs an empty signature field. Handwritten: the image from the library is drawn in the field's box and the
+    /// field, now filled, is removed (one undo step). Digital: a certificate (PAdES) signature fills the field itself.
     /// </summary>
     public async Task SignFieldAsync(PageItemViewModel page, PdfFormWidget field)
     {
-        if (PickSignatureImageAsync is null || await PickSignatureImageAsync() is not { } image) return;
+        if (ChooseAsync is null) return;
+        var how = await ChooseAsync(_loc["Sign.FieldHow"], [_loc["Dialog.Cancel"], _loc["Sign.Handwritten"], _loc["Sign.Digital"]]);
+        if (how == 2)
+        {
+            await SignIntoFieldAsync(field.Name);
+            return;
+        }
+        if (how != 1 || PickSignatureImageAsync is null || await PickSignatureImageAsync() is not { } image) return;
         await EditFieldsAsync(page, async src =>
         {
             var signed = await _annotations.AddImageOverlayAsync(src, page.SourcePageIndex, image, field.Rect);

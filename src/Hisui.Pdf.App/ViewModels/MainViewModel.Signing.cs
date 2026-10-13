@@ -18,7 +18,10 @@ public partial class MainViewModel
     [RelayCommand(CanExecute = nameof(HasDocument))]
     private Task SignInvisibleAsync() => SignCoreAsync(null, chooseField: true);
 
-    private async Task SignCoreAsync(PdfRect? area, bool chooseField = false)
+    /// <summary>Certificate signature into a given empty signature field (from its "Sign here" box).</summary>
+    private Task SignIntoFieldAsync(string fieldName) => SignCoreAsync(null, fieldName: fieldName);
+
+    private async Task SignCoreAsync(PdfRect? area, bool chooseField = false, string? fieldName = null)
     {
         if (_session is null || SelectedPage is null || PromptSignatureAsync is null) return;
         await FlushFieldEditAsync();
@@ -34,7 +37,7 @@ public partial class MainViewModel
         if (broken > 0 && (ChooseAsync is null ||
             await ChooseAsync(_loc.Format("Sign.ExistingWarning", broken), [_loc["Dialog.Cancel"], _loc["Sign.Continue"]]) != 1)) return;
 
-        string? field = null;
+        var field = fieldName;
         if (chooseField && await _signatures.ListEmptySignatureFieldsAsync(current) is { Count: > 0 } empty)
         {
             if (ChooseAsync is null) return;
