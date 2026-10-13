@@ -26,4 +26,16 @@ public sealed record OcrOptions
     /// processed. When false every page is run through OCR regardless of any existing text.
     /// </summary>
     public bool OnlyScannedPages { get; init; } = true;
+
+    /// <summary>
+    /// Maximum number of pages rasterized and recognized concurrently. <c>null</c> (default) picks
+    /// <c>Clamp(ProcessorCount / 2, 1, 4)</c>: OCR is CPU-bound, but every in-flight page holds a ~35 MB
+    /// 300 DPI bitmap plus Tesseract's working set, and half the cores stay free for the UI and for
+    /// Tesseract's own threading. Use <c>1</c> to process pages strictly one after another.
+    /// </summary>
+    public int? MaxDegreeOfParallelism { get; init; }
+
+    /// <summary>The concurrency actually used: <see cref="MaxDegreeOfParallelism"/>, or the default when unset (never below 1).</summary>
+    internal int EffectiveMaxDegreeOfParallelism =>
+        Math.Max(1, MaxDegreeOfParallelism ?? Math.Clamp(Environment.ProcessorCount / 2, 1, 4));
 }

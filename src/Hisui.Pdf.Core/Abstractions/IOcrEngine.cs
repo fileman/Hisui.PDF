@@ -1,4 +1,5 @@
 using Hisui.Pdf.Core.Model;
+using Hisui.Pdf.Core.Services;
 
 namespace Hisui.Pdf.Core.Abstractions;
 
@@ -17,4 +18,18 @@ public interface IOcrEngine
     /// The native engine or the language data is not available.
     /// </exception>
     Task<OcrPageResult> RecognizeAsync(byte[] pageImagePng, int pageIndex, OcrOptions options, CancellationToken ct = default);
+
+    /// <summary>
+    /// Recognizes text in a rasterized page given as raw pixels, skipping the PNG encode/decode round trip.
+    /// Same contract as the PNG overload. The default implementation encodes to PNG and forwards, so
+    /// engines that only understand encoded images keep working; native engines override it.
+    /// </summary>
+    /// <exception cref="OcrUnavailableException">
+    /// The native engine or the language data is not available.
+    /// </exception>
+    Task<OcrPageResult> RecognizeRenderedAsync(RenderedPage page, int pageIndex, OcrOptions options, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        return RecognizeAsync(PdfiumRenderer.EncodePng(page), pageIndex, options, ct);
+    }
 }

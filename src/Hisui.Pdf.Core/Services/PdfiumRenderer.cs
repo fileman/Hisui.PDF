@@ -142,7 +142,7 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IPdfiumDocumentHost, IDispo
         return doc;
     }
 
-    private static byte[] EncodePng(RenderedPage page)
+    internal static byte[] EncodePng(RenderedPage page)
     {
         var info = new SKImageInfo(page.Width, page.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
         using var image = SKImage.FromPixelCopy(info, page.Bgra, page.Stride);
