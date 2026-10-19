@@ -11,6 +11,8 @@
     <PackageVersion Include="PDFtoImage" Version="5.4.0" />
     <!-- OCR for scanned PDFs (Tesseract 5 engine). Apache-2.0; bundles Windows natives,
          uses system libtesseract/libleptonica on Linux/macOS. -->
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="4.153.1" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageVersion Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
   <!-- Windows printing (System.Drawing.Printing): printer enumeration, duplex, page ranges. Used only

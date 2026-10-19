@@ -31,12 +31,13 @@
     <!-- Avalonia.Skia drags in the 3.119 native libSkiaSharp.so while PDFtoImage ships the 4.150 one
          (SkiaSharp.NativeAssets.Linux.NoDependencies); both land at the same path on linux-x64 and the old
          one wins, crashing at startup ("native libSkiaSharp (119.0) is incompatible"). Drop the old assets. -->
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" VersionOverride="3.119.4" ExcludeAssets="all" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" VersionOverride="4.153.1" ExcludeAssets="all" />
     <!-- Windows print path (printer list, duplex, page ranges). Cross-platform builds keep compiling;
          the API is only called behind OperatingSystem.IsWindows() guards. -->
     <PackageReference Include="System.Drawing.Common" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
 
   <ItemGroup>
