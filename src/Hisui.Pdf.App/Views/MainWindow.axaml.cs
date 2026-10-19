@@ -19,12 +19,26 @@ public partial class MainWindow : Window
     private readonly HashSet<DocumentView> _claimed = [];
     private Control? _captionSpacer;
 
+    // Split view: two tabs shown at once. Documents live in the panes (not in TabItem.Content), reachable via TabItem.Tag.
+    private Grid? _splitHost;
+    private Border? _paneA, _paneB;
+    private GridSplitter? _splitter;
+    private TabItem? _splitLeft, _splitRight;
+    private bool _splitStacked;
+
     public MainWindow(IServiceProvider services)
     {
         InitializeComponent();
         _services = services;
-        Tabs.SelectionChanged += (_, _) =>
+        Tabs.SelectionChanged += (_, e) =>
         {
+            if (_splitLeft is not null && Tabs.SelectedItem is TabItem sel && sel != _splitLeft && sel != _splitRight)
+            {
+                // Picking a tab outside the split replaces the pane that was active.
+                var old = e.RemovedItems.OfType<TabItem>().FirstOrDefault();
+                if (old is not null && old == _splitRight) _splitRight = sel; else _splitLeft = sel;
+            }
+            LayoutPanes();
             UpdateWindowTitle();
             (Tabs.SelectedItem as Control)?.BringIntoView();
         };
@@ -32,6 +46,17 @@ public partial class MainWindow : Window
         {
             if (e.NameScope.Find<Control>("PART_NewTab") is Button add) add.Click += (_, _) => OpenInTab();
             _captionSpacer = e.NameScope.Find<Control>("PART_CaptionSpacer");
+            _splitHost = e.NameScope.Find<Grid>("PART_SplitHost");
+            _paneA = e.NameScope.Find<Border>("PART_PaneA");
+            _paneB = e.NameScope.Find<Border>("PART_PaneB");
+            _splitter = e.NameScope.Find<GridSplitter>("PART_Splitter");
+            // Clicking inside a pane makes its document the active one (keyboard shortcuts, title, ribbon).
+            foreach (var pane in new[] { _paneA, _paneB })
+                pane?.AddHandler(PointerPressedEvent, (_, _) =>
+                {
+                    if (pane.Tag is TabItem t && Tabs.SelectedItem != t) Tabs.SelectedItem = t;
+                }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+            LayoutPanes();
             // The wheel scrolls the tab strip sideways when it overflows.
             if (e.NameScope.Find<Control>("PART_TabScroll") is ScrollViewer strip)
                 strip.PointerWheelChanged += (_, w) =>
@@ -70,7 +95,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>The document view of the selected tab.</summary>
-    public DocumentView? CurrentView => (Tabs.SelectedItem as TabItem)?.Content as DocumentView;
+    public DocumentView? CurrentView => ViewOf(Tabs.SelectedItem as TabItem);
+
+    private static DocumentView? ViewOf(TabItem? item) => item?.Tag as DocumentView;
 
     // Context-menu conversions can arrive together (one launch per selected file): ask for save locations one at a time.
     private static readonly SemaphoreSlim ConvertGate = new(1, 1);
@@ -96,10 +123,10 @@ public partial class MainWindow : Window
         var empty = path is null
             ? null
             : Tabs.Items.OfType<TabItem>().OrderBy(t => ReferenceEquals(t, Tabs.SelectedItem) ? 0 : 1)
-                .FirstOrDefault(t => t.Content is DocumentView v && !_claimed.Contains(v)
+                .FirstOrDefault(t => ViewOf(t) is { } v && !_claimed.Contains(v)
                                      && v.DataContext is MainViewModel { IsDocumentLoaded: false, IsBusy: false });
         if (empty is not null) Tabs.SelectedItem = empty;
-        var view = empty?.Content as DocumentView ?? AddTab();
+        var view = ViewOf(empty) ?? AddTab();
         if (path is not null && view.DataContext is MainViewModel vm)
         {
             _claimed.Add(view);
@@ -124,7 +151,7 @@ public partial class MainWindow : Window
 
         var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 180, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis };
         var close = new Button { Content = "✕", Padding = new(5, 2), Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new(0), FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
-        var item = new TabItem { Content = view, Header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { label, close } } };
+        var item = new TabItem { Tag = view, Content = new Border(), Header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { label, close } } };
         close.Click += (_, _) => _ = CloseTabAsync(item);
         var loc = Localization.Localizer.Instance;
         var closeThis = new MenuItem { Header = loc["Tab.Close"], InputGesture = new KeyGesture(Key.W, KeyModifiers.Control) };
@@ -137,7 +164,25 @@ public partial class MainWindow : Window
                 if (!await CloseTabAsync(other)) return;
         };
         closeAll.Click += (_, _) => _ = CloseAllTabsAsync();
-        item.ContextMenu = new ContextMenu { Items = { closeThis, closeOthers, closeAll } };
+        var splitSide = new MenuItem { Header = loc["Tab.SplitSide"] };
+        var splitStacked = new MenuItem { Header = loc["Tab.SplitStacked"] };
+        var splitSwitch = new MenuItem { Header = loc["Tab.SplitSwitch"] };
+        var splitClose = new MenuItem { Header = loc["Tab.SplitClose"] };
+        splitSide.Click += (_, _) => StartSplit(item, stacked: false);
+        splitStacked.Click += (_, _) => StartSplit(item, stacked: true);
+        splitSwitch.Click += (_, _) => { _splitStacked = !_splitStacked; LayoutPanes(); };
+        splitClose.Click += (_, _) => CloseSplit();
+        var menu = new ContextMenu
+        {
+            Items = { closeThis, closeOthers, closeAll, new Separator(), splitSide, splitStacked, splitSwitch, splitClose },
+        };
+        menu.Opening += (_, _) =>
+        {
+            var other = !ReferenceEquals(Tabs.SelectedItem, item); // needs a second tab to show next to the current one
+            splitSide.IsEnabled = splitStacked.IsEnabled = other;
+            splitSwitch.IsEnabled = splitClose.IsEnabled = _splitLeft is not null;
+        };
+        item.ContextMenu = menu;
 
         void Refresh()
         {
@@ -163,7 +208,7 @@ public partial class MainWindow : Window
         if (Tabs.ItemCount == 1 && _services.GetRequiredService<ISettingsService>() is { Settings.ConfirmCloseLastTab: true } settings)
         {
             var loc = Localization.Localizer.Instance;
-            var hasDocument = item.Content is DocumentView { DataContext: MainViewModel { IsDocumentLoaded: true } };
+            var hasDocument = ViewOf(item) is { DataContext: MainViewModel { IsDocumentLoaded: true } };
             string[] choices = hasDocument
                 ? [loc["Dialog.Cancel"], loc["CloseLast.KeepOpen"], loc["CloseLast.Exit"]]
                 : [loc["Dialog.Cancel"], loc["CloseLast.Exit"]];
@@ -179,8 +224,9 @@ public partial class MainWindow : Window
         }
 
         if (!await ConfirmDiscardAsync(item)) return false;
+        if (item == _splitLeft || item == _splitRight) CloseSplit(); // one of the two panes goes away
         Tabs.Items.Remove(item);
-        if (item.Content is DocumentView v) _claimed.Remove(v);
+        if (ViewOf(item) is { } v) _claimed.Remove(v);
         if (Tabs.ItemCount == 0)
         {
             if (keepWindow) AddTab();
@@ -192,7 +238,7 @@ public partial class MainWindow : Window
     /// <summary>Save / Don't save / Cancel for a tab with unsaved changes. True when the tab may close.</summary>
     private async Task<bool> ConfirmDiscardAsync(TabItem item)
     {
-        if (item.Content is not DocumentView { DataContext: MainViewModel vm }) return true;
+        if (ViewOf(item) is not { DataContext: MainViewModel vm }) return true;
         await vm.FlushFieldEditAsync();
         if (!vm.HasUnsavedChanges) return true;
 
@@ -227,10 +273,78 @@ public partial class MainWindow : Window
         foreach (var tab in Tabs.Items.OfType<TabItem>().ToList())
         {
             if (!await ConfirmDiscardAsync(tab)) return;
+            if (tab == _splitLeft || tab == _splitRight) CloseSplit();
             Tabs.Items.Remove(tab);
-            if (tab.Content is DocumentView v) _claimed.Remove(v);
+            if (ViewOf(tab) is { } v) _claimed.Remove(v);
         }
         AddTab();
+    }
+
+    /// <summary>Shows <paramref name="other"/> next to the current tab (or replaces the inactive pane when already split).</summary>
+    private void StartSplit(TabItem other, bool stacked)
+    {
+        if (Tabs.SelectedItem is not TabItem current || current == other) return;
+        _splitStacked = stacked;
+        if (_splitLeft is null) { _splitLeft = current; _splitRight = other; }
+        else if (current == _splitRight) _splitLeft = other;
+        else _splitRight = other;
+        LayoutPanes();
+    }
+
+    private void CloseSplit()
+    {
+        _splitLeft = _splitRight = null;
+        LayoutPanes();
+    }
+
+    /// <summary>(Re)hosts the documents: the selected one alone, or the two split tabs in the chosen arrangement.</summary>
+    private void LayoutPanes()
+    {
+        if (_splitHost is null || _paneA is null || _paneB is null || _splitter is null) return;
+
+        _paneA.Child = null; // detach first: a control can only have one visual parent
+        _paneB.Child = null;
+
+        var split = _splitLeft is not null && _splitRight is not null;
+        var first = split ? _splitLeft : Tabs.SelectedItem as TabItem;
+        _paneA.Child = ViewOf(first);
+        _paneA.Tag = first;
+        _paneB.Child = split ? ViewOf(_splitRight) : null;
+        _paneB.Tag = split ? _splitRight : null;
+        _paneB.IsVisible = _splitter.IsVisible = split;
+
+        _splitHost.ColumnDefinitions.Clear();
+        _splitHost.RowDefinitions.Clear();
+        if (!split)
+        {
+            Grid.SetRow(_paneA, 0); Grid.SetColumn(_paneA, 0);
+        }
+        else if (_splitStacked)
+        {
+            _splitHost.RowDefinitions.Add(new RowDefinition(1, GridUnitType.Star) { MinHeight = 160 });
+            _splitHost.RowDefinitions.Add(new RowDefinition(5, GridUnitType.Pixel));
+            _splitHost.RowDefinitions.Add(new RowDefinition(1, GridUnitType.Star) { MinHeight = 160 });
+            Grid.SetRow(_paneA, 0); Grid.SetColumn(_paneA, 0);
+            Grid.SetRow(_splitter, 1); Grid.SetColumn(_splitter, 0);
+            Grid.SetRow(_paneB, 2); Grid.SetColumn(_paneB, 0);
+            _splitter.ResizeDirection = GridResizeDirection.Rows;
+        }
+        else
+        {
+            _splitHost.ColumnDefinitions.Add(new ColumnDefinition(1, GridUnitType.Star) { MinWidth = 320 });
+            _splitHost.ColumnDefinitions.Add(new ColumnDefinition(5, GridUnitType.Pixel));
+            _splitHost.ColumnDefinitions.Add(new ColumnDefinition(1, GridUnitType.Star) { MinWidth = 320 });
+            Grid.SetRow(_paneA, 0); Grid.SetColumn(_paneA, 0);
+            Grid.SetRow(_splitter, 0); Grid.SetColumn(_splitter, 1);
+            Grid.SetRow(_paneB, 0); Grid.SetColumn(_paneB, 2);
+            _splitter.ResizeDirection = GridResizeDirection.Columns;
+        }
+
+        // Accent outline on the active pane so it is clear which document the shortcuts act on.
+        var accent = this.TryFindResource("RibbonAccentBrush", ActualThemeVariant, out var b) && b is Avalonia.Media.IBrush br
+            ? br : Avalonia.Media.Brushes.DodgerBlue;
+        _paneA.BorderBrush = split && Tabs.SelectedItem == _splitLeft ? accent : Avalonia.Media.Brushes.Transparent;
+        _paneB.BorderBrush = split && Tabs.SelectedItem == _splitRight ? accent : Avalonia.Media.Brushes.Transparent;
     }
 
     private void UpdateWindowTitle() =>

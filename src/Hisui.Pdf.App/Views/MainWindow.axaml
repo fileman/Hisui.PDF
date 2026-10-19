@@ -98,9 +98,16 @@
                         <Border Name="PART_CaptionSpacer" Grid.Column="2" Width="140"
                                 IsVisible="{Binding $parent[Window].IsExtendedIntoWindowDecorations}" />
                     </Grid>
-                    <ContentPresenter Name="PART_SelectedContentHost"
+                    <!-- Required by TabControl; unused: documents are hosted in the panes below so two can show at once. -->
+                    <ContentPresenter Name="PART_SelectedContentHost" IsVisible="False"
                                       Content="{TemplateBinding SelectedContent}"
                                       ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+                    <!-- Split host: one pane normally; two (side by side or stacked) in split view. -->
+                    <Grid Name="PART_SplitHost">
+                        <Border Name="PART_PaneA" BorderThickness="2" BorderBrush="Transparent" />
+                        <GridSplitter Name="PART_Splitter" IsVisible="False" Background="{DynamicResource RibbonDividerBrush}" />
+                        <Border Name="PART_PaneB" IsVisible="False" BorderThickness="2" BorderBrush="Transparent" />
+                    </Grid>
                 </DockPanel>
             </ControlTemplate>
         </TabControl.Template>
