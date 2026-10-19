@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private GridSplitter? _splitter;
     private TabItem? _splitLeft, _splitRight;
     private bool _splitStacked;
+    private TabItem? _previousTab; // tab selected before the current one (right-click selects the clicked tab first)
 
     public MainWindow(IServiceProvider services)
     {
@@ -32,6 +33,7 @@ public partial class MainWindow : Window
         _services = services;
         Tabs.SelectionChanged += (_, e) =>
         {
+            if (e.RemovedItems.OfType<TabItem>().FirstOrDefault() is { } prev && Tabs.Items.Contains(prev)) _previousTab = prev;
             if (_splitLeft is not null && Tabs.SelectedItem is TabItem sel && sel != _splitLeft && sel != _splitRight)
             {
                 // Picking a tab outside the split replaces the pane that was active.
@@ -178,8 +180,7 @@ public partial class MainWindow : Window
         };
         menu.Opening += (_, _) =>
         {
-            var other = !ReferenceEquals(Tabs.SelectedItem, item); // needs a second tab to show next to the current one
-            splitSide.IsEnabled = splitStacked.IsEnabled = other;
+            splitSide.IsEnabled = splitStacked.IsEnabled = Tabs.ItemCount > 1;
             splitSwitch.IsEnabled = splitClose.IsEnabled = _splitLeft is not null;
         };
         item.ContextMenu = menu;
@@ -283,7 +284,10 @@ public partial class MainWindow : Window
     /// <summary>Shows <paramref name="other"/> next to the current tab (or replaces the inactive pane when already split).</summary>
     private void StartSplit(TabItem other, bool stacked)
     {
-        if (Tabs.SelectedItem is not TabItem current || current == other) return;
+        if (Tabs.SelectedItem is not TabItem current) return;
+        if (current == other) // right-click selected the clicked tab: pair it with the one used before, else any other
+            other = (_previousTab is { } p && Tabs.Items.Contains(p) ? p : null) ?? Tabs.Items.OfType<TabItem>().FirstOrDefault(t => t != current)!;
+        if (other is null || current == other) return;
         _splitStacked = stacked;
         if (_splitLeft is null) { _splitLeft = current; _splitRight = other; }
         else if (current == _splitRight) _splitLeft = other;
