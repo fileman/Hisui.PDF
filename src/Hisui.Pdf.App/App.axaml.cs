@@ -63,7 +63,7 @@ public partial class App : Application
 
             var window = _host.Services.GetRequiredService<MainWindow>();
             desktop.MainWindow = window;
-            desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnMainWindowClose; // detached windows are closed (after prompts) with it
+            desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnLastWindowClose; // windows are peers; exit with the last one
 
             // Silent startup check (first window only); only prompts if a newer, non-skipped release exists.
             if (settings.Settings.CheckForUpdates)

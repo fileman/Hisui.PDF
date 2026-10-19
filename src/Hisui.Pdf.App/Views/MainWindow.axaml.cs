@@ -26,14 +26,21 @@ public partial class MainWindow : Window
     private TabItem? _splitLeft, _splitRight;
     private bool _splitStacked;
 
-    // Windows: the first one is the main window (closing it exits the app); tabs can be moved between windows.
+    // Windows are peers: tabs can be moved between them and the app exits when the last one closes.
     private static readonly List<MainWindow> Open = [];
     private readonly Dictionary<TabItem, PropertyChangedEventHandler> _hooks = [];
 
     /// <summary>The window the user is working in (falls back to the main window).</summary>
     public static MainWindow? Active => Open.FirstOrDefault(w => w.IsActive) ?? Open.FirstOrDefault();
 
-    private bool IsMain => Open.Count > 0 && ReferenceEquals(this, Open[0]);
+    /// <summary>Exit: asks about unsaved changes in every window, then closes them all.</summary>
+    public static async Task ExitAsync()
+    {
+        var all = Open.ToList();
+        foreach (var w in all)
+            if (!await w.ConfirmAllAsync()) return;
+        foreach (var w in all) { w._closeConfirmed = true; w.Close(); }
+    }
     private TabItem? _previousTab; // tab selected before the current one (right-click selects the clicked tab first)
 
     public MainWindow(IServiceProvider services)
@@ -218,9 +225,8 @@ public partial class MainWindow : Window
         var splitSwitch = new MenuItem { Header = loc["Tab.SplitSwitch"] };
         var splitClose = new MenuItem { Header = loc["Tab.SplitClose"] };
         var moveNew = new MenuItem { Header = loc["Tab.MoveNewWindow"] };
-        var moveMain = new MenuItem { Header = loc["Tab.MoveMainWindow"] };
+        var moveOther = new MenuItem { Header = loc["Tab.MoveToWindow"] };
         moveNew.Click += (_, _) => MoveTab(item, null);
-        moveMain.Click += (_, _) => { if (Open.Count > 0) MoveTab(item, Open[0]); };
         splitSide.Click += (_, _) => StartSplit(item, stacked: false);
         splitStacked.Click += (_, _) => StartSplit(item, stacked: true);
         splitSwitch.Click += (_, _) => { _splitStacked = !_splitStacked; LayoutPanes(); };
@@ -228,14 +234,22 @@ public partial class MainWindow : Window
         var menu = new ContextMenu
         {
             Items = { closeThis, closeOthers, closeAll, new Separator(), splitSide, splitStacked, splitSwitch, splitClose,
-                      new Separator(), moveNew, moveMain },
+                      new Separator(), moveNew, moveOther },
         };
         menu.Opening += (_, _) =>
         {
             splitSide.IsEnabled = splitStacked.IsEnabled = Tabs.ItemCount > 1;
             splitSwitch.IsEnabled = splitClose.IsEnabled = _splitLeft is not null;
             moveNew.IsEnabled = Tabs.ItemCount > 1;
-            moveMain.IsVisible = !IsMain;
+            moveOther.Items.Clear();
+            foreach (var w in Open.Where(w => !ReferenceEquals(w, this)))
+            {
+                var target = w;
+                var entry = new MenuItem { Header = target.Title };
+                entry.Click += (_, _) => MoveTab(item, target);
+                moveOther.Items.Add(entry);
+            }
+            moveOther.IsVisible = moveOther.Items.Count > 0;
         };
         item.ContextMenu = menu;
 
@@ -262,7 +276,7 @@ public partial class MainWindow : Window
     private async Task<bool> CloseTabAsync(TabItem item)
     {
         var keepWindow = false;
-        if (Tabs.ItemCount == 1 && _services.GetRequiredService<ISettingsService>() is { Settings.ConfirmCloseLastTab: true } settings)
+        if (Tabs.ItemCount == 1 && Open.Count == 1 && _services.GetRequiredService<ISettingsService>() is { Settings.ConfirmCloseLastTab: true } settings)
         {
             var loc = Localization.Localizer.Instance;
             var hasDocument = ViewOf(item) is { DataContext: MainViewModel { IsDocumentLoaded: true } };
@@ -318,12 +332,7 @@ public partial class MainWindow : Window
     {
         if (_closeConfirmed) return;
         e.Cancel = true;
-        // Closing the main window exits the app, so every other window gets its unsaved-changes prompts first.
-        var others = IsMain ? Open.Skip(1).ToList() : [];
-        foreach (var w in others)
-            if (!await w.ConfirmAllAsync()) return;
         if (!await ConfirmAllAsync()) return;
-        foreach (var w in others) { w._closeConfirmed = true; w.Close(); }
         _closeConfirmed = true;
         Close();
     }

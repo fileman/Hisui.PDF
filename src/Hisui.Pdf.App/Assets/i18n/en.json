@@ -21,7 +21,7 @@
   "Tab.SplitSwitch": "Switch side by side / stacked",
   "Tab.SplitClose": "Close split view",
   "Tab.MoveNewWindow": "Move to new window",
-  "Tab.MoveMainWindow": "Move to main window",
+  "Tab.MoveToWindow": "Move to window",
   "Ribbon.FilePill.Tooltip": "Open, save, print, recent, preferences",
   "Cmd.Open": "Open",
   "Cmd.Open.Tooltip": "Open a PDF",
