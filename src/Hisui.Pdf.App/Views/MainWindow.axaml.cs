@@ -310,6 +310,8 @@ public partial class MainWindow : Window
         _paneB.Child = null;
 
         var split = _splitLeft is not null && _splitRight is not null;
+        if (split && Tabs.Items.IndexOf(_splitLeft) > Tabs.Items.IndexOf(_splitRight))
+            (_splitLeft, _splitRight) = (_splitRight, _splitLeft); // pane order follows tab order
         var first = split ? _splitLeft : Tabs.SelectedItem as TabItem;
         _paneA.Child = ViewOf(first);
         _paneA.Tag = first;
@@ -319,9 +321,10 @@ public partial class MainWindow : Window
 
         _splitHost.ColumnDefinitions.Clear();
         _splitHost.RowDefinitions.Clear();
+        // Reset placement first: stale row/column indices from the previous layout would overflow the cleared definitions.
+        foreach (var c in new Control[] { _paneA, _splitter, _paneB }) { Grid.SetRow(c, 0); Grid.SetColumn(c, 0); }
         if (!split)
         {
-            Grid.SetRow(_paneA, 0); Grid.SetColumn(_paneA, 0);
         }
         else if (_splitStacked)
         {
