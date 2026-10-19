@@ -639,6 +639,7 @@ public partial class MainViewModel : ObservableObject
         foreach (var path in _settings.Settings.RecentFiles)
             RecentFiles.Add(new RecentFileEntry(path));
         OnPropertyChanged(nameof(HasRecentFiles));
+        WindowsJumpList.Update(_settings.Settings.RecentFiles, _loc["Menu.Recent"]);
     }
 
     private void Renumber()
