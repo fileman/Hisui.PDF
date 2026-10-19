@@ -586,8 +586,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private static void Exit()
     {
-        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lt)
-            lt.MainWindow?.Close(); // through the window's unsaved-changes prompt
+        _ = Views.MainWindow.ExitAsync(); // every window, through its unsaved-changes prompt
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

@@ -468,5 +468,5 @@ public partial class MainViewModel
     private static Avalonia.Controls.Window? GetMainWindow() =>
         Avalonia.Application.Current?.ApplicationLifetime is
             Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime lt
-            ? lt.MainWindow : null;
+            ? Views.MainWindow.Active ?? lt.MainWindow : null;
 }
