@@ -27,6 +27,11 @@ public sealed class PdfDocumentSession
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
+    /// <summary>Identifies the current content: changes with every edit, and returns to an earlier value when undo or
+    /// redo returns to that state. Compare with a value remembered at save time to know whether there are unsaved changes.</summary>
+    public long Version { get; private set; }
+    private long _lastVersion;
+
     /// <summary>Registers a source document and appends all of its pages. Returns the new source id.</summary>
     public int AddSource(byte[] pdfBytes, int pageCount)
     {
@@ -34,12 +39,25 @@ public sealed class PdfDocumentSession
         ArgumentOutOfRangeException.ThrowIfNegative(pageCount);
 
         Snapshot();
+        Touch();
         var id = _nextSourceId++;
         _sources[id] = pdfBytes;
         _sourcePageCounts[id] = pageCount;
         for (var i = 0; i < pageCount; i++)
             _pages.Add(new PdfPageRef(id, i));
         return id;
+    }
+
+    /// <summary>The bytes of the only source when the pages are exactly its own, in order and unrotated (so the working
+    /// document is that file as is); null otherwise. Signing appends to these bytes instead of rebuilding the file.</summary>
+    public byte[]? UnchangedSingleSource()
+    {
+        if (_sources.Count != 1 || _pages.Count == 0) return null;
+        var (id, bytes) = _sources.First();
+        if (_pages.Count != _sourcePageCounts[id]) return null;
+        for (var i = 0; i < _pages.Count; i++)
+            if (_pages[i].SourceDocumentId != id || _pages[i].SourcePageIndex != i || _pages[i].Rotation != PageRotation.None) return null;
+        return bytes;
     }
 
     /// <summary>Bytes of a source document previously registered with <see cref="AddSource"/>.</summary>
@@ -56,6 +74,7 @@ public sealed class PdfDocumentSession
         if (!_sources.ContainsKey(sourceDocumentId))
             throw new KeyNotFoundException($"Source {sourceDocumentId} not found.");
         Snapshot();
+        Touch();
         _sources[sourceDocumentId] = newBytes;
     }
 
@@ -71,6 +90,7 @@ public sealed class PdfDocumentSession
     public void Move(int fromIndex, int toIndex)
     {
         Snapshot();
+        Touch();
         var item = _pages[fromIndex];
         _pages.RemoveAt(fromIndex);
         _pages.Insert(toIndex, item);
@@ -80,6 +100,7 @@ public sealed class PdfDocumentSession
     public void RemoveAt(params IReadOnlyList<int> indices)
     {
         Snapshot();
+        Touch();
         foreach (var i in indices.Distinct().OrderByDescending(x => x))
             _pages.RemoveAt(i);
     }
@@ -88,6 +109,7 @@ public sealed class PdfDocumentSession
     public void Rotate(int index, PageRotation delta)
     {
         Snapshot();
+        Touch();
         _pages[index].Rotation = Combine(_pages[index].Rotation, delta);
     }
 
@@ -95,6 +117,7 @@ public sealed class PdfDocumentSession
     public void Reorder(IReadOnlyList<int> newOrder)
     {
         Snapshot();
+        Touch();
         var reordered = newOrder.Select(i => _pages[i]).ToList();
         _pages.Clear();
         _pages.AddRange(reordered);
@@ -128,10 +151,13 @@ public sealed class PdfDocumentSession
         _redo.Clear();
     }
 
+    // Every mutation (including the coalesced ones inside a transaction) gets a fresh version.
+    private void Touch() => Version = ++_lastVersion;
+
     // A snapshot captures the page list and the source map together. The page refs are cloned (they
     // are mutable — see Rotate); the source map is a shallow copy, which is enough because source
     // bytes are immutable (UpdateSource swaps the reference, never edits the array in place).
-    private HistoryState Capture() => new(Clone(_pages), new Dictionary<int, byte[]>(_sources));
+    private HistoryState Capture() => new(Clone(_pages), new Dictionary<int, byte[]>(_sources), Version);
 
     private void Restore(HistoryState state)
     {
@@ -140,6 +166,7 @@ public sealed class PdfDocumentSession
         _sources.Clear();
         foreach (var (id, bytes) in state.Sources)
             _sources[id] = bytes;
+        Version = state.Version;
     }
 
     private static List<PdfPageRef> Clone(IEnumerable<PdfPageRef> pages) =>
@@ -148,7 +175,7 @@ public sealed class PdfDocumentSession
     private static PageRotation Combine(PageRotation current, PageRotation delta) =>
         (PageRotation)(((int)current + (int)delta + 360) % 360);
 
-    private sealed record HistoryState(List<PdfPageRef> Pages, Dictionary<int, byte[]> Sources);
+    private sealed record HistoryState(List<PdfPageRef> Pages, Dictionary<int, byte[]> Sources, long Version);
 
     private sealed class Transaction : IDisposable
     {

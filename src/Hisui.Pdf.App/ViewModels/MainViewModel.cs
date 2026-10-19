@@ -27,11 +27,22 @@ public partial class MainViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly ISettingsService _settings;
     private readonly IPdfAnnotationService _annotations;
+    private readonly IPdfFormService _forms;
+    private readonly IPdfFormDetector _formDetector;
+    private readonly IPdfCommentService _commentService;
+    private readonly IPdfNavigationService _navigation;
+    private readonly IPdfCompareService _compare;
+    private readonly IPdfRedactionService _redaction;
+    private readonly IPdfConformanceService _conformance;
+    private readonly IPdfSignatureService _signatures;
+    private readonly IPdfOfficeExporter _office;
+    private readonly IOcrLanguageStore _ocrLanguages;
     private readonly IPdfTextEditService _textEdit;
     private readonly IPdfTextExtractor _textExtractor;
     private readonly IPdfOcrService _ocr;
     private readonly IPdfOptimizer _optimizer;
     private readonly IPdfImageExtractor _imageExtractor;
+    private readonly IPdfWordExporter _wordExporter;
     private readonly IPdfMetadataService _metadata;
     private readonly IPdfSecurityService _security;
     private readonly IPrintService _print;
@@ -40,6 +51,7 @@ public partial class MainViewModel : ObservableObject
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
     private readonly Dictionary<(int Source, int Page), IImage> _previewCache = [];
+    private readonly HashSet<(int Source, int Page)> _renderingPreviews = [];
 
     private PdfDocumentSession? _session;
     private CancellationTokenSource? _cts;
@@ -50,11 +62,22 @@ public partial class MainViewModel : ObservableObject
         IFileDialogService dialogs,
         ISettingsService settings,
         IPdfAnnotationService annotations,
+        IPdfFormService forms,
+        IPdfFormDetector formDetector,
+        IPdfCommentService commentService,
+        IPdfNavigationService navigation,
+        IPdfCompareService compare,
+        IPdfRedactionService redaction,
+        IPdfConformanceService conformance,
+        IPdfSignatureService signatures,
+        IPdfOfficeExporter office,
+        IOcrLanguageStore ocrLanguages,
         IPdfTextEditService textEdit,
         IPdfTextExtractor textExtractor,
         IPdfOcrService ocr,
         IPdfOptimizer optimizer,
         IPdfImageExtractor imageExtractor,
+        IPdfWordExporter wordExporter,
         IPdfMetadataService metadata,
         IPdfSecurityService security,
         IPrintService print,
@@ -65,12 +88,25 @@ public partial class MainViewModel : ObservableObject
         _renderer = renderer;
         _dialogs = dialogs;
         _settings = settings;
+        _isContinuousView = settings.Settings.ContinuousScroll;
+        _alignToLast = settings.Settings.AlignToLastSelected;
         _annotations = annotations;
+        _forms = forms;
+        _formDetector = formDetector;
+        _commentService = commentService;
+        _navigation = navigation;
+        _compare = compare;
+        _redaction = redaction;
+        _conformance = conformance;
+        _signatures = signatures;
+        _office = office;
+        _ocrLanguages = ocrLanguages;
         _textEdit = textEdit;
         _textExtractor = textExtractor;
         _ocr = ocr;
         _optimizer = optimizer;
         _imageExtractor = imageExtractor;
+        _wordExporter = wordExporter;
         _metadata = metadata;
         _security = security;
         _print = print;
@@ -90,11 +126,10 @@ public partial class MainViewModel : ObservableObject
         };
 
         Pages.CollectionChanged += (_, _) => { RaisePageInfoChanged(); InvalidateSearch(); };
-        RefreshRecentFilesMenu();
+        RefreshRecentFiles();
     }
 
     public ObservableCollection<PageItemViewModel> Pages { get; } = [];
-    public ObservableCollection<RecentFileEntry> RecentFiles { get; } = [];
 
     [ObservableProperty] private string _title = "Hisui PDF";
     [ObservableProperty] private string _statusMessage = "Pronto";
@@ -106,8 +141,6 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>True while a file is being dragged over the window — drives the drop-target highlight.</summary>
     [ObservableProperty] private bool _isDragOver;
-
-    public bool HasRecentFiles => RecentFiles.Count > 0;
 
     private bool HasDocument => _session is not null && Pages.Count > 0;
 
@@ -132,9 +165,10 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenAsync()
     {
-        var path = await _dialogs.OpenPdfAsync();
-        if (path is null) return;
-        await OpenPathAsync(path);
+        var paths = await _dialogs.OpenPdfsAsync();
+        if (paths.Count == 0) return;
+        await OpenPathAsync(paths[0]);
+        foreach (var extra in paths.Skip(1)) _windows.OpenWindow(extra); // one window per additional file
     }
 
     /// <summary>Opens a new, empty document window (multi-window).</summary>
@@ -145,25 +179,8 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenInNewWindowAsync()
     {
-        var path = await _dialogs.OpenPdfAsync();
-        if (path is null) return;
-        _windows.OpenWindow(path);
-    }
-
-    [RelayCommand]
-    private async Task OpenRecentAsync(string path)
-    {
-        if (!File.Exists(path))
-        {
-            var stale = RecentFiles.FirstOrDefault(r => r.FullPath == path);
-            if (stale is not null) RecentFiles.Remove(stale);
-            _settings.Settings.RecentFiles.Remove(path);
-            _settings.Save();
-            OnPropertyChanged(nameof(HasRecentFiles));
-            StatusMessage = _loc["Status.FileNotFound"];
-            return;
-        }
-        await OpenPathAsync(path);
+        foreach (var path in await _dialogs.OpenPdfsAsync())
+            _windows.OpenWindow(path);
     }
 
     /// <summary>Opens a specific file. Used by the Open command, command-line args and drag-drop.</summary>
@@ -179,14 +196,16 @@ public partial class MainViewModel : ObservableObject
 
             _session = new PdfDocumentSession();
             _session.AddSource(bytes, count);
+            _savedVersion = _session.Version;
             _thumbCache.Clear();
             _previewCache.Clear();
 
             SyncPagesFromSession();
             SetOpenedFromEncrypted(wasEncrypted); // enables "remove password" only for once-encrypted files
+            _currentPath = path; // before Title: the tab tooltip reads it when Title changes
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
             _settings.AddRecentFile(path);
-            RefreshRecentFilesMenu();
+            RefreshRecentFiles();
             await RenderThumbnailsAsync(ct);
             SelectedPage = Pages.FirstOrDefault();
         });
@@ -224,20 +243,76 @@ public partial class MainViewModel : ObservableObject
         await AddExistingPathAsync(path);
     }
 
+    /// <summary>Path of the file the document was opened from or last saved to; null for a new/merged document.</summary>
+    private string? _currentPath;
+
+    /// <summary>Full path of the open file (null for a new/merged document).</summary>
+    public string? CurrentPath => _currentPath;
+
+    /// <summary>Saves over the current file. Falls back to Save As when there is no file yet, or when the
+    /// original was password-protected (overwriting it would silently strip the protection).</summary>
+    [RelayCommand(CanExecute = nameof(HasDocument))]
+    private async Task SaveAsync()
+    {
+        if (!HasDocument) return;
+        if (_currentPath is null || _openedFromEncrypted)
+        {
+            await SaveAsAsync();
+            return;
+        }
+        await SaveToAsync(_currentPath);
+    }
+
     [RelayCommand(CanExecute = nameof(HasDocument))]
     private async Task SaveAsAsync()
     {
         if (!HasDocument) return;
 
-        var path = await _dialogs.SavePdfAsync("documento.pdf");
+        var path = await _dialogs.SavePdfAsync(_currentPath is null ? "documento.pdf" : Path.GetFileName(_currentPath));
         if (path is null) return;
+        await SaveToAsync(path);
+    }
 
+    private async Task SaveToAsync(string path)
+    {
         await RunBusyAsync(_loc["Status.Saving"], async ct =>
         {
             var bytes = await _pageService.BuildFromSessionAsync(_session!, ct);
-            await Task.Run(() => File.WriteAllBytes(path, bytes), ct);
+            // Write beside the target and swap, so a failure mid-write never leaves a truncated original.
+            await Task.Run(() =>
+            {
+                var temp = path + ".tmp";
+                try
+                {
+                    File.WriteAllBytes(temp, bytes);
+                    File.Move(temp, path, overwrite: true);
+                }
+                finally
+                {
+                    if (File.Exists(temp)) File.Delete(temp);
+                }
+            }, ct);
+
+            _currentPath = path;
+            Title = $"Hisui PDF — {Path.GetFileName(path)}";
+            _savedVersion = _session!.Version;
+            OnPropertyChanged(nameof(HasUnsavedChanges));
             StatusMessage = _loc.Format("Status.Saved", Path.GetFileName(path));
         });
+    }
+
+    private long _savedVersion;
+
+    /// <summary>Edits made since the document was opened or last saved (undoing back to that point clears it).</summary>
+    public bool HasUnsavedChanges => _session is not null && (_session.Version != _savedVersion || _pendingFieldEdit is not null);
+
+    /// <summary>Saves for a close prompt; true when nothing unsaved is left (false: Save As cancelled or failed).</summary>
+    public async Task<bool> SaveBeforeCloseAsync()
+    {
+        await FlushFieldEditAsync();
+        if (!HasUnsavedChanges) return true;
+        await SaveCommand.ExecuteAsync(null);
+        return !HasUnsavedChanges;
     }
 
     [RelayCommand(CanExecute = nameof(CanEditSelected))]
@@ -377,7 +452,7 @@ public partial class MainViewModel : ObservableObject
 
             try
             {
-                var searchable = await _ocr.MakeSearchableAsync(current, options: null, ct);
+                var searchable = await _ocr.MakeSearchableAsync(current, CurrentOcrOptions(), ct);
                 await Task.Run(() => File.WriteAllBytes(path, searchable), ct);
                 StatusMessage = _loc.Format("Status.OcrSaved", scanned.Count, Path.GetFileName(path));
             }
@@ -512,7 +587,7 @@ public partial class MainViewModel : ObservableObject
     private static void Exit()
     {
         if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lt)
-            lt.Shutdown();
+            lt.MainWindow?.Close(); // through the window's unsaved-changes prompt
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -571,6 +646,7 @@ public partial class MainViewModel : ObservableObject
             };
             if (_thumbCache.TryGetValue((pageRef.SourceDocumentId, pageRef.SourcePageIndex), out var thumb))
                 item.Thumbnail = thumb;
+            PreparePage(item);
             Pages.Add(item);
         }
 
@@ -593,13 +669,57 @@ public partial class MainViewModel : ObservableObject
             if (!_thumbCache.TryGetValue(key, out var thumb))
             {
                 var source = _session.GetSource(item.SourceDocumentId);
-                var png = await _renderer.RenderPageToPngAsync(source, item.SourcePageIndex, ThumbnailDpi, ct);
-                thumb = BitmapConversions.ToFrozenBitmap(png);
+                var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, ThumbnailDpi, ct);
+                thumb = BitmapConversions.ToFrozenBitmap(page);
                 _thumbCache[key] = thumb;
             }
 
             item.Thumbnail = thumb;
+            PreparePage(item);
         }
+    }
+
+    /// <summary>Gives a page its continuous-view size: the cached render's, else estimated from the thumbnail.</summary>
+    private void PreparePage(PageItemViewModel item)
+    {
+        item.SetZoom(ZoomLevel);
+        if (_previewCache.TryGetValue((item.SourceDocumentId, item.SourcePageIndex), out var preview))
+        {
+            item.Preview = preview;
+            item.SetBaseSize(preview.Size);
+            return;
+        }
+        var scale = (double)_settings.Settings.PreviewDpi / ThumbnailDpi;
+        item.SetBaseSize(item.Thumbnail is { } t
+            ? new Avalonia.Size(t.Size.Width * scale, t.Size.Height * scale)
+            : new Avalonia.Size(8.27 * _settings.Settings.PreviewDpi, 11.69 * _settings.Settings.PreviewDpi)); // A4
+    }
+
+    /// <summary>Renders <paramref name="item"/>'s full-size preview for continuous view (shared cache with the single-page preview).</summary>
+    public async void EnsurePagePreview(PageItemViewModel item)
+    {
+        if (_session is null) return;
+        var key = (item.SourceDocumentId, item.SourcePageIndex);
+        _ = LoadFieldsAsync(item);
+        if (_previewCache.TryGetValue(key, out var cached))
+        {
+            if (!ReferenceEquals(item.Preview, cached)) { item.Preview = cached; item.SetBaseSize(cached.Size); }
+            return;
+        }
+        if (!_renderingPreviews.Add(key)) return;
+        try
+        {
+            var page = await _renderer.RenderPageAsync(_session.GetSource(item.SourceDocumentId), item.SourcePageIndex, _settings.Settings.PreviewDpi);
+            var preview = BitmapConversions.ToFrozenBitmap(page);
+            _previewCache[key] = preview;
+            item.Preview = preview;
+            item.SetBaseSize(preview.Size);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = _loc.Format("Status.RenderError", ex.Message);
+        }
+        finally { _renderingPreviews.Remove(key); }
     }
 
     private async Task UpdatePreviewAsync(PageItemViewModel? item)
@@ -619,8 +739,8 @@ public partial class MainViewModel : ObservableObject
             {
                 var source = _session.GetSource(item.SourceDocumentId);
                 var previewDpi = _settings.Settings.PreviewDpi;
-                var png = await _renderer.RenderPageToPngAsync(source, item.SourcePageIndex, previewDpi);
-                preview = BitmapConversions.ToFrozenBitmap(png);
+                var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, previewDpi);
+                preview = BitmapConversions.ToFrozenBitmap(page);
                 _previewCache[key] = preview;
             }
             catch (Exception ex)
@@ -631,15 +751,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         PreviewImage = preview;
-    }
-
-    private void RefreshRecentFilesMenu()
-    {
-        RecentFiles.Clear();
-        foreach (var path in _settings.Settings.RecentFiles)
-            RecentFiles.Add(new RecentFileEntry(path));
-        OnPropertyChanged(nameof(HasRecentFiles));
-        WindowsJumpList.Update(_settings.Settings.RecentFiles, _loc["Menu.Recent"]);
+        await LoadFieldsAsync(item);
     }
 
     private void Renumber()
@@ -656,6 +768,7 @@ public partial class MainViewModel : ObservableObject
         // Guard against re-entrancy: a second operation starting mid-await would clobber the shared
         // _cts (making Cancel target the wrong op) and reset IsBusy while the first is still running.
         if (IsBusy) return;
+        await FlushFieldEditAsync(); // field text still being typed is part of this operation's input
 
         using var cts = new CancellationTokenSource();
         _cts = cts;

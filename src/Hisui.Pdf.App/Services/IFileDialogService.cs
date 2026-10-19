@@ -4,7 +4,12 @@ namespace Hisui.Pdf.App.Services;
 public interface IFileDialogService
 {
     Task<string?> OpenPdfAsync();
+    Task<IReadOnlyList<string>> OpenPdfsAsync();
     Task<string?> SavePdfAsync(string suggestedFileName);
     Task<string?> PickFolderAsync();
+    /// <summary>Save-file picker for a non-PDF export (e.g. ".docx"); null if cancelled.</summary>
+    Task<string?> SaveFileAsync(string suggestedFileName, string extension, string typeName);
     Task<string?> OpenImageAsync();
+    /// <summary>Open-file picker for one of <paramref name="patterns"/> (e.g. "*.xfdf"); null if cancelled.</summary>
+    Task<string?> OpenFileAsync(string typeName, params string[] patterns);
 }

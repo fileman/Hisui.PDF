@@ -40,7 +40,9 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentGroupRef Id="LicenseFiles" />
       <ComponentGroupRef Id="TessdataFiles" />
+      <ComponentRef Id="PdfDocumentIcon" />
       <ComponentRef Id="OpenWithPdf" />
+      <ComponentRef Id="ContextMenuPdf" />
       <ComponentRef Id="StartMenuShortcut" />
     </Feature>
 
@@ -69,13 +71,40 @@
   </Fragment>
 
   <!-- ─── "Open with" entry for .pdf (does not take over the default app) ─ -->
+  <!-- Once the user makes Hisui PDF the default app for .pdf, Explorer shows the ProgId's DefaultIcon on every
+       PDF: a document icon (red PDF label, original artwork) rather than the app logo. The Capabilities +
+       RegisteredApplications values list Hisui PDF in Settings > Default apps. -->
   <Fragment>
+    <!-- The icon is a component of its own: WiX cannot derive a GUID for one holding both a file and registry values. -->
+    <Component Id="PdfDocumentIcon" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="PdfDocumentIco" Source="..\Hisui.Pdf.App\Assets\filetype\PdfDocument.ico" KeyPath="yes" />
+    </Component>
     <Component Id="OpenWithPdf" Directory="INSTALLFOLDER" Guid="*">
       <RegistryValue Root="HKLM" Key="Software\Classes\.pdf\OpenWithProgids" Name="HisuiPDF.Document" Type="string" Value="" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document" Type="string" Value="PDF Document" />
-      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\DefaultIcon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\DefaultIcon" Type="string" Value="[INSTALLFOLDER]PdfDocument.ico" />
+      <RegistryValue Root="HKLM" Key="Software\HisuiPDF\Capabilities" Name="ApplicationName" Type="string" Value="Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\HisuiPDF\Capabilities" Name="ApplicationDescription" Type="string" Value="PDF editor: merge, split, annotate, redact, sign" />
+      <RegistryValue Root="HKLM" Key="Software\HisuiPDF\Capabilities\FileAssociations" Name=".pdf" Type="string" Value="HisuiPDF.Document" />
+      <RegistryValue Root="HKLM" Key="Software\RegisteredApplications" Name="Hisui PDF" Type="string" Value="Software\HisuiPDF\Capabilities" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\shell\open" Name="FriendlyAppName" Type="string" Value="Hisui PDF" />
       <RegistryValue Root="HKLM" Key="Software\Classes\HisuiPDF.Document\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; &quot;%1&quot;" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <!-- ─── Explorer right-click "Open with Hisui PDF" (also shown when several PDFs are selected;
+         the "Open with" submenu is hidden for multi-selection). Explorer runs the command once per file. ─ -->
+  <Fragment>
+    <Component Id="ContextMenuPdf" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.Open" Name="MUIVerb" Type="string" Value="Open with Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.Open" Name="Icon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.Open\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; &quot;%1&quot;" KeyPath="yes" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToWord" Name="MUIVerb" Type="string" Value="Convert to Word with Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToWord" Name="Icon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToWord\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; --convert docx &quot;%1&quot;" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToImages" Name="MUIVerb" Type="string" Value="Convert to images with Hisui PDF" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToImages" Name="Icon" Type="string" Value="[INSTALLFOLDER]Hisui.Pdf.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\HisuiPdf.ToImages\command" Type="string" Value="&quot;[INSTALLFOLDER]Hisui.Pdf.App.exe&quot; --convert png &quot;%1&quot;" />
     </Component>
   </Fragment>
 
@@ -99,6 +128,10 @@
         <File Source="..\..\licenses\OFL.txt" />
       </Component>
 
+      <Component Id="LicenseOflLiberation" Directory="LicensesFolder" Guid="*">
+        <File Source="..\..\licenses\OFL-Liberation.txt" />
+      </Component>
+
     </ComponentGroup>
   </Fragment>
 
@@ -109,8 +142,10 @@
                 Name="Hisui PDF"
                 Description="PDF editor: merge, split, annotate, redact, sign"
                 Target="[INSTALLFOLDER]Hisui.Pdf.App.exe"
-                WorkingDirectory="INSTALLFOLDER"
-                Icon="AppIcon.ico" />
+                WorkingDirectory="INSTALLFOLDER" />
+      <!-- No Icon=: an Icon-table icon lives in %WINDIR%\Installer\{ProductCode}\, which every upgrade
+           (new ProductCode) deletes, breaking taskbar pins copied from this shortcut. Without it the
+           shortcut shows the EXE's embedded icon from a path that survives upgrades. -->
       <!-- Clean up the Start Menu folder on uninstall -->
       <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
       <!-- Registry key used as the component's KeyPath (required for shortcut components) -->

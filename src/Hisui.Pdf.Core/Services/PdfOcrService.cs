@@ -59,13 +59,7 @@ internal sealed class PdfOcrService : IPdfOcrService
         options ??= new OcrOptions();
 
         var targets = await ResolveTargetPagesAsync(pdf, options, ct).ConfigureAwait(false);
-        var pages = new List<OcrPageResult>(targets.Count);
-
-        foreach (var pageIndex in targets)
-        {
-            ct.ThrowIfCancellationRequested();
-            pages.Add(await RecognizePageAsync(pdf, pageIndex, options, ct).ConfigureAwait(false));
-        }
+        var pages = await RecognizePagesAsync(pdf, targets, options, ct).ConfigureAwait(false);
 
         return new OcrDocumentResult { Pages = pages };
     }
@@ -79,12 +73,10 @@ internal sealed class PdfOcrService : IPdfOcrService
         if (targets.Count == 0) return pdf; // nothing scanned — return the original bytes unchanged
 
         // Recognize every target page first (render + OCR), then write the text layer in one pass.
+        var results = await RecognizePagesAsync(pdf, targets, options, ct).ConfigureAwait(false);
         var recognized = new Dictionary<int, OcrPageResult>(targets.Count);
-        foreach (var pageIndex in targets)
-        {
-            ct.ThrowIfCancellationRequested();
-            recognized[pageIndex] = await RecognizePageAsync(pdf, pageIndex, options, ct).ConfigureAwait(false);
-        }
+        for (var i = 0; i < targets.Count; i++)
+            recognized[targets[i]] = results[i];
 
         return await Task.Run(() =>
         {
@@ -99,7 +91,7 @@ internal sealed class PdfOcrService : IPdfOcrService
             }
 
             using var output = new MemoryStream();
-            doc.Save(output);
+            doc.SaveStamped(output);
             return output.ToArray();
         }, ct).ConfigureAwait(false);
     }
@@ -138,10 +130,41 @@ internal sealed class PdfOcrService : IPdfOcrService
         return [.. Enumerable.Range(0, count)];
     }
 
+    /// <summary>
+    /// Renders and recognizes <paramref name="targets"/> with at most
+    /// <see cref="OcrOptions.EffectiveMaxDegreeOfParallelism"/> pages in flight. Results are returned in the
+    /// order of <paramref name="targets"/> regardless of completion order. The first failure cancels the
+    /// remaining pages and surfaces as its original exception type (not an <see cref="AggregateException"/>).
+    /// </summary>
+    private async Task<IReadOnlyList<OcrPageResult>> RecognizePagesAsync(
+        byte[] pdf, IReadOnlyList<int> targets, OcrOptions options, CancellationToken ct)
+    {
+        var results = new OcrPageResult[targets.Count];
+        var dop = Math.Min(options.EffectiveMaxDegreeOfParallelism, targets.Count);
+
+        if (dop <= 1)
+        {
+            for (var i = 0; i < targets.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                results[i] = await RecognizePageAsync(pdf, targets[i], options, ct).ConfigureAwait(false);
+            }
+            return results;
+        }
+
+        var parallel = new ParallelOptions { MaxDegreeOfParallelism = dop, CancellationToken = ct };
+        await Parallel.ForEachAsync(Enumerable.Range(0, targets.Count), parallel, async (i, token) =>
+        {
+            results[i] = await RecognizePageAsync(pdf, targets[i], options, token).ConfigureAwait(false);
+        }).ConfigureAwait(false);
+        return results;
+    }
+
     private async Task<OcrPageResult> RecognizePageAsync(byte[] pdf, int pageIndex, OcrOptions options, CancellationToken ct)
     {
-        var png = await _renderer.RenderPageToPngAsync(pdf, pageIndex, options.Dpi, ct).ConfigureAwait(false);
-        return await _engine.RecognizeAsync(png, pageIndex, options, ct).ConfigureAwait(false);
+        // Raw pixels straight into the engine: no PNG encode/decode round trip at 300 DPI.
+        var page = await _renderer.RenderPageAsync(pdf, pageIndex, options.Dpi, ct).ConfigureAwait(false);
+        return await _engine.RecognizeRenderedAsync(page, pageIndex, options, ct).ConfigureAwait(false);
     }
 
     private static bool HasRasterImage(UglyToad.PdfPig.Content.Page page)

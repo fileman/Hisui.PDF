@@ -188,6 +188,171 @@ public class PdfOcrServiceTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => sut.RecognizeAsync(null!));
     }
 
+    // ── parallelism ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Recognize_ManyPages_ResultsStayOrderedByPage_WithRandomizedDelays()
+    {
+        var pdf = PdfFixtureBuilder.CreateWithText("Digital", 16);
+        var engine = new GateEngine { Delay = i => TimeSpan.FromMilliseconds((i * 37) % 23) };
+        var sut = new PdfOcrService(_renderer, engine);
+
+        var result = await sut.RecognizeAsync(pdf, new OcrOptions { OnlyScannedPages = false, MaxDegreeOfParallelism = 4 });
+
+        Assert.Equal(Enumerable.Range(0, 16), result.Pages.Select(p => p.PageIndex));
+        Assert.All(result.Pages, p => Assert.Equal($"page{p.PageIndex}", p.Text));
+    }
+
+    [Fact]
+    public async Task Recognize_ConcurrencyIsBoundedByMaxDegreeOfParallelism_AndActuallyParallel()
+    {
+        var pdf = PdfFixtureBuilder.CreateWithText("Digital", 12);
+        var engine = new GateEngine { Delay = _ => TimeSpan.FromMilliseconds(200) };
+        var sut = new PdfOcrService(_renderer, engine);
+
+        await sut.RecognizeAsync(pdf, new OcrOptions { OnlyScannedPages = false, MaxDegreeOfParallelism = 3 });
+
+        // PDFium rendering is serialized, so the cap may not be reached on a slow box, but pages must overlap.
+        Assert.InRange(engine.MaxConcurrent, 2, 3);
+    }
+
+    [Fact]
+    public async Task Recognize_MaxDegreeOfParallelismOne_RunsSequentially()
+    {
+        var pdf = PdfFixtureBuilder.CreateWithText("Digital", 6);
+        var engine = new GateEngine { Delay = _ => TimeSpan.FromMilliseconds(10) };
+        var sut = new PdfOcrService(_renderer, engine);
+
+        await sut.RecognizeAsync(pdf, new OcrOptions { OnlyScannedPages = false, MaxDegreeOfParallelism = 1 });
+
+        Assert.Equal(1, engine.MaxConcurrent);
+        Assert.Equal([0, 1, 2, 3, 4, 5], engine.StartOrder);
+    }
+
+    [Fact]
+    public void DefaultMaxDegreeOfParallelism_IsBounded()
+    {
+        var dop = new OcrOptions().EffectiveMaxDegreeOfParallelism;
+        Assert.InRange(dop, 1, 4);
+        Assert.Equal(1, new OcrOptions { MaxDegreeOfParallelism = 0 }.EffectiveMaxDegreeOfParallelism);
+    }
+
+    [Fact]
+    public async Task Recognize_WhenEngineIsUnavailable_SurfacesOcrUnavailableAndStopsEarly()
+    {
+        var pdf = PdfFixtureBuilder.CreateWithText("Digital", 40);
+        var engine = new GateEngine { Delay = _ => TimeSpan.FromMilliseconds(20), FailOn = 0 };
+        var sut = new PdfOcrService(_renderer, engine);
+
+        await Assert.ThrowsAsync<OcrUnavailableException>(
+            () => sut.RecognizeAsync(pdf, new OcrOptions { OnlyScannedPages = false, MaxDegreeOfParallelism = 4 }));
+
+        Assert.True(engine.Started < 40, $"expected remaining pages to be skipped, but {engine.Started} started");
+    }
+
+    [Fact]
+    public async Task Recognize_WhenEngineIsUnavailable_Sequential_SurfacesSameType()
+    {
+        var pdf = PdfFixtureBuilder.CreateWithText("Digital", 3);
+        var engine = new GateEngine { FailOn = 1 };
+        var sut = new PdfOcrService(_renderer, engine);
+
+        await Assert.ThrowsAsync<OcrUnavailableException>(
+            () => sut.MakeSearchableAsync(pdf, new OcrOptions { OnlyScannedPages = false, MaxDegreeOfParallelism = 1 }));
+    }
+
+    [Fact]
+    public async Task Recognize_Cancellation_StopsWork()
+    {
+        var pdf = PdfFixtureBuilder.CreateWithText("Digital", 40);
+        using var cts = new CancellationTokenSource();
+        var engine = new GateEngine { Delay = _ => TimeSpan.FromMilliseconds(25), OnStart = _ => cts.CancelAfter(60) };
+        var sut = new PdfOcrService(_renderer, engine);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.RecognizeAsync(pdf, new OcrOptions { OnlyScannedPages = false, MaxDegreeOfParallelism = 4 }, cts.Token));
+
+        Assert.True(engine.Started < 40, $"expected cancellation to stop work, but {engine.Started} started");
+    }
+
+    [Fact]
+    public async Task MakeSearchable_ParallelOutputMatchesSequential()
+    {
+        var pdf = PdfFixtureBuilder.CreateScanned();
+        var words = new (string, PdfRect)[] { ("Hisui", new PdfRect(0.10, 0.10, 0.40, 0.16)), ("Scan", new PdfRect(0.5, 0.2, 0.7, 0.25)) };
+        var sequential = await new PdfOcrService(_renderer, new FakeOcrEngine(words))
+            .MakeSearchableAsync(pdf, new OcrOptions { MaxDegreeOfParallelism = 1 });
+        var parallel = await new PdfOcrService(_renderer, new FakeOcrEngine(words))
+            .MakeSearchableAsync(pdf, new OcrOptions { MaxDegreeOfParallelism = 4 });
+
+        var ex = new PdfTextExtractor();
+        Assert.Equal(await ex.ExtractTextAsync(sequential), await ex.ExtractTextAsync(parallel));
+    }
+
+    [Fact]
+    public async Task MakeSearchable_MultiPage_PlacesEachPagesTextOnItsOwnPage()
+    {
+        var pdf = PdfFixtureBuilder.CreateWithText("Digital", 8);
+        var engine = new GateEngine { Delay = i => TimeSpan.FromMilliseconds((8 - i) * 5), Word = "w" };
+        var sut = new PdfOcrService(_renderer, engine);
+
+        var searchable = await sut.MakeSearchableAsync(pdf, new OcrOptions { OnlyScannedPages = false, MaxDegreeOfParallelism = 4 });
+
+        var extractor = new PdfTextExtractor();
+        for (var i = 0; i < 8; i++) Assert.Contains($"page{i}", await extractor.ExtractTextAsync(searchable, i));
+    }
+
+    /// <summary>
+    /// Engine double that records concurrency, start order and cancellation, with a per-page delay and an
+    /// optional page on which it throws <see cref="OcrUnavailableException"/>. Returns <c>page{index}</c> as text.
+    /// </summary>
+    private sealed class GateEngine : IOcrEngine
+    {
+        private readonly object _gate = new();
+        private int _running, _maxConcurrent, _started;
+        private readonly List<int> _startOrder = [];
+
+        public Func<int, TimeSpan> Delay { get; init; } = _ => TimeSpan.Zero;
+        public Action<int>? OnStart { get; init; }
+        public int FailOn { get; init; } = -1;
+        public string? Word { get; init; }
+
+        public int MaxConcurrent => Volatile.Read(ref _maxConcurrent);
+        public int Started => Volatile.Read(ref _started);
+        public List<int> StartOrder { get { lock (_gate) return [.. _startOrder]; } }
+
+        public async Task<OcrPageResult> RecognizeAsync(byte[] pageImagePng, int pageIndex, OcrOptions options, CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            int now;
+            lock (_gate)
+            {
+                _startOrder.Add(pageIndex);
+                now = ++_running;
+                if (now > _maxConcurrent) _maxConcurrent = now;
+            }
+            Interlocked.Increment(ref _started);
+            try
+            {
+                OnStart?.Invoke(pageIndex);
+                await Task.Delay(Delay(pageIndex), ct);
+                if (pageIndex == FailOn) throw new OcrUnavailableException("engine unavailable");
+                var text = $"page{pageIndex}";
+                return new OcrPageResult
+                {
+                    PageIndex = pageIndex,
+                    Text = text,
+                    MeanConfidence = 90,
+                    Words = [new OcrWord { Text = text, BoundingBox = new PdfRect(0.1, 0.1, 0.5, 0.15), Confidence = 90 }],
+                };
+            }
+            finally
+            {
+                lock (_gate) _running--;
+            }
+        }
+    }
+
     /// <summary>
     /// Test double for <see cref="IOcrEngine"/>: records which pages it was asked to process and
     /// returns a fixed set of words, so the orchestration can be tested without native Tesseract.
@@ -195,13 +360,15 @@ public class PdfOcrServiceTests
     private sealed class FakeOcrEngine : IOcrEngine
     {
         private readonly (string Text, PdfRect Box)[] _words;
-        public List<int> ProcessedPages { get; } = [];
+        private readonly object _gate = new();
+        private readonly List<int> _processed = [];
+        public List<int> ProcessedPages { get { lock (_gate) return [.. _processed.Order()]; } }
 
         public FakeOcrEngine(params (string Text, PdfRect Box)[] words) => _words = words;
 
         public Task<OcrPageResult> RecognizeAsync(byte[] pageImagePng, int pageIndex, OcrOptions options, CancellationToken ct = default)
         {
-            ProcessedPages.Add(pageIndex);
+            lock (_gate) _processed.Add(pageIndex);
             var words = _words
                 .Select(w => new OcrWord { Text = w.Text, BoundingBox = w.Box, Confidence = 90 })
                 .ToList();

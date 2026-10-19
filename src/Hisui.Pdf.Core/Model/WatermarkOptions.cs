@@ -15,3 +15,6 @@ public sealed class WatermarkOptions
     /// <summary>CSS-style hex color (e.g. "#808080"). Default mid-gray.</summary>
     public string ColorHex { get; init; } = "#808080";
 }
+
+/// <summary>A watermark found in a document: its text and settings.</summary>
+public sealed record WatermarkInfo(string Text, WatermarkOptions Options);

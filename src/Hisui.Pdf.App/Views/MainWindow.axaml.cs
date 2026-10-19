@@ -1,451 +1,245 @@
-using System.Diagnostics;
+using System.ComponentModel;
 using System.IO;
-using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
+using Avalonia.Layout;
 using Avalonia.Reactive;
-using Hisui.Pdf.App.Localization;
+using Avalonia.VisualTree;
 using Hisui.Pdf.App.Services;
 using Hisui.Pdf.App.ViewModels;
-using Hisui.Pdf.Core.Abstractions;
-using Hisui.Pdf.Core.Model;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Hisui.Pdf.App.Views;
 
+/// <summary>Tabbed shell: every open document lives in its own <see cref="DocumentView"/> tab.</summary>
 public partial class MainWindow : Window
 {
-    private Canvas? _annotCanvas;
-    private readonly ISignatureService _signatures;
-    private readonly IPrintService _print;
-    private readonly IPdfRenderer _renderer;
-    private readonly IUpdateService _updates;
-    private readonly ISettingsService _settings;
+    private readonly IServiceProvider _services;
+    private readonly HashSet<DocumentView> _claimed = [];
+    private Control? _captionSpacer;
 
-    public MainWindow(MainViewModel viewModel, ISignatureService signatures, IPrintService print, IPdfRenderer renderer,
-        IUpdateService updates, ISettingsService settings)
+    public MainWindow(IServiceProvider services)
     {
         InitializeComponent();
-        DataContext = viewModel;
-        _signatures = signatures;
-        _print = print;
-        _renderer = renderer;
-        _updates = updates;
-        _settings = settings;
-
-        // Lets the view model prompt for a password when opening an encrypted PDF.
-        viewModel.RequestPasswordAsync = async () =>
+        _services = services;
+        Tabs.SelectionChanged += (_, _) =>
         {
-            var dialog = new PasswordDialog("Password.EnterPrompt");
-            return await dialog.ShowDialog<bool>(this) ? dialog.Password : null;
+            UpdateWindowTitle();
+            (Tabs.SelectedItem as Control)?.BringIntoView();
         };
-
-        AddHandler(DragDrop.DragEnterEvent, OnDragEnter);
-        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
-        AddHandler(DragDrop.DropEvent, OnDrop);
-        DragDrop.SetAllowDrop(this, true);
-
-        // Keyboard shortcuts that target the view (not a VM command): print dialog, find, match nav, clear.
-        KeyDown += OnWindowKeyDown;
-
-        // Wire annotation canvas pointer events after layout is complete.
-        Loaded += OnLoaded;
-    }
-
-    private void OnLoaded(object? sender, RoutedEventArgs e)
-    {
-        // Push the preview image's size to the VM so it can place search highlights in pixel space.
-        if (this.FindControl<Image>("PreviewImageControl") is { } preview)
-            preview.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b =>
-            {
-                if (DataContext is MainViewModel vm) vm.UpdateSearchOverlaySize(b.Width, b.Height);
-            }));
-
-        // Track the scroll viewport (for fit-width/height) and enable Ctrl+wheel zoom.
-        if (this.FindControl<ScrollViewer>("PreviewScroll") is { } scroll)
+        Tabs.TemplateApplied += (_, e) =>
         {
-            scroll.GetObservable(Visual.BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b =>
-            {
-                if (DataContext is MainViewModel vm) vm.UpdateViewportSize(b.Width, b.Height);
-            }));
-            scroll.AddHandler(PointerWheelChangedEvent, OnPreviewWheel, RoutingStrategies.Tunnel);
-        }
-
-        _annotCanvas = this.FindControl<Canvas>("AnnotationCanvas");
-        if (_annotCanvas is null) return;
-
-        _annotCanvas.AddHandler(PointerPressedEvent,  OnAnnotationPressed,  RoutingStrategies.Tunnel);
-        _annotCanvas.AddHandler(PointerMovedEvent,    OnAnnotationMoved,    RoutingStrategies.Tunnel);
-        _annotCanvas.AddHandler(PointerReleasedEvent, OnAnnotationReleased, RoutingStrategies.Tunnel);
-    }
-
-    // ── File backstage menu ───────────────────────────────────────────────────
-
-    // Built programmatically so command bindings and the (dynamic) recent-files list resolve
-    // reliably — a declarative MenuFlyout would live in a popup namescope that complicates both.
-    private void OnFileBackstageClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm || sender is not Control anchor) return;
-
-        var loc = Localizer.Instance;
-        var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
-
-        flyout.Items.Add(MakeItem(loc["Menu.Open"], vm.OpenCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.OpenInNewWindow"], vm.OpenInNewWindowCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
-        flyout.Items.Add(new Separator());
-
-        // Document tools (Acrobat-parity)
-        flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
-        var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
-        propsItem.Click += OnDocumentPropertiesClick;
-        flyout.Items.Add(propsItem);
-        var protectItem = new MenuItem { Header = loc["Menu.Protect"], IsEnabled = vm.IsDocumentLoaded };
-        protectItem.Click += OnProtectClick;
-        flyout.Items.Add(protectItem);
-        flyout.Items.Add(MakeItem(loc["Menu.RemovePassword"], vm.RemovePasswordCommand));
-        flyout.Items.Add(new Separator());
-
-        var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
-        foreach (var entry in vm.RecentFiles)
-        {
-            var item = new MenuItem
-            {
-                Header = entry.DisplayName,
-                Command = vm.OpenRecentCommand,
-                CommandParameter = entry.FullPath,
-            };
-            ToolTip.SetTip(item, entry.FullPath);
-            recent.Items.Add(item);
-        }
-        flyout.Items.Add(recent);
-        flyout.Items.Add(new Separator());
-
-        var language = new MenuItem { Header = loc["Menu.Language"] };
-        foreach (var option in vm.Languages)
-        {
-            var item = new MenuItem
-            {
-                Header = option.DisplayName,
-                Command = vm.SetLanguageCommand,
-                CommandParameter = option.Code,
-                // A leading check marks the active language.
-                Icon = option.Code == vm.CurrentLanguage ? new TextBlock { Text = "✓" } : null,
-            };
-            language.Items.Add(item);
-        }
-        flyout.Items.Add(language);
-
-        var theme = new MenuItem { Header = loc["Menu.Theme"] };
-        foreach (var option in vm.Themes)
-        {
-            var item = new MenuItem
-            {
-                Header = loc[option.DisplayNameKey],
-                Command = vm.SetThemeCommand,
-                CommandParameter = option.Code,
-                // A leading check marks the active theme.
-                Icon = option.Code == vm.CurrentTheme ? new TextBlock { Text = "✓" } : null,
-            };
-            theme.Items.Add(item);
-        }
-        flyout.Items.Add(theme);
-        flyout.Items.Add(new Separator());
-
-        var updates = new MenuItem { Header = loc["Menu.CheckUpdates"] };
-        updates.Click += async (_, _) => await CheckForUpdatesAsync(manual: true);
-        flyout.Items.Add(updates);
-
-        var log = new MenuItem { Header = loc["Menu.ViewLog"] };
-        log.Click += async (_, _) => await new LogViewerDialog().ShowDialog(this);
-        flyout.Items.Add(log);
-
-        var info = new MenuItem { Header = loc["Menu.About"] };
-        info.Click += OnAboutClick;
-        flyout.Items.Add(info);
-
-        flyout.Items.Add(MakeItem(loc["Menu.Exit"], vm.ExitCommand));
-
-        flyout.ShowAt(anchor);
-
-        static MenuItem MakeItem(string header, ICommand command) =>
-            new() { Header = header, Command = command };
-    }
-
-    // ── Keyboard shortcuts (view-targeted) ────────────────────────────────────
-
-    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-
-        switch (e.Key)
-        {
-            case Key.P when ctrl:
-                OnPrintClick(this, new RoutedEventArgs());
-                e.Handled = true;
-                break;
-            case Key.F when ctrl:
-                this.FindControl<TextBox>("SearchBox")?.Focus();
-                e.Handled = true;
-                break;
-            case Key.F3:
-                var prev = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-                var cmd = prev ? vm.PrevMatchCommand : vm.NextMatchCommand;
-                if (cmd.CanExecute(null)) cmd.Execute(null);
-                e.Handled = true;
-                break;
-            case Key.Escape when !string.IsNullOrEmpty(vm.SearchQuery):
-                vm.SearchQuery = string.Empty;
-                e.Handled = true;
-                break;
-        }
-    }
-
-    // ── Zoom ──────────────────────────────────────────────────────────────────
-
-    private void OnPreviewWheel(object? sender, PointerWheelEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return; // plain wheel scrolls as usual
-        if (e.Delta.Y > 0) vm.ZoomInCommand.Execute(null);
-        else if (e.Delta.Y < 0) vm.ZoomOutCommand.Execute(null);
-        e.Handled = true;
-    }
-
-    // ── Annotation pointer handlers ───────────────────────────────────────────
-
-    private void OnAnnotationPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-        if (!vm.IsAnnotationActive) return;
-        e.Pointer.Capture(_annotCanvas);
-        vm.OnPointerPressed(e.GetPosition(_annotCanvas));
-        e.Handled = true;
-    }
-
-    private void OnAnnotationMoved(object? sender, PointerEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-        if (!vm.IsDragging) return;
-        vm.OnPointerMoved(e.GetPosition(_annotCanvas));
-        e.Handled = true;
-    }
-
-    private async void OnAnnotationReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm || _annotCanvas is null) return;
-        if (!vm.IsAnnotationActive) return;
-
-        e.Pointer.Capture(null);
-        var pos = e.GetPosition(_annotCanvas);
-        var canvasSize = _annotCanvas.Bounds.Size;
-        e.Handled = true;
-
-        try
-        {
-            if (vm.ActiveTool == AnnotationTool.TextEdit)
-            {
-                await vm.OnTextEditClickAsync(pos, canvasSize, async original =>
+            if (e.NameScope.Find<Control>("PART_NewTab") is Button add) add.Click += (_, _) => OpenInTab();
+            _captionSpacer = e.NameScope.Find<Control>("PART_CaptionSpacer");
+            // The wheel scrolls the tab strip sideways when it overflows.
+            if (e.NameScope.Find<Control>("PART_TabScroll") is ScrollViewer strip)
+                strip.PointerWheelChanged += (_, w) =>
                 {
-                    var dialog = new AnnotationInputDialog(AnnotationTool.TextEdit, initialText: original);
-                    var ok = await dialog.ShowDialog<bool>(this);
-                    return ok ? dialog.InputText : null;
-                });
-                return;
-            }
-
-            await vm.OnPointerReleasedAsync(pos, canvasSize, async tool =>
+                    strip.Offset = strip.Offset.WithX(strip.Offset.X - (w.Delta.Y + w.Delta.X) * 60);
+                    w.Handled = true;
+                };
+        };
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.W && e.KeyModifiers.HasFlag(KeyModifiers.Control) && Tabs.SelectedItem is TabItem t)
             {
-                // The Signature tool picks a reusable PNG from the library instead of the param dialog.
-                if (tool == AnnotationTool.Signature)
-                {
-                    var picker = new SignatureManagerDialog(_signatures);
-                    var picked = await picker.ShowDialog<bool>(this);
-                    if (!picked || picker.SelectedImage is null) return null;
-                    return new AnnotationInputModel
-                    {
-                        Tool = AnnotationTool.Signature,
-                        ImageBytes = picker.SelectedImage,
-                    };
-                }
-
-                var dialog = new AnnotationInputDialog(tool);
-                var ok = await dialog.ShowDialog<bool>(this);
-                return ok ? dialog.Result : null;
-            });
-        }
-        catch (Exception ex)
-        {
-            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
-        }
-    }
-
-    // ── Print ─────────────────────────────────────────────────────────────────
-
-    private async void OnPrintClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm || !vm.IsDocumentLoaded) return;
-        try
-        {
-            // No in-app print stack on this platform — hand off to the OS print path.
-            if (!_print.SupportsSystemDialog)
-            {
-                if (vm.PrintCommand.CanExecute(null)) vm.PrintCommand.Execute(null);
-                return;
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) _ = CloseAllTabsAsync();
+                else _ = CloseTabAsync(t);
+                e.Handled = true;
             }
+        };
+        AddTab();
+        Closing += OnClosing;
+        Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(FitCaptionButtons, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
 
-            var pdf = await vm.BuildCurrentDocumentAsync();
-            if (pdf is null) return;
+    // Avalonia 12 draws the title and caption buttons itself when the client area is extended, and exposes no API to
+    // trim them. Hide the title text (our tabs fill the strip) and the full-screen button, then reserve exactly the
+    // width the remaining caption buttons take, measured from the decoration overlay.
+    private void FitCaptionButtons()
+    {
+        Visual root = this;
+        while (root.GetVisualParent() is { } parent) root = parent;
+        Control? Part(string name) => root.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == name);
 
-            var dialog = new PrintDialog(_print, _renderer, pdf, vm.Pages.Count, vm.CurrentPageIndex);
-            if (await dialog.ShowDialog<bool>(this) && dialog.Result is not null)
-                await vm.RunPrintJobAsync(pdf, dialog.Result);
-        }
-        catch (Exception ex)
+        if (Part("PART_TitleTextPanel") is { } title) title.IsVisible = false;
+        if (Part("PART_FullScreenButton") is { } fullScreen) fullScreen.IsVisible = false;
+        if (Part("PART_OverlayPanel") is { } buttons && _captionSpacer is { } spacer)
+            buttons.GetObservable(BoundsProperty).Subscribe(new AnonymousObserver<Rect>(b => spacer.Width = b.Width));
+    }
+
+    /// <summary>The document view of the selected tab.</summary>
+    public DocumentView? CurrentView => (Tabs.SelectedItem as TabItem)?.Content as DocumentView;
+
+    // Context-menu conversions can arrive together (one launch per selected file): ask for save locations one at a time.
+    private static readonly SemaphoreSlim ConvertGate = new(1, 1);
+
+    /// <summary>Handles command-line arguments: files to open, optionally preceded by <c>--convert docx|txt|png</c>
+    /// (open the file, then export it).</summary>
+    public void OpenArgs(IReadOnlyList<string> args)
+    {
+        string? convert = null;
+        for (var i = 0; i < args.Count; i++)
         {
-            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+            if (args[i] == "--convert" && i + 1 < args.Count && args[i + 1] is "docx" or "txt" or "png") convert = args[++i];
+            else if (File.Exists(args[i])) OpenInTab(args[i], convert);
         }
     }
 
-    // ── Document tools ────────────────────────────────────────────────────────
-
-    private async void OnDocumentPropertiesClick(object? sender, RoutedEventArgs e)
+    /// <summary>Opens <paramref name="path"/> in the selected tab when it is empty, otherwise in a new tab, and
+    /// optionally exports it to <paramref name="convert"/>. With no path, adds an empty tab.</summary>
+    public void OpenInTab(string? path = null, string? convert = null)
     {
-        if (DataContext is not MainViewModel vm) return;
-        try
+        // Reuse an empty tab (the current one first) rather than leaving it in front of the documents. Loading is async,
+        // so IsDocumentLoaded alone can't tell that a tab was just claimed by a previous file or is opening one itself.
+        var empty = path is null
+            ? null
+            : Tabs.Items.OfType<TabItem>().OrderBy(t => ReferenceEquals(t, Tabs.SelectedItem) ? 0 : 1)
+                .FirstOrDefault(t => t.Content is DocumentView v && !_claimed.Contains(v)
+                                     && v.DataContext is MainViewModel { IsDocumentLoaded: false, IsBusy: false });
+        if (empty is not null) Tabs.SelectedItem = empty;
+        var view = empty?.Content as DocumentView ?? AddTab();
+        if (path is not null && view.DataContext is MainViewModel vm)
         {
-            var metadata = await vm.ReadMetadataAsync();
-            if (metadata is null) return;
-            var dialog = new MetadataDialog(metadata);
-            if (await dialog.ShowDialog<bool>(this) && dialog.Result is not null)
-                await vm.ApplyMetadataAsync(dialog.Result);
-        }
-        catch (Exception ex)
-        {
-            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+            _claimed.Add(view);
+            _ = OpenAndConvertAsync(vm, path, convert);
         }
     }
 
-    private async void OnProtectClick(object? sender, RoutedEventArgs e)
+    private static async Task OpenAndConvertAsync(MainViewModel vm, string path, string? convert)
     {
-        if (DataContext is not MainViewModel vm) return;
-        try
-        {
-            var dialog = new PasswordDialog("Password.SetPrompt");
-            if (await dialog.ShowDialog<bool>(this) && !string.IsNullOrEmpty(dialog.Password))
-                await vm.ProtectAsync(dialog.Password);
-        }
-        catch (Exception ex)
-        {
-            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
-        }
+        await vm.OpenPathAsync(path);
+        if (convert is null || !vm.IsDocumentLoaded) return;
+
+        await ConvertGate.WaitAsync();
+        try { await vm.ConvertAsync(convert); }
+        finally { ConvertGate.Release(); }
     }
 
-    // ── Updates ──────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Asks GitHub for the latest release and, if it is newer, offers to open its download page.
-    /// A startup check stays silent unless there is something new; a manual check always reports.
-    /// </summary>
-    public async Task CheckForUpdatesAsync(bool manual)
+    private DocumentView AddTab()
     {
-        try
-        {
-            if (DataContext is not MainViewModel vm) return;
+        var view = _services.GetRequiredService<DocumentView>();
+        var vm = (MainViewModel)view.DataContext!;
 
-            var update = await _updates.CheckForUpdateAsync();
-            if (update is null)
+        var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 180, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis };
+        var close = new Button { Content = "✕", Padding = new(5, 2), Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new(0), FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+        var item = new TabItem { Content = view, Header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { label, close } } };
+        close.Click += (_, _) => _ = CloseTabAsync(item);
+        var loc = Localization.Localizer.Instance;
+        var closeThis = new MenuItem { Header = loc["Tab.Close"], InputGesture = new KeyGesture(Key.W, KeyModifiers.Control) };
+        var closeOthers = new MenuItem { Header = loc["Tab.CloseOthers"] };
+        var closeAll = new MenuItem { Header = loc["Tab.CloseAll"], InputGesture = new KeyGesture(Key.W, KeyModifiers.Control | KeyModifiers.Shift) };
+        closeThis.Click += (_, _) => _ = CloseTabAsync(item);
+        closeOthers.Click += async (_, _) =>
+        {
+            foreach (var other in Tabs.Items.OfType<TabItem>().Where(t => t != item).ToList())
+                if (!await CloseTabAsync(other)) return;
+        };
+        closeAll.Click += (_, _) => _ = CloseAllTabsAsync();
+        item.ContextMenu = new ContextMenu { Items = { closeThis, closeOthers, closeAll } };
+
+        void Refresh()
+        {
+            close.Content = vm.HasUnsavedChanges ? "●" : "✕"; // unsaved marker, like an editor tab
+            // An empty tab reads "New tab", not a second copy of the app name in front of the documents.
+            label.Text = vm.Title.Contains(" — ") ? vm.Title[(vm.Title.IndexOf(" — ", StringComparison.Ordinal) + 3)..] : Localization.Localizer.Instance["Tab.New"];
+            ToolTip.SetTip(item, vm.CurrentPath is { } p ? $"{Path.GetFileName(p)}\n{p}" : label.Text);
+            if (ReferenceEquals(Tabs.SelectedItem, item)) UpdateWindowTitle();
+        }
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName is nameof(MainViewModel.Title) or nameof(MainViewModel.HasUnsavedChanges)) Refresh(); };
+        Refresh();
+
+        Tabs.Items.Add(item);
+        Tabs.SelectedItem = item;
+        return view;
+    }
+
+    /// <summary>Closes a tab after offering to save unsaved changes; false when the user cancels. Closing the last tab
+    /// closes the application, so that asks first (and offers to keep the window with an empty tab instead).</summary>
+    private async Task<bool> CloseTabAsync(TabItem item)
+    {
+        var keepWindow = false;
+        if (Tabs.ItemCount == 1 && _services.GetRequiredService<ISettingsService>() is { Settings.ConfirmCloseLastTab: true } settings)
+        {
+            var loc = Localization.Localizer.Instance;
+            var hasDocument = item.Content is DocumentView { DataContext: MainViewModel { IsDocumentLoaded: true } };
+            string[] choices = hasDocument
+                ? [loc["Dialog.Cancel"], loc["CloseLast.KeepOpen"], loc["CloseLast.Exit"]]
+                : [loc["Dialog.Cancel"], loc["CloseLast.Exit"]];
+            var (choice, dontAsk) = await FormDialog.ChooseWithCheckAsync(this, "Hisui PDF", loc["CloseLast.Message"],
+                loc["CloseLast.DontAsk"], choices);
+            if (choice < 1) return false;
+            keepWindow = hasDocument && choice == 1;
+            if (dontAsk)
             {
-                if (manual) vm.StatusMessage = Localizer.Instance["Update.UpToDate"];
-                return;
-            }
-
-            var settings = _settings;
-            if (!manual && settings.Settings.SkippedUpdateTag == update.Tag) return;
-
-            var choice = await new UpdateDialog(update, _updates.CurrentVersion).ShowDialog<UpdateChoice>(this);
-            switch (choice)
-            {
-                case UpdateChoice.Download:
-                    // Windows: fetch the MSI and hand it to Windows Installer (MajorUpgrade replaces this build).
-                    if (OperatingSystem.IsWindows() && update.MsiUrl is not null
-                        && await _updates.DownloadInstallerAsync(update) is { } msi)
-                    {
-                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\"") { UseShellExecute = true });
-                        Close();
-                    }
-                    else
-                        Process.Start(new ProcessStartInfo(update.Url) { UseShellExecute = true });
-                    break;
-                case UpdateChoice.Skip:
-                    settings.Settings.SkippedUpdateTag = update.Tag;
-                    settings.Save();
-                    break;
+                settings.Settings.ConfirmCloseLastTab = false;
+                settings.Save();
             }
         }
-        catch (Exception ex)
+
+        if (!await ConfirmDiscardAsync(item)) return false;
+        Tabs.Items.Remove(item);
+        if (item.Content is DocumentView v) _claimed.Remove(v);
+        if (Tabs.ItemCount == 0)
         {
-            if (manual && DataContext is MainViewModel vm) vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
+            if (keepWindow) AddTab();
+            else { _closeConfirmed = true; Close(); }
         }
+        return true;
     }
 
-    // ── About dialog ─────────────────────────────────────────────────────────
-
-    private async void OnAboutClick(object? sender, RoutedEventArgs e)
+    /// <summary>Save / Don't save / Cancel for a tab with unsaved changes. True when the tab may close.</summary>
+    private async Task<bool> ConfirmDiscardAsync(TabItem item)
     {
-        try
+        if (item.Content is not DocumentView { DataContext: MainViewModel vm }) return true;
+        await vm.FlushFieldEditAsync();
+        if (!vm.HasUnsavedChanges) return true;
+
+        Tabs.SelectedItem = item;
+        var loc = Localization.Localizer.Instance;
+        var name = vm.CurrentPath is { } p ? Path.GetFileName(p) : loc["Tab.New"];
+        return await FormDialog.ChooseAsync(this, "Hisui PDF", loc.Format("Unsaved.Message", name),
+                   loc["Dialog.Cancel"], loc["Unsaved.Discard"], loc["Unsaved.Save"]) switch
         {
-            await new AboutDialog().ShowDialog(this);
-        }
-        catch (Exception ex)
-        {
-            if (DataContext is MainViewModel vm) vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
-        }
+            2 => await vm.SaveBeforeCloseAsync(),
+            1 => true,
+            _ => false,
+        };
     }
 
-    // ── Drag-drop ────────────────────────────────────────────────────────────
+    private bool _closeConfirmed;
 
-    private void OnDragEnter(object? sender, DragEventArgs e)
+    // Window close (title bar, Alt+F4, Exit): ask for every tab with unsaved changes first.
+    private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        var hasFiles = e.DataTransfer.Contains(DataFormat.File);
-        e.DragEffects = hasFiles ? DragDropEffects.Copy : DragDropEffects.None;
-        if (hasFiles && DataContext is MainViewModel vm) vm.IsDragOver = true;
-        e.Handled = true;
+        if (_closeConfirmed) return;
+        e.Cancel = true;
+        foreach (var tab in Tabs.Items.OfType<TabItem>().ToList())
+            if (!await ConfirmDiscardAsync(tab)) return;
+        _closeConfirmed = true;
+        Close();
     }
 
-    private void OnDragLeave(object? sender, DragEventArgs e)
+    /// <summary>Closes every tab and leaves one empty tab (the window stays open).</summary>
+    private async Task CloseAllTabsAsync()
     {
-        if (DataContext is MainViewModel vm) vm.IsDragOver = false;
+        foreach (var tab in Tabs.Items.OfType<TabItem>().ToList())
+        {
+            if (!await ConfirmDiscardAsync(tab)) return;
+            Tabs.Items.Remove(tab);
+            if (tab.Content is DocumentView v) _claimed.Remove(v);
+        }
+        AddTab();
     }
 
-    private async void OnDrop(object? sender, DragEventArgs e)
+    private void UpdateWindowTitle() =>
+        Title = (CurrentView?.DataContext as MainViewModel)?.Title ?? "Hisui PDF";
+
+    /// <summary>Brings the window to the front (second launch / forwarded files).</summary>
+    public void Bring()
     {
-        if (DataContext is MainViewModel dropVm) dropVm.IsDragOver = false;
-        if (!e.DataTransfer.Contains(DataFormat.File)) return;
-        if (DataContext is not MainViewModel vm) return;
-
-        var files = e.DataTransfer.TryGetFiles()?.OfType<IStorageFile>() ?? [];
-        var pdfs = files
-            .Select(f => f.TryGetLocalPath())
-            .Where(p => p is not null &&
-                        Path.GetExtension(p).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
-            .Cast<string>()
-            .ToArray();
-
-        if (pdfs.Length == 0) return;
-
-        try
-        {
-            await vm.DropFilesAsync(pdfs);
-        }
-        catch (Exception ex)
-        {
-            vm.StatusMessage = Localizer.Instance.Format("Status.Error", ex.Message);
-        }
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
     }
 }

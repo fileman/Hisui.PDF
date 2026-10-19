@@ -27,18 +27,23 @@ public partial class MainViewModel
     private double NativeW => PreviewImage?.Size.Width ?? 0;
     private double NativeH => PreviewImage?.Size.Height ?? 0;
 
+    partial void OnZoomLevelChanged(double value)
+    {
+        foreach (var page in Pages) page.SetZoom(value);
+    }
+
     partial void OnPreviewImageChanged(IImage? value)
     {
         OnPropertyChanged(nameof(PreviewDisplayWidth));
         OnPropertyChanged(nameof(PreviewDisplayHeight));
     }
 
-    [RelayCommand] private void ZoomIn() => SetZoom(ZoomLevel * ZoomStep);
-    [RelayCommand] private void ZoomOut() => SetZoom(ZoomLevel / ZoomStep);
-    [RelayCommand] private void ZoomActual() => SetZoom(1.0);
+    [RelayCommand(CanExecute = nameof(HasDocument))] private void ZoomIn() => SetZoom(ZoomLevel * ZoomStep);
+    [RelayCommand(CanExecute = nameof(HasDocument))] private void ZoomOut() => SetZoom(ZoomLevel / ZoomStep);
+    [RelayCommand(CanExecute = nameof(HasDocument))] private void ZoomActual() => SetZoom(1.0);
 
     /// <summary>Jumps to a preset zoom percentage (from the status-bar zoom dropdown).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasDocument))]
     private void SetZoomPercent(string? percent)
     {
         if (double.TryParse(percent, System.Globalization.NumberStyles.Number,
@@ -46,13 +51,13 @@ public partial class MainViewModel
             SetZoom(p / 100.0);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasDocument))]
     private void FitWidth()
     {
         if (NativeW > 0 && _viewportW > 0) SetZoom((_viewportW - ViewportPadding) / NativeW);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasDocument))]
     private void FitHeight()
     {
         if (NativeH > 0 && _viewportH > 0) SetZoom((_viewportH - ViewportPadding) / NativeH);
@@ -66,6 +71,7 @@ public partial class MainViewModel
     /// <summary>Pushed from the view: the preview scroll viewport size, used by fit-width / fit-height.</summary>
     public void UpdateViewportSize(double width, double height)
     {
+        if (width <= 0 || height <= 0) return; // the hidden one of the two preview scrollers reports 0
         _viewportW = width;
         _viewportH = height;
     }

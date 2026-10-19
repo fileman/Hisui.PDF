@@ -88,7 +88,7 @@ public partial class SignatureCreateDialog : Window
         }
         else
         {
-            var text = TextInput.Text;
+            var text = SigTextInput.Text;
             if (string.IsNullOrWhiteSpace(text)) { ShowError(); return; }
             png = RenderTextToPng(text);
         }
@@ -114,7 +114,7 @@ public partial class SignatureCreateDialog : Window
             new PixelSize(Math.Max(1, width), Math.Max(1, height)), new Vector(96, 96));
         rtb.Render(visual);
         using var ms = new MemoryStream();
-        rtb.Save(ms);
+        rtb.Save(ms, new PngBitmapEncoderOptions());
         return ms.ToArray();
     }
 

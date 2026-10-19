@@ -1,0 +1,20 @@
+<Project Sdk="WixToolset.Sdk/4.0.5">
+
+  <PropertyGroup>
+    <OutputType>Bundle</OutputType>
+    <Platform>x64</Platform>
+    <!-- Override at build time: dotnet build -p:Version=1.2.3 -->
+    <Version Condition="'$(Version)' == ''">1.0.0</Version>
+    <OutputName>HisuiPDF-Setup-$(Version)-win-x64</OutputName>
+    <OutputPath>$(MSBuildThisFileDirectory)..\..\bin\installer\</OutputPath>
+    <DefineConstants>Version=$(Version)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Standard bootstrapper UI (license + progress) -->
+    <PackageReference Include="WixToolset.Bal.wixext" />
+    <!-- Builds the MSI first and exposes $(var.Hisui.Pdf.Installer.Win.TargetPath) -->
+    <ProjectReference Include="..\Hisui.Pdf.Installer.Win\Hisui.Pdf.Installer.Win.wixproj" />
+  </ItemGroup>
+
+</Project>

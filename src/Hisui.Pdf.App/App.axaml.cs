@@ -33,10 +33,14 @@ public partial class App : Application
             builder.Services.AddSingleton<IPrintService, PrintService>();
             builder.Services.AddSingleton<IWindowService, WindowService>();
             builder.Services.AddSingleton<IUpdateService, UpdateService>();
+            builder.Services.AddSingleton<Hisui.Pdf.Core.Abstractions.IOcrLanguageStore>(_ => new Hisui.Pdf.Core.Services.OcrLanguageStore(
+                System.IO.Path.Combine(AppContext.BaseDirectory, "tessdata"), AppDataPaths.TessDataDir,
+                new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(5) }));
             builder.Services.AddSingleton<ILocalizer>(Localizer.Instance);
             // Transient so each window owns an independent view model + document session (multi-window).
             builder.Services.AddTransient<MainViewModel>();
-            builder.Services.AddTransient<MainWindow>();
+            builder.Services.AddTransient<DocumentView>();
+            builder.Services.AddSingleton<MainWindow>(); // tabbed shell; each tab is a DocumentView
 
             builder.Logging.ClearProviders();
             builder.Logging.AddDebug();
@@ -62,11 +66,17 @@ public partial class App : Application
 
             // Silent startup check (first window only); only prompts if a newer, non-skipped release exists.
             if (settings.Settings.CheckForUpdates)
-                window.Opened += (_, _) => _ = window.CheckForUpdatesAsync(manual: false);
+                window.Opened += (_, _) => _ = window.CurrentView?.CheckForUpdatesAsync(manual: false);
 
-            // Support "Open with" / command-line: open a file passed as the first arg into this window's VM.
-            if (desktop.Args?.Length > 0 && File.Exists(desktop.Args[0]) && window.DataContext is MainViewModel vm)
-                await vm.OpenPathAsync(desktop.Args[0]);
+            // "Open with" / command-line: open every file passed (the first reuses the empty startup tab).
+            window.OpenArgs(desktop.Args ?? []);
+
+            // Arguments forwarded by later launches (single instance) open as extra tabs here.
+            SingleInstance.Received = args => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                window.Bring();
+                window.OpenArgs(args);
+            });
 
             desktop.Exit += async (_, _) =>
             {

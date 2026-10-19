@@ -19,6 +19,19 @@ internal sealed class FileDialogService : IFileDialogService
     private FilePickerFileType ImageType =>
         new(_loc["Picker.Images"]) { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.tiff"] };
 
+    public async Task<string?> OpenFileAsync(string typeName, params string[] patterns)
+    {
+        var sp = GetStorageProvider();
+        if (sp is null) return null;
+        var files = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = typeName,
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType(typeName) { Patterns = patterns }],
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
     public async Task<string?> OpenPdfAsync()
     {
         var sp = GetStorageProvider();
@@ -34,6 +47,21 @@ internal sealed class FileDialogService : IFileDialogService
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
+    public async Task<IReadOnlyList<string>> OpenPdfsAsync()
+    {
+        var sp = GetStorageProvider();
+        if (sp is null) return [];
+
+        var files = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = _loc["Picker.OpenPdf"],
+            AllowMultiple = true,
+            FileTypeFilter = [PdfType],
+        });
+
+        return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
+    }
+
     public async Task<string?> SavePdfAsync(string suggestedFileName)
     {
         var sp = GetStorageProvider();
@@ -45,6 +73,22 @@ internal sealed class FileDialogService : IFileDialogService
             SuggestedFileName = suggestedFileName,
             DefaultExtension = ".pdf",
             FileTypeChoices = [PdfType],
+        });
+
+        return file?.TryGetLocalPath();
+    }
+
+    public async Task<string?> SaveFileAsync(string suggestedFileName, string extension, string typeName)
+    {
+        var sp = GetStorageProvider();
+        if (sp is null) return null;
+
+        var file = await sp.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = _loc["Picker.SaveAs"],
+            SuggestedFileName = suggestedFileName,
+            DefaultExtension = extension,
+            FileTypeChoices = [new FilePickerFileType(typeName) { Patterns = [$"*{extension}"] }],
         });
 
         return file?.TryGetLocalPath();

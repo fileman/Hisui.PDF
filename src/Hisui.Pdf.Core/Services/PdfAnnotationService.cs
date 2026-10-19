@@ -3,6 +3,8 @@ using Hisui.Pdf.Core.Model;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf;
+using System.Text;
+using System.Text.RegularExpressions;
 using PdfSharp.Pdf.IO;
 
 namespace Hisui.Pdf.Core.Services;
@@ -18,7 +20,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
     // The static constructor runs once per AppDomain, including in test hosts.
     static PdfAnnotationService()
     {
-        GlobalFontSettings.FontResolver ??= new SystemFontResolver();
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
     }
     public Task<byte[]> AddTextWatermarkAsync(byte[] pdf, string text, WatermarkOptions? options = null, CancellationToken ct = default)
     {
@@ -28,18 +30,100 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyAllPages(pdf, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
-            var color = ColorWithAlpha(options.ColorHex, options.Opacity);
-            var font = new XFont("Arial", options.FontSizePoints);
-            var brush = new XSolidBrush(color);
-            var center = new XPoint(page.Width.Point / 2, page.Height.Point / 2);
+            RemoveWatermark(page);
+            var before = page.Contents.Elements.Count;
+            using (var gfx = PageGeometry.OpenGraphics(page))
+            {
+                var color = ColorWithAlpha(options.ColorHex, options.Opacity);
+                var font = new XFont("Arial", options.FontSizePoints);
+                var brush = new XSolidBrush(color);
+                var (vw, vh) = PageGeometry.VisualSize(page);
+                var center = new XPoint(vw / 2, vh / 2);
 
-            gfx.Save();
-            gfx.RotateAtTransform(options.RotationDegrees, center);
-            gfx.DrawString(text, font, brush, center, XStringFormats.Center);
-            gfx.Restore();
+                gfx.Save();
+                gfx.RotateAtTransform(options.RotationDegrees, center);
+                gfx.DrawString(text, font, brush, center, XStringFormats.Center);
+                gfx.Restore();
+            }
+            // The stream just appended is the watermark: tag it with its settings so it can be edited or removed later.
+            if (page.Contents.Elements.Count > before && Resolve(page.Contents.Elements[^1]) is PdfDictionary added)
+                added.Elements[WatermarkKey] = Describe(text, options);
         }), ct);
     }
+
+    public Task<WatermarkInfo?> ReadWatermarkAsync(byte[] pdf, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run(() =>
+        {
+            using var stream = new MemoryStream(pdf, writable: false);
+            using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+            foreach (var page in doc.Pages)
+                foreach (var item in page.Contents.Elements)
+                    if (Resolve(item) is PdfDictionary content && content.Elements.GetDictionary(WatermarkKey) is { } d)
+                        return new WatermarkInfo(d.Elements.GetString("/Text"), new WatermarkOptions
+                        {
+                            Opacity = d.Elements.GetReal("/Opacity"),
+                            FontSizePoints = d.Elements.GetReal("/Size"),
+                            RotationDegrees = d.Elements.GetReal("/Rotation"),
+                            ColorHex = d.Elements.GetString("/Color"),
+                        });
+            return (WatermarkInfo?)null;
+        }, ct);
+    }
+
+    public Task<byte[]> RemoveWatermarkAsync(byte[] pdf, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run(() => ModifyAllPages(pdf, (_, page) => RemoveWatermark(page)), ct);
+    }
+
+    // Second-class key on the watermark's content stream, holding the text and settings it was drawn with.
+    private const string WatermarkKey = "/HisuiWatermark";
+
+    private static PdfDictionary Describe(string text, WatermarkOptions options)
+    {
+        var d = new PdfDictionary();
+        d.Elements["/Text"] = new PdfString(text, PdfStringEncoding.Unicode);
+        d.Elements["/Opacity"] = new PdfReal(options.Opacity);
+        d.Elements["/Size"] = new PdfReal(options.FontSizePoints);
+        d.Elements["/Rotation"] = new PdfReal(options.RotationDegrees);
+        d.Elements["/Color"] = new PdfString(options.ColorHex);
+        return d;
+    }
+
+    /// <summary>
+    /// Drops the tagged watermark stream(s) of a page. PDFsharp isolates each later addition by putting "q" in front of the
+    /// first stream and "Q" after the last one, so a watermark stream may carry such operators: they are kept (as the
+    /// stream's only content) to leave the graphics-state nesting balanced.
+    /// </summary>
+    private static void RemoveWatermark(PdfPage page)
+    {
+        var items = page.Contents.Elements;
+        for (var i = items.Count - 1; i >= 0; i--)
+        {
+            if (Resolve(items[i]) is not PdfDictionary content || content.Elements[WatermarkKey] is null) continue;
+            var balance = GraphicsStateBalance(content.Stream.UnfilteredValue);
+            if (balance == 0)
+            {
+                items.RemoveAt(i);
+                continue;
+            }
+            content.Elements.Remove(WatermarkKey);
+            content.Elements.Remove("/Filter");
+            content.Elements.Remove("/DecodeParms");
+            content.Stream.Value = Encoding.ASCII.GetBytes(string.Join(' ', Enumerable.Repeat(balance > 0 ? "q" : "Q", Math.Abs(balance))));
+        }
+    }
+
+    /// <summary>Number of "q" minus number of "Q" operators, string operands left out.</summary>
+    private static int GraphicsStateBalance(byte[] content)
+    {
+        var text = Regex.Replace(Encoding.Latin1.GetString(content), @"\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]*>", " ");
+        return Regex.Count(text, @"(?<!\S)q(?!\S)") - Regex.Count(text, @"(?<!\S)Q(?!\S)");
+    }
+
+    private static PdfItem? Resolve(PdfItem? item) => item is PdfSharp.Pdf.Advanced.PdfReference r ? r.Value : item;
 
     public Task<byte[]> AddHighlightAsync(byte[] pdf, int pageIndex, PdfRect rect, string colorHex = "#FFFF00", double opacity = 0.4, CancellationToken ct = default)
     {
@@ -47,7 +131,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             var brush = new XSolidBrush(ColorWithAlpha(colorHex, opacity));
             gfx.DrawRectangle(brush, ToXRect(rect, page));
         }), ct);
@@ -59,7 +143,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             var pen = new XPen(ParseColor(strokeHex), lineWidthPoints);
             var xRect = ToXRect(rect, page);
 
@@ -77,7 +161,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             var xRect = ToXRect(rect, page);
             var font = new XFont("Arial", fontSizePoints);
             var brush = new XSolidBrush(ParseColor(colorHex));
@@ -103,12 +187,13 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
 
-            var noteW = page.Width.Point * 0.18;
-            var noteH = page.Height.Point * 0.10;
-            var noteX = normalizedX * page.Width.Point - noteW / 2;
-            var noteY = normalizedY * page.Height.Point - noteH / 2;
+            var (vw, vh) = PageGeometry.VisualSize(page);
+            var noteW = vw * 0.18;
+            var noteH = vh * 0.10;
+            var noteX = normalizedX * vw - noteW / 2;
+            var noteY = normalizedY * vh - noteH / 2;
             var noteRect = new XRect(noteX, noteY, noteW, noteH);
 
             gfx.DrawRectangle(
@@ -130,7 +215,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            using var gfx = PageGeometry.OpenGraphics(page);
             using var imgStream = new MemoryStream(imageBytes);
             var xImg = XImage.FromStream(imgStream);
             try
@@ -169,14 +254,13 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
     private static byte[] Save(PdfDocument doc)
     {
         using var ms = new MemoryStream();
-        doc.Save(ms);
+        doc.SaveStamped(ms);
         return ms.ToArray();
     }
 
     private static XRect ToXRect(PdfRect rect, PdfPage page)
     {
-        var w = page.Width.Point;
-        var h = page.Height.Point;
+        var (w, h) = PageGeometry.VisualSize(page);
         return new XRect(rect.Left * w, rect.Top * h, rect.Width * w, rect.Height * h);
     }
 

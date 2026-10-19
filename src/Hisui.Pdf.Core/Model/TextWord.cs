@@ -8,4 +8,6 @@ public sealed class TextWord
     public PdfRect BoundingBox { get; init; }
     /// <summary>Approximate font size in points, from the first letter of the word.</summary>
     public double FontSizePoints { get; init; } = 12;
+    /// <summary>False for rotated text (e.g. vertical column headers).</summary>
+    public bool IsHorizontal { get; init; } = true;
 }

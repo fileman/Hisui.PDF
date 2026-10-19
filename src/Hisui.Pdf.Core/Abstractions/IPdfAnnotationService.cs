@@ -9,8 +9,14 @@ namespace Hisui.Pdf.Core.Abstractions;
 /// </summary>
 public interface IPdfAnnotationService
 {
-    /// <summary>Stamps a diagonal text watermark on every page.</summary>
+    /// <summary>Stamps a diagonal text watermark on every page, replacing the one added earlier by this method.</summary>
     Task<byte[]> AddTextWatermarkAsync(byte[] pdf, string text, WatermarkOptions? options = null, CancellationToken ct = default);
+
+    /// <summary>Text and settings of the watermark added by <see cref="AddTextWatermarkAsync"/>; null when there is none.</summary>
+    Task<WatermarkInfo?> ReadWatermarkAsync(byte[] pdf, CancellationToken ct = default);
+
+    /// <summary>Removes the watermark added by <see cref="AddTextWatermarkAsync"/> from every page.</summary>
+    Task<byte[]> RemoveWatermarkAsync(byte[] pdf, CancellationToken ct = default);
 
     /// <summary>Draws a semi-transparent highlight rectangle on a single page.</summary>
     Task<byte[]> AddHighlightAsync(byte[] pdf, int pageIndex, PdfRect rect, string colorHex = "#FFFF00", double opacity = 0.4, CancellationToken ct = default);

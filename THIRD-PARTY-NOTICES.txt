@@ -17,17 +17,17 @@ Components
    Copyright: (c) 2026 empira (PDFsharp Team)
    Project  : https://docs.pdfsharp.net/
 
-2. PdfPig 0.1.14
+2. PdfPig 0.1.16
    License  : Apache-2.0
    Copyright: (c) UglyToad and the PdfPig contributors
    Project  : https://github.com/UglyToad/PdfPig
 
-3. PDFtoImage 5.2.1
+3. PDFtoImage 5.4.0
    License  : MIT
    Copyright: (c) David Sungaila
    Project  : https://github.com/sungaila/PDFtoImage
 
-4. SkiaSharp 3.119.2
+4. SkiaSharp 4.150.1
    (incl. SkiaSharp.NativeAssets.Win32 / macOS / Linux.NoDependencies)
    License  : MIT  (managed binding)
    Copyright: (c) Microsoft Corporation. All rights reserved.
@@ -36,7 +36,7 @@ Components
               licensed under the BSD-3-Clause License (see below).
 
 5. PDFium (native binaries)
-   bblanchon.PDFium.Win32 / Linux / macOS 147.0.7690
+   bblanchon.PDFium.Win32 / Linux / macOS 152.0.7961
    License  : Apache-2.0  (binary packaging)
    Copyright: (c) Benoit Blanchon 2017-2025
    Project  : https://github.com/bblanchon/pdfium-binaries
@@ -48,19 +48,19 @@ Components
    Copyright: (c) .NET Foundation and Contributors. All rights reserved.
    Project  : https://github.com/CommunityToolkit/dotnet
 
-7. Microsoft.Extensions.* 10.0.9
+7. Microsoft.Extensions.* 10.0.12
    (Hosting, DependencyInjection.Abstractions, Logging.Abstractions, Logging.Debug)
    License  : MIT
    Copyright: (c) Microsoft Corporation. All rights reserved.
    Project  : https://dot.net/
 
-8. Avalonia 11.2.0
+8. Avalonia 12.1.4
    (incl. Avalonia.Desktop, Avalonia.Themes.Fluent)
    License  : MIT
    Copyright: Copyright 2013-2024 (c) The AvaloniaUI Project
    Project  : https://avaloniaui.net/
 
-9. Inter (font), bundled via Avalonia.Fonts.Inter 11.2.0
+9. Inter (font), bundled via Avalonia.Fonts.Inter 12.1.4
    License  : SIL Open Font License 1.1 (OFL-1.1)
    Copyright: (c) The Inter Project Authors (https://github.com/rsms/inter)
    Project  : https://rsms.me/inter/
@@ -84,6 +84,23 @@ Components
    Project  : https://github.com/tesseract-ocr/tessdata_fast
    Note     : The 'eng.traineddata' / 'ita.traineddata' files bundled in the
               'tessdata' folder next to the executable, used by the OCR feature.
+
+12. DocumentFormat.OpenXml 3.3.0
+   License  : MIT
+   Copyright: (c) Microsoft Corporation
+   Project  : https://github.com/dotnet/Open-XML-SDK
+   Note     : Writes the .docx file for the PDF-to-Word export.
+
+13. Liberation Sans 2.1.5 (font: Regular, Bold, Italic, Bold Italic)
+   License  : SIL Open Font License 1.1 (OFL-1.1)
+   Copyright: Digitized data (c) 2010 Google Corporation (Reserved Font Arimo);
+              (c) 2012 Red Hat, Inc. (Reserved Font Name Liberation)
+   Project  : https://github.com/liberationfonts/liberation-fonts
+   Note     : Embedded in Hisui.Pdf.Core and used (instead of any system font)
+              for the text Hisui PDF writes into documents: annotations, edited
+              text, form field values, headers/footers, signature blocks. Only
+              the glyphs used are embedded in the PDF. Metric-compatible with
+              Arial. Unmodified font files.
 
 
 --------------------------------------------------------------------------------
@@ -158,10 +175,13 @@ contributors of the above components.
 
 ### SIL Open Font License, Version 1.1
 
-Applies to: the Inter font (bundled via Avalonia.Fonts.Inter).
+Applies to: the Inter font (bundled via Avalonia.Fonts.Inter) and the Liberation
+Sans font (embedded in Hisui.Pdf.Core).
 
-The complete OFL 1.1 text (with the Inter copyright notice) ships with this
-distribution as "licenses/OFL.txt" (SPDX identifier: OFL-1.1).
-Under the OFL, the font may be bundled and redistributed freely, must remain
-under the OFL, may not be sold by itself, and the Reserved Font Name "Inter"
-may not be used for modified versions.
+The complete OFL 1.1 text ships with this distribution with each font's
+copyright notice: "licenses/OFL.txt" (Inter) and "licenses/OFL-Liberation.txt"
+(Liberation Sans) (SPDX identifier: OFL-1.1).
+Under the OFL, the fonts may be bundled and redistributed freely, must remain
+under the OFL, may not be sold by themselves, and the Reserved Font Names
+("Inter"; "Liberation", "Arimo", "Tinos", "Cousine") may not be used for
+modified versions. The OFL does not apply to documents created with the fonts.

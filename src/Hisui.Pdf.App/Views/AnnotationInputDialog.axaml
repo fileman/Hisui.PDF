@@ -35,6 +35,8 @@
 
         <!-- Footer buttons -->
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,18,0,0">
+            <Button Content="{loc:Tr Watermark.Remove}" Name="RemoveButton" IsVisible="False"
+                    HorizontalAlignment="Left" />
             <Button Grid.Column="1" Content="{loc:Tr Dialog.Cancel}" Name="CancelButton"
                     IsCancel="True" Margin="0,0,8,0" />
             <Button Grid.Column="2" Content="{loc:Tr Dialog.Apply}" Name="ApplyButton"
@@ -48,6 +50,12 @@
             <Border Name="ErrorBanner" Classes="error-banner" IsVisible="False">
                 <TextBlock Name="ErrorLabel" Classes="error-text" />
             </Border>
+
+            <!-- Field name — form tools -->
+            <StackPanel Name="FieldNameSection" IsVisible="False">
+                <TextBlock Classes="caption" Text="{loc:Tr Label.FieldName}" />
+                <TextBox Name="FieldNameBox" PlaceholderText="{loc:Tr Label.FieldName.Auto}" />
+            </StackPanel>
 
             <!-- Text input — FreeText, StickyNote, Watermark, TextEdit -->
             <StackPanel Name="TextSection" IsVisible="False">

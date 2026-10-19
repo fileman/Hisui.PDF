@@ -1,0 +1,1446 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:Hisui.Pdf.App.Converters"
+        xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
+        xmlns:vm="clr-namespace:Hisui.Pdf.App.ViewModels"
+        xmlns:views="clr-namespace:Hisui.Pdf.App.Views"
+        x:Class="Hisui.Pdf.App.Views.DocumentView"
+        x:DataType="vm:MainViewModel"
+        FontFamily="Segoe UI Variable Text, Segoe UI, $Default"
+        Background="{DynamicResource RibbonWindowBrush}">
+
+    <!-- Keyboard shortcuts for the common commands. Print / Find / match navigation and Esc-to-clear
+         are handled in code-behind (they target the view, not a VM command). -->
+    <UserControl.KeyBindings>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
+        <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+        <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+        <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Gesture="Ctrl+Add" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Gesture="Ctrl+OemMinus" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Gesture="Ctrl+Subtract" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Gesture="Ctrl+D0" Command="{Binding ZoomActualCommand}" />
+    </UserControl.KeyBindings>
+
+    <UserControl.Resources>
+        <conv:EnumToBoolConverter x:Key="EnumToBool" />
+
+        <!-- Ribbon glyphs (16-unit coordinate space, stroked, no fill) -->
+        <StreamGeometry x:Key="IconStar">M8 1.8l1.85 3.9 4.25.5-3.15 2.9.85 4.2L8 11.2l-3.8 2.1.85-4.2L1.9 6.2l4.25-.5z</StreamGeometry>
+        <StreamGeometry x:Key="IconOpen">M2 4.5h4l1.2 1.6H14V13H2z</StreamGeometry>
+        <StreamGeometry x:Key="IconAdd">M8 3v10M3 8h10</StreamGeometry>
+        <StreamGeometry x:Key="IconSave">M3.5 3h7l2.5 2.5V13H3.5z M6 3v3.5h4V3 M5.5 9h5v4h-5z</StreamGeometry>
+        <StreamGeometry x:Key="IconPrint">M5 6V3h6v3 M3.5 6.5h9v4h-2 M6 14v-4h4v4z M9.5 8.3h1.5</StreamGeometry>
+        <StreamGeometry x:Key="IconInfo">M8 2.5a5.5 5.5 0 1 0 .01 0 M8 7.2v4 M8 4.8h.01</StreamGeometry>
+        <StreamGeometry x:Key="IconLock">M5 7.5V5.5a3 3 0 0 1 6 0v2 M4 7.5h8v6H4z M8 10v1.5</StreamGeometry>
+        <StreamGeometry x:Key="IconRotateCw">M11 6a4 4 0 1 0 1 3 M11 3v3H8</StreamGeometry>
+        <StreamGeometry x:Key="IconRotateCcw">M5 6a4 4 0 1 1-1 3 M5 3v3h3</StreamGeometry>
+        <StreamGeometry x:Key="IconDelete">M3 5h10M6 5V3h4v2M5 5l.7 9h4.6L11 5</StreamGeometry>
+        <StreamGeometry x:Key="IconUp">M8 13V4 M4 8l4-4 4 4</StreamGeometry>
+        <StreamGeometry x:Key="IconDown">M8 3V12 M4 8l4 4 4-4</StreamGeometry>
+        <StreamGeometry x:Key="IconUndo">M6 5L3 8l3 3 M3 8h7a3 3 0 0 1 0 6H7</StreamGeometry>
+        <StreamGeometry x:Key="IconRedo">M10 5l3 3-3 3 M13 8H6a3 3 0 0 0 0 6h2</StreamGeometry>
+        <StreamGeometry x:Key="IconExtract">M4 2h6l2.5 2.5V14H4z M8 7v4M6 9l2 2 2-2</StreamGeometry>
+        <StreamGeometry x:Key="IconSplit">M8 2v12M3 5L1.5 8 3 11M13 5l1.5 3L13 11</StreamGeometry>
+        <StreamGeometry x:Key="IconOcr">M4 2h6l2.5 2.5V14H4z M6 6h4 M6 8.5h4 M6 11h2.5</StreamGeometry>
+        <StreamGeometry x:Key="IconCompress">M8 2v6 M5.5 5.5L8 8l2.5-2.5 M4 11.5h8 M4 13.5h8</StreamGeometry>
+        <StreamGeometry x:Key="IconPages">M3 3h4v4H3z M9 3h4v4H9z M3 9h4v4H3z M9 9h4v4H9z</StreamGeometry>
+        <StreamGeometry x:Key="IconTools">M3 5h10 M3 11h10 M6 3v4 M10 9v4</StreamGeometry>
+
+        <!-- Annotation tool glyphs (16-unit coordinate space, stroked, no fill) -->
+        <StreamGeometry x:Key="IconHighlight">M5 11l6-6 3 3-6 6H5z M3 14h10</StreamGeometry>
+        <StreamGeometry x:Key="IconRectangle">M3 4h10v8H3z</StreamGeometry>
+        <StreamGeometry x:Key="IconFreeText">M4 4h8 M8 4v9</StreamGeometry>
+        <StreamGeometry x:Key="IconFormText">M2 4h12v8H2z M5 6v4</StreamGeometry>
+        <StreamGeometry x:Key="IconFormCheckBox">M3 3h10v10H3z M5.5 8l2 2l3.5-4</StreamGeometry>
+        <StreamGeometry x:Key="IconFormComboBox">M2 4h12v8H2z M9.5 7l2 2l2-2</StreamGeometry>
+        <StreamGeometry x:Key="IconDetectFields">M2 5V2h3 M11 2h3v3 M14 11v3h-3 M5 14H2v-3 M5 8h6</StreamGeometry>
+        <StreamGeometry x:Key="IconFormRadio">M8 2.5a5.5 5.5 0 1 0 .01 0z M8 6a2 2 0 1 0 .01 0z</StreamGeometry>
+        <StreamGeometry x:Key="IconFormListBox">M2.5 2.5h11v11h-11z M5 5.5h6 M5 8h6 M5 10.5h6</StreamGeometry>
+        <StreamGeometry x:Key="IconStickyNote">M3 3h7l3 3v7H3z M10 3v3h3</StreamGeometry>
+        <StreamGeometry x:Key="IconTextEdit">M3 13h6 M12 3l1.5 1.5-7 7-2 .5 .5-2z</StreamGeometry>
+        <StreamGeometry x:Key="IconImage">M2.5 4h11v8h-11z M5 10l2.5-2.5 2 2 3-3 1 1 M6 7a.8 .8 0 1 0 .01 0</StreamGeometry>
+        <StreamGeometry x:Key="IconWatermark">M4 2h6l2.5 2.5V14H4z M5.5 11l5-6</StreamGeometry>
+        <StreamGeometry x:Key="IconSelectAll">M2 4V2h2 M7 2h2 M12 2h2v2 M14 7v2 M14 12v2h-2 M9 14H7 M4 14H2v-2 M2 9V7</StreamGeometry>
+        <StreamGeometry x:Key="IconProperties">M3 4h10 M3 8h10 M3 12h10 M6 2.5v3 M10 6.5v3 M5 10.5v3</StreamGeometry>
+        <StreamGeometry x:Key="IconSortRows">M2.5 4h8 M2.5 8h8 M2.5 12h5 M12.5 3v10 M10.5 11l2 2 2-2</StreamGeometry>
+        <StreamGeometry x:Key="IconExport">M8 10V2.5 M5 5.5l3-3 3 3 M3 9v4.5h10V9</StreamGeometry>
+        <StreamGeometry x:Key="IconImport">M8 2.5V10 M5 7l3 3 3-3 M3 9v4.5h10V9</StreamGeometry>
+        <StreamGeometry x:Key="IconFlatten">M2 6.5l6-3 6 3-6 3z M2 10l6 3 6-3</StreamGeometry>
+        <StreamGeometry x:Key="IconAddChild">M2.5 2.5v7h6 M6.5 7.5l2 2-2 2 M12 2.5v5 M9.5 5h5</StreamGeometry>
+        <StreamGeometry x:Key="IconReply">M6 4L2.5 7.5 6 11 M2.5 7.5h6.5a4 4 0 0 1 4 4v1</StreamGeometry>
+        <StreamGeometry x:Key="IconSignature">M2 10.5c1-2.5 2-2.5 3 0s2 2.5 3 0 2-2.5 3 0 M2 13.5h11</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+
+        <!-- File backstage pill -->
+        <Style Selector="Button.ribbon-filepill">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonOnAccentBrush}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+        </Style>
+        <Style Selector="Button.ribbon-filepill /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="Button.ribbon-filepill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="Button.ribbon-filepill:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="Button.ribbon-filepill:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonOnAccentBrush}" />
+        </Style>
+
+        <!-- Ribbon command buttons -->
+        <Style Selector="Button.ribbon-small, Button.ribbon-icon">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
+        </Style>
+        <Style Selector="Button.ribbon-small">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.ribbon-icon">
+            <Setter Property="Padding" Value="5" />
+        </Style>
+        <Style Selector="Button.ribbon-small /template/ ContentPresenter#PART_ContentPresenter,
+                         Button.ribbon-icon /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="Button.ribbon-small:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         Button.ribbon-icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.ribbon-small:pressed /template/ ContentPresenter#PART_ContentPresenter,
+                         Button.ribbon-icon:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <!-- Dim the whole content (glyph + label) when the command is unavailable. -->
+        <Style Selector="Button.ribbon-small:disabled /template/ ContentPresenter#PART_ContentPresenter,
+                         Button.ribbon-icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Opacity" Value="0.4" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <!-- Glyphs -->
+        <Style Selector="Path.glyph">
+            <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}" />
+            <Setter Property="StrokeThickness" Value="1.4" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="Stretch" Value="Uniform" />
+        </Style>
+        <Style Selector="Path.glyph-accent">
+            <Setter Property="Stroke" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <!-- Glyph inside an annotation tool toggle: a RadioButton (not a Button), and its stroke must
+             track the toggle's Foreground so it flips to the on-accent colour when checked. -->
+        <Style Selector="Path.glyph-tool">
+            <Setter Property="Stroke" Value="{Binding $parent[RadioButton].Foreground}" />
+            <Setter Property="StrokeThickness" Value="1.4" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="Stretch" Value="Uniform" />
+        </Style>
+
+        <!-- Panel labels -->
+        <Style Selector="TextBlock.ribbon-label-sm">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.panel-caption">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LetterSpacing" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonCaptionBrush}" />
+            <Setter Property="Margin" Value="4,10,0,4" />
+        </Style>
+
+        <!-- Left rail toggles (panel pickers) -->
+        <Style Selector="ToggleButton.rail">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Padding" Value="0,7" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="root" CornerRadius="7" Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"
+                                          HorizontalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.rail:pointerover /template/ Border#root">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.rail:checked /template/ Border#root">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentSoftBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.rail:checked">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="TextBlock.rail-caption">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{Binding $parent[ToggleButton].Foreground}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Annotation tool toggles -->
+        <!-- Tools act on a page: unavailable until a document is open. -->
+        <Style Selector="RadioButton.tool">
+            <Setter Property="IsEnabled" Value="{Binding IsDocumentLoaded}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="root" CornerRadius="5" Background="Transparent"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center"
+                                          Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.tool:pointerover /template/ Border#root">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="RadioButton.tool:checked /template/ Border#root">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="RadioButton.tool:disabled">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="RadioButton.tool:checked">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonOnAccentBrush}" />
+        </Style>
+
+        <!-- Thumbnail list -->
+        <Style Selector="ListBox.thumbs">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.thumbs ListBoxItem">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="CornerRadius" Value="5" />
+        </Style>
+        <Style Selector="ListBox.thumbs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource RibbonAccentBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="5" />
+        </Style>
+
+        <!-- Backstage menu -->
+        <Style Selector="MenuItem.backstage">
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <!-- Command-bar zoom buttons -->
+        <Style Selector="Button.zoombtn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="MinWidth" Value="26" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+        </Style>
+        <Style Selector="Button.zoombtn /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.zoombtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+
+        <!-- Recent-file links in the empty state -->
+        <Style Selector="Button.recent-link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="Button.recent-link /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.recent-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <!-- Recent-file rows: name + folder, then pin (star) and remove; actions show on hover or when pinned -->
+        <Style Selector="Button.recent-item">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Button.recent-item /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.recent-item:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.recent-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action:disabled">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="Button.recent-action:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Grid.recent-row Button.recent-action">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Grid.recent-row:pointerover Button.recent-action, Grid.recent-row Button.recent-action:focus-within">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Grid.recent-row.missing > Button.recent-item">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Grid.recent-row Button.recent-action.pinned">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="Button.recent-action.pinned Path.glyph">
+            <Setter Property="Fill" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+
+        <!-- Form-field editors sit on the white page: same light fill in every theme and state -->
+        <Style Selector="TextBox.field /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#E8F0FE" />
+            <Setter Property="BorderBrush" Value="#5A86D0" />
+            <Setter Property="BorderThickness" Value="0.5" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <Style Selector="TextBox.field:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="#005FB8" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBox.field.required /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#C42B1C" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBox.field.invalid /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#FDE7E9" />
+            <Setter Property="BorderBrush" Value="#C42B1C" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="ToggleButton.field /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#E8F0FE" />
+            <Setter Property="BorderBrush" Value="#5A86D0" />
+            <Setter Property="BorderThickness" Value="0.5" />
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+        <Style Selector="ToggleButton.field:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BorderBrush" Value="#005FB8" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Root: ribbon shell + modal busy overlay. -->
+    <Grid>
+        <DockPanel>
+
+            <!-- ── Command bar ── -->
+            <Border DockPanel.Dock="Top" Height="40"
+                    Background="{DynamicResource RibbonTabStripBrush}"
+                    BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="0,0,0,1">
+                <Grid Margin="10,0" ColumnDefinitions="Auto,*,Auto,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                        <Button Classes="ribbon-filepill" Content="{loc:Tr Ribbon.FilePill}" Click="OnFileBackstageClick"
+                                ToolTip.Tip="{loc:Tr Ribbon.FilePill.Tooltip}" />
+                        <Border Width="1" Height="18" Background="{DynamicResource RibbonDividerBrush}" Margin="6,0" />
+                        <Button Classes="ribbon-icon" Command="{Binding OpenCommand}" ToolTip.Tip="{loc:Tr Cmd.Open.Tooltip}"
+                                AutomationProperties.Name="{loc:Tr Cmd.Open}">
+                            <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconOpen}" />
+                        </Button>
+                        <Button Classes="ribbon-icon" Command="{Binding SaveCommand}" ToolTip.Tip="{loc:Tr Cmd.Save.Tooltip}"
+                                AutomationProperties.Name="{loc:Tr Cmd.Save}">
+                            <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconSave}" />
+                        </Button>
+                        <Button Classes="ribbon-icon" Click="OnPrintClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Cmd.Print.Tooltip}"
+                                AutomationProperties.Name="{loc:Tr Cmd.Print}">
+                            <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconPrint}" />
+                        </Button>
+                        <Border Width="1" Height="18" Background="{DynamicResource RibbonDividerBrush}" Margin="6,0" />
+                        <Button Classes="ribbon-icon" Command="{Binding UndoCommand}" ToolTip.Tip="{loc:Tr Cmd.Undo.Tooltip}"
+                                AutomationProperties.Name="{loc:Tr Cmd.Undo}">
+                            <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconUndo}" />
+                        </Button>
+                        <Button Classes="ribbon-icon" Command="{Binding RedoCommand}" ToolTip.Tip="{loc:Tr Cmd.Redo.Tooltip}"
+                                AutomationProperties.Name="{loc:Tr Cmd.Redo}">
+                            <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconRedo}" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Status message -->
+                    <Grid Grid.Column="1" Margin="14,0" ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                        <Ellipse Width="7" Height="7" Margin="0,0,6,0" Fill="{DynamicResource RibbonSuccessBrush}" />
+                        <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" FontSize="12"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                    </Grid>
+
+                    <!-- Find-in-document bar -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center"
+                                IsEnabled="{Binding IsDocumentLoaded}">
+                        <TextBox x:Name="SearchBox" Width="190" Height="27" Padding="8,2" VerticalContentAlignment="Center"
+                                 PlaceholderText="{loc:Tr Search.Placeholder}" Text="{Binding SearchQuery}">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <ToggleButton Content="Aa" FontSize="12" MinWidth="30" Height="27" Padding="6,0"
+                                      IsChecked="{Binding SearchMatchCase}" ToolTip.Tip="{loc:Tr Search.MatchCase}"
+                                      AutomationProperties.Name="{loc:Tr Search.MatchCase}" />
+                        <ToggleButton MinWidth="34" Height="27" Padding="6,0"
+                                      IsChecked="{Binding SearchWholeWord}" ToolTip.Tip="{loc:Tr Search.WholeWord}"
+                                      AutomationProperties.Name="{loc:Tr Search.WholeWord}">
+                            <TextBlock Text="ab" FontSize="12" TextDecorations="Underline" />
+                        </ToggleButton>
+                        <TextBlock Text="{Binding SearchSummary}" VerticalAlignment="Center" MinWidth="46"
+                                   TextAlignment="Center" FontSize="11.5"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                        <Button Classes="ribbon-icon" Command="{Binding PrevMatchCommand}" ToolTip.Tip="{loc:Tr Search.Prev}"
+                                AutomationProperties.Name="{loc:Tr Search.Prev}">
+                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconUp}" />
+                        </Button>
+                        <Button Classes="ribbon-icon" Command="{Binding NextMatchCommand}" ToolTip.Tip="{loc:Tr Search.Next}"
+                                AutomationProperties.Name="{loc:Tr Search.Next}">
+                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconDown}" />
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="1" Height="18" Background="{DynamicResource RibbonDividerBrush}" Margin="6,0" />
+                        <!-- Zoom controls: − [percentage ▾ presets] + -->
+                        <StackPanel Orientation="Horizontal" Spacing="1" VerticalAlignment="Center"
+                                    IsEnabled="{Binding IsDocumentLoaded}">
+                            <Button Classes="zoombtn" Command="{Binding ZoomOutCommand}"
+                                    ToolTip.Tip="{loc:Tr Zoom.Out}" AutomationProperties.Name="{loc:Tr Zoom.Out}">
+                                <Path Classes="glyph" Width="12" Height="12" Data="M3 8h10" />
+                            </Button>
+                            <Button Classes="zoombtn" MinWidth="62" ToolTip.Tip="{loc:Tr Zoom.Presets}"
+                                    AutomationProperties.Name="{loc:Tr Zoom.Presets}">
+                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding ZoomLabel}" VerticalAlignment="Center" />
+                                    <Path Classes="glyph" Width="8" Height="6" Data="M1 2l3 3 3-3" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="50%"  Command="{Binding SetZoomPercentCommand}" CommandParameter="50" />
+                                        <MenuItem Header="75%"  Command="{Binding SetZoomPercentCommand}" CommandParameter="75" />
+                                        <MenuItem Header="100%" Command="{Binding SetZoomPercentCommand}" CommandParameter="100" />
+                                        <MenuItem Header="125%" Command="{Binding SetZoomPercentCommand}" CommandParameter="125" />
+                                        <MenuItem Header="150%" Command="{Binding SetZoomPercentCommand}" CommandParameter="150" />
+                                        <MenuItem Header="200%" Command="{Binding SetZoomPercentCommand}" CommandParameter="200" />
+                                        <Separator />
+                                        <MenuItem Header="{loc:Tr Zoom.FitWidth}"  Command="{Binding FitWidthCommand}" />
+                                        <MenuItem Header="{loc:Tr Zoom.FitHeight}" Command="{Binding FitHeightCommand}" />
+                                        <Separator />
+                                        <MenuItem Header="{loc:Tr View.SinglePage}" Command="{Binding SetContinuousViewCommand}"
+                                                  CommandParameter="{x:False}">
+                                            <MenuItem.Icon><TextBlock Text="✓" IsVisible="{Binding !IsContinuousView}" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="{loc:Tr View.Continuous}" Command="{Binding SetContinuousViewCommand}"
+                                                  CommandParameter="{x:True}">
+                                            <MenuItem.Icon><TextBlock Text="✓" IsVisible="{Binding IsContinuousView}" /></MenuItem.Icon>
+                                        </MenuItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Classes="zoombtn" Command="{Binding ZoomInCommand}"
+                                    ToolTip.Tip="{loc:Tr Zoom.In}" AutomationProperties.Name="{loc:Tr Zoom.In}">
+                                <Path Classes="glyph" Width="12" Height="12" Data="M8 3v10 M3 8h10" />
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Text="{Binding PageInfo}" FontSize="12" Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                        <Border Width="1" Height="18" Background="{DynamicResource RibbonDividerBrush}" Margin="10,0,6,0" />
+                        <!-- Help in plain sight: report, request, share, updates, about. -->
+                        <Button Classes="ribbon-filepill" Content="{loc:Tr Ribbon.Help}" Click="OnHelpClick"
+                                ToolTip.Tip="{loc:Tr Ribbon.Help.Tooltip}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ── Body: rail | tool panel | thumbnails | splitter | preview ── -->
+            <Grid x:Name="BodyGrid">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="56" />
+                    <ColumnDefinition Width="0" />
+                    <ColumnDefinition Width="266" MinWidth="200" />
+                    <ColumnDefinition Width="5" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left rail: panel toggles -->
+                <Border Grid.Column="0" Background="{DynamicResource RibbonTabStripBrush}"
+                        BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="4" Margin="0,8" HorizontalAlignment="Center">
+                        <ToggleButton Classes="rail" IsChecked="{Binding IsThumbnailPanelOpen}"
+                                      ToolTip.Tip="{loc:Tr Rail.Pages}" AutomationProperties.Name="{loc:Tr Rail.Pages}">
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconPages}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Pages}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Home}"
+                                      ToolTip.Tip="{loc:Tr Rail.Tools}" AutomationProperties.Name="{loc:Tr Rail.Tools}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Home" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconTools}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Tools}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Annota}"
+                                      ToolTip.Tip="{loc:Tr Rail.Annotate}" AutomationProperties.Name="{loc:Tr Rail.Annotate}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Annota" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconHighlight}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Annotate}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Forms}"
+                                      ToolTip.Tip="{loc:Tr Rail.Forms}" AutomationProperties.Name="{loc:Tr Rail.Forms}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Forms" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconFormText}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Forms}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Sign}"
+                                      ToolTip.Tip="{loc:Tr Rail.Sign}" AutomationProperties.Name="{loc:Tr Rail.Sign}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Sign" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconSignature}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Sign}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Comments}"
+                                      ToolTip.Tip="{loc:Tr Rail.Comments}" AutomationProperties.Name="{loc:Tr Rail.Comments}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Comments" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconStickyNote}" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Comments}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
+                                      CommandParameter="{x:Static vm:RibbonTab.Bookmarks}"
+                                      ToolTip.Tip="{loc:Tr Rail.Bookmarks}" AutomationProperties.Name="{loc:Tr Rail.Bookmarks}">
+                            <ToggleButton.IsChecked>
+                                <MultiBinding Mode="OneWay" Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsToolPanelOpen" />
+                                    <Binding Path="RibbonTab" Converter="{StaticResource EnumToBool}" ConverterParameter="Bookmarks" />
+                                </MultiBinding>
+                            </ToggleButton.IsChecked>
+                            <StackPanel Spacing="3" HorizontalAlignment="Center">
+                                <Path Classes="glyph" Width="18" Height="18" Data="M4.5 2h7v12l-3.5-3-3.5 3z" />
+                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Bookmarks}" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </StackPanel>
+                </Border>
+
+                <!-- Tool panel: the tool set picked on the rail -->
+                <Border Grid.Column="1" IsVisible="{Binding IsToolPanelOpen}"
+                        Background="{DynamicResource RibbonBarBrush}"
+                        BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="0,0,1,0">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <Panel Margin="10,6,10,12">
+
+                            <!-- HOME -->
+                            <StackPanel Spacing="2"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Home}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Pages}" />
+                                <Button Classes="ribbon-small" Command="{Binding RotateRightCommand}" ToolTip.Tip="{loc:Tr Cmd.RotateRight.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCw}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.RotateRight}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding RotateLeftCommand}" ToolTip.Tip="{loc:Tr Cmd.RotateLeft.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCcw}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.RotateLeft}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteSelectedCommand}" ToolTip.Tip="{loc:Tr Cmd.Delete.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Delete}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding MoveUpCommand}" ToolTip.Tip="{loc:Tr Cmd.MoveUp.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconUp}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.MoveUp.Tooltip}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding MoveDownCommand}" ToolTip.Tip="{loc:Tr Cmd.MoveDown.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDown}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.MoveDown.Tooltip}" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Tools}" />
+                                <Button Classes="ribbon-small" Command="{Binding ExtractSelectedCommand}" ToolTip.Tip="{loc:Tr Cmd.Extract.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconExtract}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Extract}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding SplitToSinglePagesCommand}" ToolTip.Tip="{loc:Tr Cmd.Split.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconSplit}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Split}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding MakeSearchableCommand}" ToolTip.Tip="{loc:Tr Cmd.Ocr.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconOcr}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Ocr}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding CompressCommand}" ToolTip.Tip="{loc:Tr Cmd.Compress.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconCompress}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Compress}" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Document}" />
+                                <Button Classes="ribbon-small" Click="OnDocumentPropertiesClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.DocumentProperties}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconInfo}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Properties}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Click="OnProtectClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.Protect}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconLock}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Protect}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ExtractImagesCommand}" ToolTip.Tip="{loc:Tr Menu.ExtractImages}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconImage}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.ExtractImages}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding AddFilesCommand}" ToolTip.Tip="{loc:Tr Cmd.Add.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAdd}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ChooseOcrLanguagesCommand}" ToolTip.Tip="{loc:Tr Ocr.Button.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2a6 6 0 1 0 .01 0 M2 8h12 M8 2c2 2 2 10 0 12 M8 2c-2 2-2 10 0 12" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Ocr.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding BatchCommand}" ToolTip.Tip="{loc:Tr Batch.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M5 2h7v9H5z M3 4v9h7 M7 5h3 M7 7h3" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Batch.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding SaveAsProfileCommand}" ToolTip.Tip="{loc:Tr Conf.Button.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M4 2h6l2.5 2.5V14H4z M6 9l1.5 1.5L10.5 7" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Conf.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding CheckAccessibilityCommand}" ToolTip.Tip="{loc:Tr Conf.A11y.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2.5a1.2 1.2 0 1 0 .01 0 M3.5 5.5L8 6.5l4.5-1 M8 6.5v3 M8 9.5l-2.5 4.5 M8 9.5l2.5 4.5" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Conf.A11y}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding CompareCommand}" ToolTip.Tip="{loc:Tr Compare.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 3h5v10H2z M9 3h5v10H9z M3.5 6h2 M10.5 6h2 M10.5 9h2" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Compare.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding RedactPatternsCommand}" ToolTip.Tip="{loc:Tr Redact.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 4h12 M2 8h5 M10 7h4v3h-4z M2 12h12" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Redact.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding AddHeaderFooterCommand}" ToolTip.Tip="{loc:Tr Stamp.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M3 2h10v12H3z M5 4h6 M5 12h6" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Stamp.Button}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- ANNOTA -->
+                            <StackPanel Spacing="2"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Annota}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Annotate}" />
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Link.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Link, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="M6.5 9.5l3-3 M7 4.5l1.5-1.5a2.5 2.5 0 0 1 3.5 3.5L10.5 8 M9 11.5L7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8" />
+                                        <TextBlock Text="{loc:Tr Tool.Link}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Highlight.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Highlight, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconHighlight}" />
+                                        <TextBlock Text="{loc:Tr Tool.Highlight}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.OcrSelection.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=OcrSelection, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconOcr}" />
+                                        <TextBlock Text="{loc:Tr Tool.OcrSelection}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Rectangle.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Rectangle, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconRectangle}" />
+                                        <TextBlock Text="{loc:Tr Tool.Rectangle}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FreeText.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FreeText, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFreeText}" />
+                                        <TextBlock Text="{loc:Tr Tool.FreeText}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.StickyNote.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=StickyNote, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconStickyNote}" />
+                                        <TextBlock Text="{loc:Tr Tool.StickyNote}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.TextEdit.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=TextEdit, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconTextEdit}" />
+                                        <TextBlock Text="{loc:Tr Tool.TextEdit}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.ImageOverlay.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=ImageOverlay, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconImage}" />
+                                        <TextBlock Text="{loc:Tr Tool.ImageOverlay}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
+                                <Button Classes="ribbon-small" Command="{Binding AddWatermarkCommand}" ToolTip.Tip="{loc:Tr Tool.Watermark.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconWatermark}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Watermark}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
+                                        IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M1 1l9 9M10 1l-9 9" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Clear}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- SIGN: handwritten and certificate signatures, and their verification -->
+                            <StackPanel Spacing="2"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Sign}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Sign}" />
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.Signature.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Signature, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconSignature}" />
+                                        <TextBlock Text="{loc:Tr Tool.Signature}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" Height="38" ToolTip.Tip="{loc:Tr Tool.DigitalSignature.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=DigitalSignature, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="M3 2h7l3 3v9H3z M5.5 11c1-2 2-2 2.5 0s1.5 1 2.5-.5 M8.5 6.5l1.5 1.5 2.5-3" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{loc:Tr Tool.DigitalSignature}" />
+                                            <TextBlock Text="{loc:Tr Sign.Experimental}" FontSize="11" FontStyle="Italic" Opacity="0.85" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </RadioButton>
+                                <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
+                                <Button Classes="ribbon-small" Command="{Binding VerifySignaturesCommand}" ToolTip.Tip="{loc:Tr Sign.Verify.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M8 2l5 2v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4z M5.8 8l1.6 1.6 3-3" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Sign.Verify}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
+                                        IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M1 1l9 9M10 1l-9 9" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Clear}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- BOOKMARKS -->
+                            <StackPanel Spacing="4"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Bookmarks}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Bookmarks.Section}" />
+                                <Button Classes="ribbon-small" Command="{Binding AddBookmarkCommand}" ToolTip.Tip="{loc:Tr Bookmarks.Add.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAdd}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Add}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding AddChildBookmarkCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAddChild}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.AddChild}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding RenameBookmarkCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconTextEdit}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Rename}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteBookmarkCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Bookmarks.Delete}" />
+                                    </StackPanel>
+                                </Button>
+                                <WrapPanel Margin="4,0">
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="up" ToolTip.Tip="{loc:Tr Bookmarks.Up}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="{StaticResource IconUp}" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="down" ToolTip.Tip="{loc:Tr Bookmarks.Down}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="{StaticResource IconDown}" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="in" ToolTip.Tip="{loc:Tr Bookmarks.In}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M3 8h9 M9 5l3 3-3 3 M2 2v12" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding MoveBookmarkCommand}" CommandParameter="out" ToolTip.Tip="{loc:Tr Bookmarks.Out}">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M13 8H4 M7 5L4 8l3 3 M14 2v12" /></Button>
+                                </WrapPanel>
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Bookmarks.Empty}" TextWrapping="Wrap" FontSize="11" Margin="8,4"
+                                           IsVisible="{Binding !BookmarkRows.Count}" />
+                                <ListBox ItemsSource="{Binding BookmarkRows}" SelectedItem="{Binding SelectedBookmark, Mode=TwoWay}"
+                                         Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:BookmarkRow">
+                                            <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent}">
+                                                <TextBlock Text="{Binding Title}" FontSize="12" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="1" Text="{Binding PageLabel}" FontSize="10.5" Margin="6,0,0,0"
+                                                           Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <!-- COMMENTS -->
+                            <StackPanel Spacing="4"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Comments}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Comments.Section}" />
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Comments.Add.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=Comment, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconStickyNote}" />
+                                        <TextBlock Text="{loc:Tr Comments.Add}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Comments.Hint}" TextWrapping="Wrap" FontSize="11" Margin="8,0,4,2" />
+                                <Button Classes="ribbon-small" Command="{Binding ReplyToCommentCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconReply}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Reply}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding EditCommentCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconTextEdit}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Edit}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteCommentCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Comments.Delete}" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Comments.Empty}" TextWrapping="Wrap" FontSize="11" Margin="8,4"
+                                           IsVisible="{Binding !CommentList.Count}" />
+                                <ListBox ItemsSource="{Binding CommentList}" SelectedItem="{Binding SelectedComment, Mode=TwoWay}"
+                                         Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:CommentItem">
+                                            <StackPanel Margin="{Binding Indent}" Spacing="1">
+                                                <TextBlock Text="{Binding Header}" FontSize="10.5" Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                                <TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" MaxHeight="64" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <!-- FORMS -->
+                            <StackPanel Spacing="2"
+                                        IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Forms}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Forms}" />
+                                <Button Classes="ribbon-small" Command="{Binding DetectFormFieldsCommand}" ToolTip.Tip="{loc:Tr Tool.DetectFields.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDetectFields}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.DetectFields}" />
+                                    </StackPanel>
+                                </Button>
+                                <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormText.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormText, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormText}" />
+                                        <TextBlock Text="{loc:Tr Tool.FormText}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormCheckBox.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormCheckBox, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormCheckBox}" />
+                                        <TextBlock Text="{loc:Tr Tool.FormCheckBox}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormRadio.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormRadio, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormRadio}" />
+                                        <TextBlock Text="{loc:Tr Tool.FormRadio}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormComboBox.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormComboBox, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormComboBox}" />
+                                        <TextBlock Text="{loc:Tr Tool.FormComboBox}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormListBox.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormListBox, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFormListBox}" />
+                                        <TextBlock Text="{loc:Tr Tool.FormListBox}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Classes="tool" GroupName="AnnotTools" ToolTip.Tip="{loc:Tr Tool.FormSignature.Tooltip}"
+                                             IsChecked="{Binding ActiveTool, Converter={StaticResource EnumToBool}, ConverterParameter=FormSignature, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconSignature}" />
+                                        <TextBlock Text="{loc:Tr Tool.FormSignature}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <!-- Layout of the selected fields (layout mode: click / Ctrl+click on the page) -->
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.Layout}" />
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Fields.SelectHint}" TextWrapping="Wrap" FontSize="11" Margin="8,0,4,4" />
+                                <!-- Which selected field the others align to and take the size of -->
+                                <StackPanel Orientation="Horizontal" Margin="8,0,4,2">
+                                    <TextBlock Text="{loc:Tr Fields.AlignTo}" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <RadioButton GroupName="AlignAnchor" FontSize="12.5" MinWidth="0" Padding="4,0,8,0" Content="{loc:Tr Fields.AlignToFirst}"
+                                                 ToolTip.Tip="{loc:Tr Fields.AlignToFirst.Tooltip}"
+                                                 IsChecked="{Binding !AlignToLast, Mode=OneWay}" />
+                                    <RadioButton GroupName="AlignAnchor" FontSize="12.5" MinWidth="0" Padding="4,0,8,0" Content="{loc:Tr Fields.AlignToLast}"
+                                                 ToolTip.Tip="{loc:Tr Fields.AlignToLast.Tooltip}"
+                                                 IsChecked="{Binding AlignToLast}" />
+                                </StackPanel>
+                                <WrapPanel Margin="4,0">
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="left" ToolTip.Tip="{loc:Tr Fields.AlignLeft}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M1 0v15 M4 3h9v3h-9z M4 9h6v3h-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="hcenter" ToolTip.Tip="{loc:Tr Fields.AlignHCenter}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M7.5 0v15 M2 3h11v3h-11z M4 9h7v3h-7z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="right" ToolTip.Tip="{loc:Tr Fields.AlignRight}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M14 0v15 M2 3h9v3h-9z M5 9h6v3h-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="top" ToolTip.Tip="{loc:Tr Fields.AlignTop}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M0 1h15 M3 4v9h3v-9z M9 4v6h3v-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="vcenter" ToolTip.Tip="{loc:Tr Fields.AlignVCenter}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M0 7.5h15 M3 2v11h3v-11z M9 4v7h3v-7z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="bottom" ToolTip.Tip="{loc:Tr Fields.AlignBottom}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M0 14h15 M3 2v9h3v-9z M9 5v6h3v-6z" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="width" ToolTip.Tip="{loc:Tr Fields.SameWidth}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M1 4v7 M14 4v7 M1 7.5h13 M3 5.5l-2 2 2 2 M12 5.5l2 2-2 2" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="height" ToolTip.Tip="{loc:Tr Fields.SameHeight}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M4 1h7 M4 14h7 M7.5 1v13 M5.5 3l2-2 2 2 M5.5 12l2 2 2-2" /></Button>
+                                    <Button Classes="ribbon-icon" Command="{Binding AlignFieldsCommand}" CommandParameter="size" ToolTip.Tip="{loc:Tr Fields.SameSize}">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 2h11v11h-11z M5 5h5v5h-5z" /></Button>
+                                </WrapPanel>
+                                <Button Classes="ribbon-small" Command="{Binding SelectAllPageFieldsCommand}" ToolTip.Tip="{loc:Tr Fields.SelectAll.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconSelectAll}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.SelectAll}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding EditFieldPropertiesCommand}" ToolTip.Tip="{loc:Tr Fields.Properties.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconProperties}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Properties}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteSelectedFieldsCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.Delete}" />
+                                    </StackPanel>
+                                </Button>
+
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Fields.Section.TabOrder}" />
+                                <CheckBox Content="{loc:Tr Fields.ShowTabOrder}" IsChecked="{Binding ShowTabOrder}" Margin="8,0" FontSize="12.5" />
+                                <Grid ColumnDefinitions="*,*">
+                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="up">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconUp}" />
+                                            <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabEarlier}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="ribbon-small" Command="{Binding MoveTabOrderCommand}" CommandParameter="down" Grid.Column="1">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDown}" />
+                                            <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.TabLater}" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <Button Classes="ribbon-small" Command="{Binding SortTabOrderCommand}" ToolTip.Tip="{loc:Tr Fields.SortTabOrder.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconSortRows}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Fields.SortTabOrder}" />
+                                    </StackPanel>
+                                </Button>
+
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr FormData.Section}" />
+                                <Button Classes="ribbon-small" Command="{Binding ExportFormDataCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconExport}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Export}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ImportFormDataCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconImport}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Import}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding ResetFormCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCcw}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Reset}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding FlattenFieldsCommand}" ToolTip.Tip="{loc:Tr FormData.Flatten.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconFlatten}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr FormData.Flatten}" />
+                                    </StackPanel>
+                                </Button>
+                                <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
+                                <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
+                                        IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="13" Height="13" Data="M1 1l9 9M10 1l-9 9" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Clear}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                        </Panel>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- Thumbnail panel -->
+                <Border Grid.Column="2" IsVisible="{Binding IsThumbnailPanelOpen}"
+                        Background="{DynamicResource RibbonThumbPanelBrush}"
+                        BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="0,0,1,0">
+                    <DockPanel Margin="14,14" IsVisible="{Binding IsDocumentLoaded}">
+                        <TextBlock DockPanel.Dock="Top" Text="{Binding PageCountLabel}"
+                                   FontSize="11" FontWeight="SemiBold" LetterSpacing="1"
+                                   Foreground="{DynamicResource RibbonCaptionBrush}" Margin="2,0,0,12" />
+                        <ListBox x:Name="ThumbList" Classes="thumbs"
+                                 ItemsSource="{Binding Pages}"
+                                 SelectedItem="{Binding SelectedPage, Mode=TwoWay}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PageItemViewModel">
+                                    <StackPanel HorizontalAlignment="Center" Spacing="6">
+                                        <Border Background="{DynamicResource RibbonPageBrush}"
+                                                BorderBrush="#22000000" BorderThickness="1"
+                                                CornerRadius="3" Width="96" Height="130"
+                                                ClipToBounds="True" HorizontalAlignment="Center">
+                                            <Image Source="{Binding Thumbnail}"
+                                                   Stretch="Uniform" Margin="3"
+                                                   RenderTransformOrigin="50%,50%">
+                                                <Image.RenderTransform>
+                                                    <RotateTransform Angle="{Binding RotationAngle}" />
+                                                </Image.RenderTransform>
+                                            </Image>
+                                        </Border>
+                                        <TextBlock Text="{Binding PageNumber}" FontSize="11.5"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+
+                <GridSplitter Grid.Column="3" Width="5" IsVisible="{Binding IsThumbnailPanelOpen}"
+                              Background="{DynamicResource RibbonDividerBrush}" />
+
+                <!-- Page preview + annotation overlay -->
+                <Border Grid.Column="4" Background="{DynamicResource RibbonPreviewBrush}">
+                  <Panel>
+                    <!-- Continuous view: every page stacked; previews load lazily as pages near the viewport (code-behind) -->
+                    <ScrollViewer x:Name="ContinuousScroll" IsVisible="{Binding ShowContinuousPages}"
+                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Pages}" Margin="16" HorizontalAlignment="Center">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PageItemViewModel">
+                                    <LayoutTransformControl Margin="0,0,0,12" HorizontalAlignment="Center">
+                                        <LayoutTransformControl.LayoutTransform>
+                                            <RotateTransform Angle="{Binding RotationAngle}" />
+                                        </LayoutTransformControl.LayoutTransform>
+                                        <Border Width="{Binding DisplayWidth}" Height="{Binding DisplayHeight}"
+                                                Background="{DynamicResource RibbonPageBrush}">
+                                            <Panel>
+                                                <Image Source="{Binding Preview}" Stretch="Fill" />
+                                                <views:LinkLayer Page="{Binding}" />
+                                                <views:FieldLayer Page="{Binding}" />
+                                                <views:CommentLayer Page="{Binding}" />
+                                            </Panel>
+                                        </Border>
+                                    </LayoutTransformControl>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <ScrollViewer x:Name="PreviewScroll" IsVisible="{Binding ShowSinglePage}"
+                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <Grid Margin="16" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <Image x:Name="PreviewImageControl"
+                                   Source="{Binding PreviewImage}"
+                                   Stretch="Fill"
+                                   Width="{Binding PreviewDisplayWidth}"
+                                   Height="{Binding PreviewDisplayHeight}"
+                                   HorizontalAlignment="Left" VerticalAlignment="Top"
+                                   RenderTransformOrigin="50%,50%">
+                                <Image.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </Image.RenderTransform>
+                            </Image>
+
+            <!-- Search-match highlight layer (over the image, under the annotation canvas) -->
+                            <ItemsControl x:Name="HighlightLayer" ItemsSource="{Binding Highlights}"
+                                          HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False"
+                                          Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                          Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                          RenderTransformOrigin="50%,50%">
+                                <ItemsControl.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </ItemsControl.RenderTransform>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.Styles>
+                                    <Style Selector="ContentPresenter" x:DataType="vm:HighlightBox">
+                                        <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                                        <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                                    </Style>
+                                </ItemsControl.Styles>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HighlightBox">
+                                        <Rectangle Width="{Binding Width}" Height="{Binding Height}"
+                                                   Fill="{Binding Fill}" Stroke="{Binding Stroke}"
+                                                   StrokeThickness="{Binding StrokeThickness}"
+                                                   RadiusX="1.5" RadiusY="1.5" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <views:LinkLayer Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:LinkLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:LinkLayer.RenderTransform>
+                            </views:LinkLayer>
+
+                            <!-- Form fields: editors to fill them, or boxes to move/resize in form layout mode (code-behind) -->
+                            <views:FieldLayer x:Name="FieldCanvas" Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:FieldLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:FieldLayer.RenderTransform>
+                            </views:FieldLayer>
+                            <views:CommentLayer Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:CommentLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:CommentLayer.RenderTransform>
+                            </views:CommentLayer>
+
+                            <Canvas x:Name="AnnotationCanvas"
+                                    Background="Transparent"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    IsVisible="{Binding CanAnnotate}"
+                                    IsEnabled="{Binding CanAnnotate}"
+                                    RenderTransformOrigin="50%,50%"
+                                    ToolTip.Tip="{loc:Tr Annotate.CanvasTooltip}">
+                                <Canvas.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </Canvas.RenderTransform>
+                                <Rectangle IsVisible="{Binding IsDragging}"
+                                           Canvas.Left="{Binding DragRect.X}"
+                                           Canvas.Top="{Binding DragRect.Y}"
+                                           Width="{Binding DragRect.Width}"
+                                           Height="{Binding DragRect.Height}"
+                                           Stroke="{DynamicResource RibbonAccentBrush}" StrokeThickness="1.5"
+                                           StrokeDashArray="4,4" Fill="{DynamicResource RibbonAccentSoftBrush}" />
+                            </Canvas>
+
+                        </Grid>
+                    </ScrollViewer>
+
+                    <!-- Empty state (shown when no document is open). Without recent files: a centred open prompt.
+                         With recent files: a compact header, then the recent files as a full-width table. -->
+                    <Panel IsVisible="{Binding ShowEmptyState}">
+                        <StackPanel IsVisible="{Binding !HasRecentFiles}" MaxWidth="440" Spacing="14"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border Width="76" Height="76" CornerRadius="16" HorizontalAlignment="Center"
+                                    Background="{DynamicResource RibbonAccentSoftBrush}">
+                                <Path Classes="glyph glyph-accent" Width="34" Height="34"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Data="{StaticResource IconOpen}" />
+                            </Border>
+                            <TextBlock Text="{loc:Tr Empty.Title}" FontSize="19" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" Foreground="{DynamicResource RibbonTextBrush}" />
+                            <TextBlock Text="{loc:Tr Empty.Subtitle}" Classes="dialog-hint"
+                                       TextAlignment="Center" />
+                            <Button Content="{loc:Tr Empty.OpenButton}" Command="{Binding OpenCommand}"
+                                    Classes="primary" Padding="22,9" HorizontalAlignment="Center" />
+                        </StackPanel>
+
+                        <Grid IsVisible="{Binding HasRecentFiles}" RowDefinitions="Auto,Auto,Auto,*" Margin="28,20,28,8">
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,18">
+                                <Border Width="44" Height="44" CornerRadius="10" VerticalAlignment="Center"
+                                        Background="{DynamicResource RibbonAccentSoftBrush}">
+                                    <Path Classes="glyph glyph-accent" Width="22" Height="22"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Data="{StaticResource IconOpen}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{loc:Tr Empty.Title}" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource RibbonTextBrush}" />
+                                    <TextBlock Text="{loc:Tr Empty.Subtitle}" Classes="dialog-hint" />
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="{loc:Tr Empty.OpenButton}" Command="{Binding OpenCommand}"
+                                        Classes="primary" Padding="22,9" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                                <TextBlock Text="{loc:Tr Recent.Title}" FontSize="17" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource RibbonTextBrush}" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="recent-link" FontSize="12"
+                                        Content="{loc:Tr Recent.Clear}" Command="{Binding ClearRecentCommand}"
+                                        IsVisible="{Binding HasUnpinnedRecentFiles}" />
+                            </Grid>
+
+                            <!-- Column header; the widths match the rows below -->
+                            <Border Grid.Row="2" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource RibbonDividerBrush}"
+                                    Padding="0,0,0,6">
+                                <Grid ColumnDefinitions="64,*,170,110,72" Margin="8,0">
+                                    <TextBlock Grid.Column="1" Classes="caption" Text="{loc:Tr Recent.Column.Name}" />
+                                    <TextBlock Grid.Column="2" Classes="caption" Text="{loc:Tr Recent.Column.Opened}" />
+                                    <TextBlock Grid.Column="3" Classes="caption" Text="{loc:Tr Recent.Column.Size}" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Recent files: pinned first (star), each removable; a row opens its file -->
+                            <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding RecentFiles}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RecentFileEntry">
+                                            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource RibbonDividerBrush}">
+                                                <Grid Classes="recent-row" Classes.missing="{Binding !Exists}"
+                                                      ColumnDefinitions="*,72" Background="Transparent">
+                                                    <Button Classes="recent-item" HorizontalContentAlignment="Stretch" ToolTip.Tip="{Binding FullPath}"
+                                                            CommandParameter="{Binding FullPath}"
+                                                            Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenRecentCommand}">
+                                                        <Grid ColumnDefinitions="64,*,170,110">
+                                                            <!-- First page once rendered; a document glyph until then -->
+                                                            <Border Width="38" Height="48" HorizontalAlignment="Center"
+                                                                    BorderThickness="1" BorderBrush="{DynamicResource RibbonPageBorderBrush}"
+                                                                    Background="{DynamicResource RibbonPageBrush}">
+                                                                <Panel>
+                                                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="1"
+                                                                                IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
+                                                                        <Path Classes="glyph" Width="16" Height="16" Data="M4 2h5l3 3v9H4z M9 2v3h3" />
+                                                                        <TextBlock Text="PDF" FontSize="8" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                                                    </StackPanel>
+                                                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                                                </Panel>
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" Margin="0,0,12,0">
+                                                                <TextBlock Text="{Binding DisplayName}" FontSize="13"
+                                                                           Foreground="{DynamicResource RibbonTextBrush}"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding Folder}" FontSize="11"
+                                                                           Foreground="{DynamicResource RibbonSubtleTextBrush}"
+                                                                           TextTrimming="LeadingCharacterEllipsis" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2" Text="{Binding OpenedText}" FontSize="12.5" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource RibbonTextBrush}" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="12.5" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource RibbonTextBrush}" />
+                                                        </Grid>
+                                                    </Button>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                                                HorizontalAlignment="Right" Spacing="2" Margin="0,0,6,0">
+                                                        <Button Classes="recent-action" Classes.pinned="{Binding IsPinned}"
+                                                                ToolTip.Tip="{loc:Tr Recent.Pin.Tooltip}"
+                                                                CommandParameter="{Binding FullPath}"
+                                                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).TogglePinRecentCommand}">
+                                                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconStar}" />
+                                                        </Button>
+                                                        <Button Classes="recent-action" ToolTip.Tip="{loc:Tr Recent.Remove.Tooltip}"
+                                                                CommandParameter="{Binding FullPath}"
+                                                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).RemoveRecentCommand}">
+                                                            <Path Classes="glyph" Width="10" Height="10" Data="M2 2l8 8 M10 2l-8 8" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Panel>
+
+                    <!-- Drag-over drop affordance -->
+                    <Border IsVisible="{Binding IsDragOver}" IsHitTestVisible="False" Margin="10"
+                            CornerRadius="8" BorderThickness="2.5" BorderBrush="{DynamicResource RibbonAccentBrush}"
+                            Background="{DynamicResource RibbonAccentSoftBrush}">
+                        <TextBlock Text="{loc:Tr Empty.DropOverlay}" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource RibbonAccentBrush}" />
+                    </Border>
+                  </Panel>
+                </Border>
+            </Grid>
+
+        </DockPanel>
+
+        <!-- Modal busy overlay -->
+        <Border Background="#99000000" ZIndex="100" IsVisible="{Binding IsBusy}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="220" Height="16" />
+                <TextBlock Text="{Binding StatusMessage}" Foreground="White"
+                           Margin="0,10,0,0" HorizontalAlignment="Center" />
+                <Button Content="{loc:Tr Busy.Cancel}" Command="{Binding CancelCommand}"
+                        Margin="0,10,0,0" Padding="16,4"
+                        HorizontalAlignment="Center"
+                        IsVisible="{Binding CanCancel}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

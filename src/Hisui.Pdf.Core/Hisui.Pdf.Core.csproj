@@ -10,6 +10,8 @@
     <!-- CA1416: PDFtoImage annotates its API as "not supported on all platforms" but it explicitly
          supports Windows / Linux / macOS (all our targets). Suppress to avoid false positives. -->
     <NoWarn>CA1416</NoWarn>
+    <!-- Required by the [LibraryImport] source generator (direct PDFium bindings). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,13 +19,22 @@
     <PackageReference Include="PDFsharp" />
     <!-- Read / extract (text with coordinates, images, structure). -->
     <PackageReference Include="PdfPig" />
-    <!-- Page rendering to PNG (PDFium + SkiaSharp). -->
+    <!-- Writes .docx for PDF-to-Word export (MIT). -->
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <!-- Supplies the native PDFium binaries (bblanchon.PDFium.*) and SkiaSharp; rendering itself
+         goes through PdfiumNative, so PDFium is parsed once per document rather than per page. -->
     <PackageReference Include="PDFtoImage" />
     <!-- OCR engine for scanned-PDF conversion (Tesseract 5). -->
     <PackageReference Include="Tesseract" />
     <!-- DI + logging abstractions only — Core stays UI/host agnostic. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Liberation Sans (OFL-1.1, Arial-metric): the only font Hisui PDF writes into documents, so output never
+         depends on (or embeds) a proprietary system font. See THIRD-PARTY-NOTICES.txt / licenses/OFL-Liberation.txt. -->
+    <EmbeddedResource Include="Fonts\LiberationSans-*.ttf" LogicalName="Hisui.Pdf.Core.Fonts.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

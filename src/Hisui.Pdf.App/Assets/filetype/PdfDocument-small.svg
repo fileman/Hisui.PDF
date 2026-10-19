@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 16 px variant of PdfDocument.svg: same page and red label, without the unreadable lettering. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <path d="M3.5 0.5h6.5l3.5 3.5v11h-10z" fill="#FFFFFF" stroke="#9A9A9A" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M10 0.5v3.5h3.5z" fill="#D6D6D6" stroke="#9A9A9A" stroke-width="1" stroke-linejoin="round"/>
+  <rect x="1" y="7" width="13" height="6" rx="1" fill="#D42A25"/>
+  <rect x="3" y="9" width="8" height="1" fill="#FFFFFF"/>
+  <rect x="3" y="11" width="5" height="1" fill="#FFFFFF"/>
+</svg>

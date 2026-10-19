@@ -7,13 +7,23 @@ single Avalonia desktop app that runs on Windows, Linux and macOS.
 
 ## Download
 
+### winget (Windows)
+
+```powershell
+winget install Fileman.HisuiPDF
+```
+
+Upgrade later with `winget upgrade Fileman.HisuiPDF`.
+
+### Release assets
+
 Grab a ready-to-run build from the
 [**Releases**](https://github.com/fileman/Hisui.PDF/releases/latest) page — the
 binaries are self-contained, so **no .NET install is required**.
 
 | Platform | Asset |
 |---|---|
-| Windows x64 (installer) | `HisuiPDF-X.Y.N-win-x64.msi` |
+| Windows x64 (installer) | `HisuiPDF-Setup-X.Y.N-win-x64.exe` (asks for UAC up front; works where AppLocker blocks unsigned MSIs) or `HisuiPDF-X.Y.N-win-x64.msi` |
 | Windows x64 (portable) | `Hisui.Pdf-vX.Y.N-win-x64.zip` |
 | Linux x64 | `Hisui.Pdf-vX.Y.N-linux-x64.tar.gz` |
 | macOS (Intel) | `Hisui.Pdf-vX.Y.N-osx-x64.tar.gz` |
@@ -31,34 +41,55 @@ Releases started with the *prerelease* option are published as pre-releases.
 ### Updates
 
 Hisui PDF checks GitHub for a newer stable release at startup (disable with `"CheckForUpdates": false` in
-`%APPDATA%\Hisui.PDF\settings.json`) and from the main menu → *Check for updates…*. On Windows, accepting
+`%APPDATA%\Hisui.PDF\settings.json`) and from *? Help* → *Check for updates…*. On Windows, accepting
 downloads the MSI and runs it as an in-place upgrade; on other platforms it opens
 the release page. Pre-releases are never offered.
 
 ## Features
 
 - **Pages** — merge, split, extract, reorder, rotate and delete pages, with
-  non-destructive editing and full undo/redo.
+  non-destructive editing and full undo/redo. Multiple documents in tabs, with
+  an unsaved-changes prompt on close.
 - **Annotations** — highlight, rectangle, free text, sticky notes, image
-  overlays and document-wide watermarks (all undoable).
+  overlays, editable watermarks and header/footer with page, date and Bates
+  tokens (all undoable).
+- **Comments, bookmarks & links** — real PDF comments with replies and a
+  comments panel; bookmarks panel (add, nest, rename, reorder); link tool with
+  clickable links. Saving keeps outline, links, tags and metadata.
 - **Reusable signatures** — build a library of signatures (draw freehand, import
   a PNG, or type cursive text) and reuse them across documents.
+- **Digital signatures (experimental)** — PAdES signing with a PFX certificate,
+  appended as an incremental update so existing signatures stay valid; sign
+  into empty signature fields or invisibly; verify signatures.
+- **Forms** — fill AcroForm fields in place (formats, required/invalid
+  highlight); automatic field detection; layout mode with multi-select, align,
+  resize, tab order and field properties; import/export data (XFDF, FDF, CSV),
+  reset and flatten.
 - **Text editing** — replace a word in place (redact-and-retype).
 - **Redaction** — secure redaction that rasterises the page and removes the
-  underlying text/vector content.
-- **Forms** — read and fill AcroForm fields.
+  underlying text/vector content; find-and-redact by pattern (tax code, IBAN,
+  VAT, e-mail, phone, date, custom regex).
+- **Compare** — text comparison with another PDF, with marks and a report.
+- **Standards** — preflight and conversion to PDF 1.4–2.0, PDF/A-1b/2b/2u/3b/3u,
+  PDF/UA-1, PDF/X-4, plus an accessibility check.
 - **Security & metadata** — AES-256 encryption, password removal, document
   properties.
 - **Print & compress** — print with preview and options (printer, copies,
   duplex, page range); reduce file size by recompressing images.
-- **Extraction** — pull out text (with coordinates) and embedded images.
+- **Export & extraction** — convert to Word (.docx), Excel (.xlsx) and
+  PowerPoint (.pptx); pull out text (with coordinates) and embedded images.
 - **OCR** — turn scanned (image-only) PDFs into searchable PDFs by adding an
-  invisible, selectable text layer (Tesseract). Scanned pages are detected
-  automatically.
+  invisible, selectable text layer (Tesseract, parallel across pages). Scanned
+  pages are detected automatically; extra languages can be downloaded on demand.
+- **Batch processing** — apply one operation (OCR, compression, PDF/A, Word,
+  Excel, PowerPoint, text) to many PDFs; originals are never changed.
+- **Recent files** — start page with a table of recent documents (thumbnail,
+  folder, last opened, size) and pinning.
 - **Localization** — English and Italian UI, switchable at runtime; light, dark
-  or system theme.
-- **Diagnostics** — main menu → *View log…* shows warnings, errors and stack
-  traces from `%APPDATA%\Hisui.PDF\hisui.log`; unhandled exceptions are logged.
+  or system theme (light theme meets WCAG AA contrast).
+- **Help & diagnostics** — the *? Help* button reports a problem or requests a
+  feature on GitHub, checks for updates and opens *View log…* (warnings, errors
+  and stack traces from `%APPDATA%\Hisui.PDF\hisui.log`).
 
 ## Tech stack
 
@@ -66,6 +97,7 @@ the release page. Pre-releases are never offered.
 - **[Avalonia](https://avaloniaui.net/) 12** — cross-platform UI
 - **[PDFsharp](https://docs.pdfsharp.net/)** — structural & write operations
 - **[PdfPig](https://github.com/UglyToad/PdfPig)** — text/image extraction
+- **[Open XML SDK](https://github.com/dotnet/Open-XML-SDK)** — Word (.docx) export
 - **[PDFtoImage](https://github.com/sungaila/PDFtoImage)** (PDFium) — page rendering
 - **[Tesseract](https://github.com/charlesw/tesseract)** — OCR for scanned PDFs
 - **[SkiaSharp](https://github.com/mono/SkiaSharp)** — raster compositing
@@ -107,10 +139,11 @@ OCR works out of the box. The **English and Italian** language data
 the executable, and the native engine binaries are bundled on Windows via the
 `Tesseract` package.
 
-- **More languages** — drop extra `*.traineddata` files into the `tessdata`
-  folder next to the app (or point the `TESSDATA_PREFIX` environment variable at
-  them) and pass the language code. Grab them from
-  [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast).
+- **More languages** — main menu → *Preferences* → *OCR languages…* downloads
+  other languages on demand from
+  [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) or imports a
+  `.traineddata` file offline. You can also drop `*.traineddata` files into the
+  `tessdata` folder next to the app (or point `TESSDATA_PREFIX` at them).
 - **Native libraries on Linux/macOS** — install the system Tesseract/Leptonica:
   on Linux `libtesseract`/`libleptonica`, on macOS `brew install tesseract leptonica`.
 

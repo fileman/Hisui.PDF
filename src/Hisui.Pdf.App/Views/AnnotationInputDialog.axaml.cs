@@ -13,6 +13,25 @@ public partial class AnnotationInputDialog : Window
 
     public AnnotationInputModel? Result { get; private set; }
 
+    /// <summary>The user chose to remove the existing watermark (the dialog closes with true and no Result).</summary>
+    public bool RemoveRequested { get; private set; }
+
+    /// <summary>Edits the document's watermark: its text and settings fill the form, and it can be removed.</summary>
+    public void LoadWatermark(WatermarkInfo existing)
+    {
+        SetText("ToolLabel", Localizer.Instance["DialogTool.WatermarkEdit"]);
+        SetText("AnnotTextBox", existing.Text);
+        SetText("ColorInput", existing.Options.ColorHex);
+        SetNumber("OpacityInput", existing.Options.Opacity);
+        SetNumber("WmFontSizeInput", existing.Options.FontSizePoints);
+        SetNumber("WmRotationInput", existing.Options.RotationDegrees);
+        if (this.FindControl<Button>("RemoveButton") is { } remove)
+        {
+            remove.IsVisible = true;
+            remove.Click += (_, _) => { RemoveRequested = true; Close(true); };
+        }
+    }
+
     /// <summary>The current text in the editor — used by the TextEdit replacement flow.</summary>
     public string InputText => GetText("AnnotTextBox") ?? string.Empty;
 
@@ -73,6 +92,28 @@ public partial class AnnotationInputDialog : Window
                 Show("TextSection");
                 SetText("TextLabel", Localizer.Instance["Label.NewText"]);
                 if (initialText is not null) SetText("AnnotTextBox", initialText);
+                break;
+
+            case AnnotationTool.FormText:
+            case AnnotationTool.FormCheckBox:
+                Show("FieldNameSection");
+                break;
+
+            case AnnotationTool.FormSignature:
+                Show("FieldNameSection");
+                break;
+
+            case AnnotationTool.FormRadio:
+                Show("FieldNameSection");
+                Show("TextSection");
+                SetText("TextLabel", Localizer.Instance["Label.RadioChoice"]);
+                break;
+
+            case AnnotationTool.FormComboBox:
+            case AnnotationTool.FormListBox:
+                Show("FieldNameSection");
+                Show("TextSection");
+                SetText("TextLabel", Localizer.Instance["Label.ComboOptions"]);
                 break;
 
             case AnnotationTool.ImageOverlay:
@@ -146,6 +187,7 @@ public partial class AnnotationInputDialog : Window
         {
             Tool = _tool,
             Text = text,
+            FieldName = GetText("FieldNameBox"),
             ColorHex = colorHex,
             FillHex = fillHex,
             Opacity = opacity,
@@ -159,7 +201,8 @@ public partial class AnnotationInputDialog : Window
 
     private static bool RequiresText(AnnotationTool tool) => tool is
         AnnotationTool.FreeText or AnnotationTool.StickyNote or
-        AnnotationTool.TextEdit or AnnotationTool.Watermark;
+        AnnotationTool.TextEdit or AnnotationTool.Watermark or
+        AnnotationTool.FormComboBox or AnnotationTool.FormListBox;
 
     private void ShowError(string message)
     {
@@ -241,6 +284,12 @@ public partial class AnnotationInputDialog : Window
         AnnotationTool.TextEdit     => "DialogTool.TextEdit",
         AnnotationTool.ImageOverlay => "DialogTool.ImageOverlay",
         AnnotationTool.Watermark    => "DialogTool.Watermark",
+        AnnotationTool.FormText     => "DialogTool.FormText",
+        AnnotationTool.FormCheckBox => "DialogTool.FormCheckBox",
+        AnnotationTool.FormComboBox => "DialogTool.FormComboBox",
+        AnnotationTool.FormRadio    => "DialogTool.FormRadio",
+        AnnotationTool.FormListBox  => "DialogTool.FormListBox",
+        AnnotationTool.FormSignature => "DialogTool.FormSignature",
         _                           => "DialogTool.Default",
     }];
 
@@ -253,6 +302,9 @@ public partial class AnnotationInputDialog : Window
         AnnotationTool.TextEdit     => Localizer.Instance["Hint.TextEdit"],
         AnnotationTool.ImageOverlay => Localizer.Instance["Hint.ImageOverlay"],
         AnnotationTool.Watermark    => Localizer.Instance["Hint.Watermark"],
+        AnnotationTool.FormText or AnnotationTool.FormCheckBox or AnnotationTool.FormComboBox or
+        AnnotationTool.FormRadio or AnnotationTool.FormListBox or AnnotationTool.FormSignature
+                                    => Localizer.Instance["Hint.FormField"],
         _                           => string.Empty,
     };
 }

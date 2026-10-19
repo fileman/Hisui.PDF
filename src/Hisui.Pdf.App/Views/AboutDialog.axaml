@@ -3,7 +3,7 @@
         xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
         x:Class="Hisui.Pdf.App.Views.AboutDialog"
         Title="{loc:Tr About.Title}"
-        Width="490" Height="510"
+        Width="490" Height="550"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
@@ -33,7 +33,7 @@
             <TextBlock Text="{loc:Tr About.Ai}" FontSize="10" FontWeight="SemiBold"
                        Foreground="{DynamicResource RibbonSubtleTextBrush}" LetterSpacing="1.2" />
             <TextBlock Margin="0,4,0,14">
-                <Run Text="Claude Sonnet 5.5" FontWeight="SemiBold" />
+                <Run Text="Claude" FontWeight="SemiBold" />
                 <Run Text=" — Anthropic" />
             </TextBlock>
 
@@ -45,6 +45,8 @@
 
             <Grid ColumnDefinitions="168,*">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -65,7 +67,7 @@
                 <TextBlock Grid.Row="2" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.PdfToImage}" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia 12.1.3" Margin="0,4,0,0" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia 12.1.4" Margin="0,4,0,0" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.Avalonia}" />
 
@@ -76,6 +78,14 @@
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="SkiaSharp / PDFium" Margin="0,4,0,0" />
                 <TextBlock Grid.Row="5" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
                            Text="{loc:Tr About.Lib.Skia}" />
+
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="DocumentFormat.OpenXml 3.5.1" Margin="0,4,0,0" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
+                           Text="{loc:Tr About.Lib.OpenXml}" />
+
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="Tesseract 5.2.0" Margin="0,4,0,0" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Foreground="{DynamicResource RibbonSubtleTextBrush}" Margin="0,4,0,0"
+                           Text="{loc:Tr About.Lib.Tesseract}" />
             </Grid>
 
         </StackPanel>
