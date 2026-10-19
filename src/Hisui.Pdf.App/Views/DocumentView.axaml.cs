@@ -5,14 +5,18 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Data;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Reactive;
+using Avalonia.Threading;
 using Hisui.Pdf.App.Localization;
 using Hisui.Pdf.App.Services;
 using Hisui.Pdf.App.ViewModels;
 using Hisui.Pdf.Core.Abstractions;
 using Hisui.Pdf.Core.Model;
+using Shapes = Avalonia.Controls.Shapes;
 
 namespace Hisui.Pdf.App.Views;
 
@@ -187,11 +191,12 @@ public partial class DocumentView : UserControl
         var loc = Localizer.Instance;
         var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
 
-        // Grouped the way a newcomer looks for things: open/recent, save/print/convert, tools,
-        // then preferences and help as submenus so the top level stays short.
-        flyout.Items.Add(MakeItem(loc["Menu.Open"], vm.OpenCommand));
+        // Laid out like Acrobat's File menu: open · save/export · print · protect/properties ·
+        // preferences/help · exit. Page and document tools live in the Tools panel, not here;
+        // variants (save as other, export formats, security) are submenus so the top level stays short.
+        flyout.Items.Add(MakeItem(loc["Menu.Open"], vm.OpenCommand, "IconOpen", new KeyGesture(Key.O, KeyModifiers.Control)));
         vm.RefreshRecentFiles(); // another tab or window may have changed the shared list
-        var recent = new MenuItem { Header = loc["Menu.Recent"], IsEnabled = vm.HasRecentFiles };
+        var recent = new MenuItem { Header = loc["Menu.OpenRecent"], IsEnabled = vm.HasRecentFiles };
         foreach (var entry in vm.AllRecentFiles.Take(15)) // the full list is in the empty state
         {
             var item = new MenuItem
@@ -213,27 +218,28 @@ public partial class DocumentView : UserControl
         flyout.Items.Add(recent);
         flyout.Items.Add(MakeItem(loc["Menu.OpenInNewWindow"], vm.OpenInNewWindowCommand));
         flyout.Items.Add(MakeItem(loc["Menu.NewWindow"], vm.NewWindowCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.AddFiles"], vm.AddFilesCommand));
         flyout.Items.Add(new Separator());
 
-        flyout.Items.Add(MakeItem(loc["Menu.Save"], vm.SaveCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand));
-        flyout.Items.Add(MakeItem(loc["Menu.SaveAsProfile"], vm.SaveAsProfileCommand));
-        var print = new MenuItem { Header = loc["Menu.Print"], IsEnabled = vm.IsDocumentLoaded, InputGesture = new KeyGesture(Key.P, KeyModifiers.Control) };
-        print.Click += OnPrintClick;
-        flyout.Items.Add(print);
-        var convert = new MenuItem { Header = loc["Menu.Convert"], IsEnabled = vm.IsDocumentLoaded };
+        flyout.Items.Add(MakeItem(loc["Menu.Save"], vm.SaveCommand, "IconSave", new KeyGesture(Key.S, KeyModifiers.Control)));
+        flyout.Items.Add(MakeItem(loc["Menu.SaveAs"], vm.SaveAsCommand, gesture: new KeyGesture(Key.S, KeyModifiers.Control | KeyModifiers.Shift)));
+        var saveOther = new MenuItem { Header = loc["Menu.SaveAsOther"], IsEnabled = vm.IsDocumentLoaded };
+        saveOther.Items.Add(MakeItem(loc["Menu.SaveAsProfile"], vm.SaveAsProfileCommand));
+        saveOther.Items.Add(MakeItem(loc["Menu.ReducedSize"], vm.CompressCommand));
+        flyout.Items.Add(saveOther);
+        var convert = new MenuItem { Header = loc["Menu.Convert"], IsEnabled = vm.IsDocumentLoaded, Icon = Glyph("IconExport") };
         foreach (var (key, format) in new[] { ("Menu.ConvertWord", "docx"), ("Menu.ConvertExcel", "xlsx"), ("Menu.ConvertPowerPoint", "pptx"), ("Menu.ConvertText", "txt"), ("Menu.ConvertImages", "png") })
             convert.Items.Add(new MenuItem { Header = loc[key], Command = vm.ConvertCommand, CommandParameter = format });
+        convert.Items.Add(new Separator());
+        convert.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
         flyout.Items.Add(convert);
         flyout.Items.Add(new Separator());
 
-        // Document tools (Acrobat-parity)
-        var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded };
-        propsItem.Click += OnDocumentPropertiesClick;
-        flyout.Items.Add(propsItem);
-        flyout.Items.Add(MakeItem(loc["Menu.ExtractImages"], vm.ExtractImagesCommand));
-        var security = new MenuItem { Header = loc["Menu.Security"] };
+        var print = new MenuItem { Header = loc["Menu.Print"], IsEnabled = vm.IsDocumentLoaded, Icon = Glyph("IconPrint"), InputGesture = new KeyGesture(Key.P, KeyModifiers.Control) };
+        print.Click += OnPrintClick;
+        flyout.Items.Add(print);
+        flyout.Items.Add(new Separator());
+
+        var security = new MenuItem { Header = loc["Menu.Security"], Icon = Glyph("IconLock") };
         var protectItem = new MenuItem { Header = loc["Menu.Protect"], IsEnabled = vm.IsDocumentLoaded };
         protectItem.Click += OnProtectClick;
         security.Items.Add(protectItem);
@@ -242,10 +248,12 @@ public partial class DocumentView : UserControl
         security.Items.Add(MakeItem(loc["Menu.SignInvisible"], vm.SignInvisibleCommand));
         security.Items.Add(MakeItem(loc["Menu.VerifySignatures"], vm.VerifySignaturesCommand));
         flyout.Items.Add(security);
-        flyout.Items.Add(MakeItem(loc["Menu.Batch"], vm.BatchCommand));
+        var propsItem = new MenuItem { Header = loc["Menu.DocumentProperties"], IsEnabled = vm.IsDocumentLoaded, Icon = Glyph("IconInfo") };
+        propsItem.Click += OnDocumentPropertiesClick;
+        flyout.Items.Add(propsItem);
         flyout.Items.Add(new Separator());
 
-        var preferences = new MenuItem { Header = loc["Menu.Preferences"] };
+        var preferences = new MenuItem { Header = loc["Menu.Preferences"], Icon = Glyph("IconProperties") };
         var language = new MenuItem { Header = loc["Menu.Language"] };
         foreach (var option in vm.Languages)
         {
@@ -300,9 +308,28 @@ public partial class DocumentView : UserControl
 
         flyout.ShowAt(anchor);
 
-        static MenuItem MakeItem(string header, ICommand command) =>
-            new() { Header = header, Command = command };
+        MenuItem MakeItem(string header, ICommand command, string? icon = null, KeyGesture? gesture = null) =>
+            new() { Header = header, Command = command, Icon = icon is null ? null : Glyph(icon), InputGesture = gesture };
     }
+
+    // A ribbon glyph sized for a menu row; its stroke follows the item's foreground (dims when disabled).
+    private Control? Glyph(string resourceKey) =>
+        this.TryFindResource(resourceKey, out var res) && res is Geometry geometry
+            ? new Shapes.Path
+            {
+                Data = geometry,
+                Width = 14,
+                Height = 14,
+                Stretch = Stretch.Uniform,
+                StrokeThickness = 1.3,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeJoin = PenLineJoin.Round,
+                [!Shapes.Shape.StrokeProperty] = new Binding(nameof(MenuItem.Foreground))
+                {
+                    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor) { AncestorType = typeof(MenuItem) },
+                },
+            }
+            : null;
 
     // ── Keyboard shortcuts (view-targeted) ────────────────────────────────────
 
@@ -317,8 +344,12 @@ public partial class DocumentView : UserControl
                 OnPrintClick(this, new RoutedEventArgs());
                 e.Handled = true;
                 break;
-            case Key.F when ctrl:
-                this.FindControl<TextBox>("SearchBox")?.Focus();
+            case Key.F when ctrl && vm.IsDocumentLoaded:
+                ShowFind(vm, replace: false);
+                e.Handled = true;
+                break;
+            case Key.H when ctrl && vm.IsDocumentLoaded:
+                ShowFind(vm, replace: true);
                 e.Handled = true;
                 break;
             case Key.F3:
@@ -327,11 +358,42 @@ public partial class DocumentView : UserControl
                 if (cmd.CanExecute(null)) cmd.Execute(null);
                 e.Handled = true;
                 break;
-            case Key.Escape when !string.IsNullOrEmpty(vm.SearchQuery):
-                vm.SearchQuery = string.Empty;
+            case Key.Escape when vm.IsFindVisible:
+                vm.CloseFindCommand.Execute(null);
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void OnFindClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) ShowFind(vm, replace: false);
+    }
+
+    /// <summary>Opens the find widget (with the replace row for Ctrl+H) and focuses the field to type in.</summary>
+    private void ShowFind(MainViewModel vm, bool replace)
+    {
+        vm.IsFindVisible = true;
+        if (replace) vm.IsReplaceVisible = true;
+        var name = replace && !string.IsNullOrWhiteSpace(vm.SearchQuery) ? "ReplaceBox" : "SearchBox";
+        // The widget is only focusable once the layout has made it visible.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (this.FindControl<TextBox>(name) is not { } box) return;
+            box.Focus();
+            box.SelectAll();
+        }, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>Enter in the page-number box jumps to that page; Esc puts the current number back.</summary>
+    private void OnPageNumberKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox box || DataContext is not MainViewModel vm) return;
+        if (e.Key == Key.Enter) vm.PageNumberText = box.Text ?? string.Empty;
+        else if (e.Key == Key.Escape) box.Text = vm.PageNumberText;
+        else return;
+        box.SelectAll();
+        e.Handled = true;
     }
 
     // ── Zoom ──────────────────────────────────────────────────────────────────

@@ -28,4 +28,14 @@ public interface IPdfTextExtractor
 
     Task<IReadOnlyList<TextSearchResult>> SearchAsync(
         byte[] pdf, string query, TextSearchOptions? options = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Plans the edits that replace <paramref name="query"/> with <paramref name="replacement"/> on one zero-based
+    /// page, matching exactly as <see cref="SearchAsync"/> does. With <paramref name="matchOrdinal"/> only that
+    /// match (its position among the page's search results) is replaced; otherwise every match is. Matches in
+    /// rotated (non-horizontal) text are skipped, since the retyped text would come out horizontal.
+    /// </summary>
+    Task<IReadOnlyList<TextReplacement>> PlanReplacementsAsync(
+        byte[] pdf, int pageIndex, string query, string replacement, TextSearchOptions? options = null,
+        int? matchOrdinal = null, CancellationToken ct = default);
 }

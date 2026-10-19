@@ -88,6 +88,35 @@ internal static partial class PdfiumNative
     [LibraryImport(Lib)]
     public static partial double FPDFText_GetFontSize(IntPtr textPage, int index);
 
+    /// <summary>
+    /// "Loose" glyph box: the glyph's advance by the font's ascent-to-descent, in unrotated page space, so it has
+    /// the same height for every glyph of a font at a given size. Returns 0 on failure.
+    /// </summary>
+    [LibraryImport(Lib)]
+    public static partial int FPDFText_GetLooseCharBox(IntPtr textPage, int index, out FsRectF rect);
+
+    /// <summary>The glyph's fill colour, 0–255 per channel. Returns 0 on failure.</summary>
+    [LibraryImport(Lib)]
+    public static partial int FPDFText_GetFillColor(IntPtr textPage, int index, out uint r, out uint g, out uint b, out uint a);
+
+    /// <summary>The glyph's font weight (400 normal, 700 bold), or -1 on failure.</summary>
+    [LibraryImport(Lib)]
+    public static partial int FPDFText_GetFontWeight(IntPtr textPage, int index);
+
+    /// <summary>
+    /// The glyph's font name (UTF-8, NUL-terminated) into <paramref name="buffer"/>, and its descriptor flags.
+    /// Returns the buffer length needed; 0 on failure.
+    /// </summary>
+    [LibraryImport(Lib)]
+    public static partial uint FPDFText_GetFontInfo(IntPtr textPage, int index, Span<byte> buffer, uint length, out int flags);
+
+    /// <summary>FS_RECTF: left, top, right, bottom (page space, y up).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct FsRectF
+    {
+        public float Left, Top, Right, Bottom;
+    }
+
     /// <summary>Glyph box in unrotated page space (origin bottom-left, y up). Returns 0 on failure.</summary>
     [LibraryImport(Lib)]
     public static partial int FPDFText_GetCharBox(IntPtr textPage, int index, out double left, out double right, out double bottom, out double top);

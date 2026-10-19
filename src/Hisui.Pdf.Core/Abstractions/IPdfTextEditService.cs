@@ -15,4 +15,13 @@ public interface IPdfTextEditService
         string newText,
         double fontSizePoints,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Applies find-and-replace edits (see <see cref="IPdfTextExtractor.PlanReplacementsAsync"/>) in one pass:
+    /// each edit's boxes are covered and its new text retyped on the first box's baseline.
+    /// </summary>
+    Task<byte[]> ApplyReplacementsAsync(
+        byte[] pdf,
+        IReadOnlyList<TextReplacement> replacements,
+        CancellationToken ct = default);
 }

@@ -125,6 +125,27 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
         }, ct);
     }
 
+    public Task<IReadOnlyList<TextReplacement>> PlanReplacementsAsync(
+        byte[] pdf, int pageIndex, string query, string replacement, TextSearchOptions? options = null,
+        int? matchOrdinal = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        ArgumentException.ThrowIfNullOrEmpty(query);
+        ArgumentNullException.ThrowIfNull(replacement);
+        options ??= new TextSearchOptions();
+
+        var needle = CollapseWhitespace(query);
+        if (needle.Length == 0) return Task.FromResult<IReadOnlyList<TextReplacement>>([]);
+
+        return Task.Run(() =>
+        {
+            ValidatePage(pageIndex, PageCount(pdf));
+            // The same word list SearchAsync matches against, so ordinals line up with its results.
+            var words = WordsOf(ReadPage(pdf, pageIndex), pageIndex, splitVerticalIntoWords: true);
+            return PlanReplacements(words, pageIndex, needle, replacement, options, matchOrdinal);
+        }, ct);
+    }
+
     // ── PDFium access ────────────────────────────────────────────────────────
 
     private int PageCount(byte[] pdf) => _host.WithDocument(pdf, static (_, count) => count);
@@ -165,7 +186,8 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
 
     /// <summary>One character (UTF-16 unit) of a page, positioned in rendered orientation (points, top-left origin).</summary>
     private readonly record struct Glyph(
-        char Ch, bool IsSeparator, bool SpaceBefore, double Left, double Top, double Right, double Bottom, double FontSize, int Orientation)
+        char Ch, bool IsSeparator, bool SpaceBefore, double Left, double Top, double Right, double Bottom, double FontSize, int Orientation,
+        uint Color = 0xFF000000, bool Bold = false)
     {
         public bool IsVertical => Orientation is 90 or 270;
 
@@ -233,9 +255,9 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
                 double dx = ca * ax0 + sa * ay0, dy = ca * ax1 + sa * ay1;
                 var orientation = Math.Abs(dx) >= Math.Abs(dy) ? (dx >= 0 ? 0 : 180) : (dy < 0 ? 90 : 270);
 
-                var size = PdfiumNative.FPDFText_GetFontSize(text, i);
+                var size = EffectiveFontSize(text, i, angle);
                 glyphs.Add(new Glyph(ch, false, previousWasSeparator, Math.Min(x1, x2), Math.Min(y1, y2), Math.Max(x1, x2), Math.Max(y1, y2),
-                    size > 0 ? size : 12, orientation));
+                    size, orientation, FillColor(text, i), IsBold(text, i)));
                 previousWasSeparator = false;
             }
             return new PageGlyphs(width, height, glyphs);
@@ -259,7 +281,7 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
         var words = new List<TextWord>();
         var source = splitVerticalIntoWords ? page.Glyphs : page.Glyphs.Where(g => g.IsSeparator || !g.IsVertical).ToList();
         foreach (var w in SplitWords(source))
-            words.Add(ToWord(w.Text, w.Left, w.Top, w.Right, w.Bottom, w.FontSize, w.Orientation is 0 or 180, page, pageIndex));
+            words.Add(ToWord(w.Text, w.Left, w.Top, w.Right, w.Bottom, w.FontSize, w.Orientation is 0 or 180, page, pageIndex, w.Color, w.Bold));
 
         if (!splitVerticalIntoWords)
             foreach (var line in VerticalLines(page.Glyphs))
@@ -267,7 +289,8 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
         return words;
     }
 
-    private static TextWord ToWord(string text, double left, double top, double right, double bottom, double fontSize, bool horizontal, PageGlyphs page, int pageIndex) =>
+    private static TextWord ToWord(string text, double left, double top, double right, double bottom, double fontSize, bool horizontal, PageGlyphs page, int pageIndex,
+        uint color = 0xFF000000, bool bold = false) =>
         new()
         {
             Text = text,
@@ -275,6 +298,8 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
             BoundingBox = new PdfRect(left / page.Width, top / page.Height, right / page.Width, bottom / page.Height),
             FontSizePoints = fontSize,
             IsHorizontal = horizontal,
+            ColorArgb = color,
+            IsBold = bold,
         };
 
     private sealed class WordBuilder
@@ -283,15 +308,63 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
         public double Left = double.MaxValue, Top = double.MaxValue, Right = double.MinValue, Bottom = double.MinValue;
         public double FontSize;
         public int Orientation;
+        public uint Color;
+        public bool Bold;
         public Glyph Last;
     }
 
-    private readonly record struct RawWord(string Text, double Left, double Top, double Right, double Bottom, double FontSize, int Orientation);
+    private readonly record struct RawWord(string Text, double Left, double Top, double Right, double Bottom, double FontSize, int Orientation, uint Color, bool Bold);
 
     /// <summary>
     /// Splits glyphs into words at whitespace (real or generated by PDFium), at line changes, at orientation
     /// changes and at gaps / backward jumps along the reading direction that PDFium did not mark with a space.
     /// </summary>
+    /// <summary>
+    /// The glyph's font size in points. PDFium reports the Tf operand, which is not the rendered size when the
+    /// text matrix does the scaling (layout tools often emit "1 Tf" with a 9-unit matrix): every gap would then
+    /// look wider than a word space. When the reported size is clearly smaller than the font's own ascent-to-descent
+    /// extent (the loose box, the same for every glyph of the font), the size is taken from that extent instead.
+    /// </summary>
+    /// <summary>The glyph's fill colour as 0xAARRGGBB; opaque black when PDFium cannot tell.</summary>
+    private static uint FillColor(IntPtr text, int index) =>
+        PdfiumNative.FPDFText_GetFillColor(text, index, out var r, out var g, out var b, out var a) == 0
+            ? 0xFF000000
+            : (Math.Min(a, 255) << 24) | (Math.Min(r, 255) << 16) | (Math.Min(g, 255) << 8) | Math.Min(b, 255);
+
+    /// <summary>
+    /// Bold by the descriptor weight, the ForceBold flag, or — since many embedded fonts leave both out — the
+    /// font's name (Arial-BoldMT, Helvetica-Black, DIN-Semibold…).
+    /// </summary>
+    private static bool IsBold(IntPtr text, int index)
+    {
+        if (PdfiumNative.FPDFText_GetFontWeight(text, index) >= 600) return true;
+        Span<byte> name = stackalloc byte[128];
+        var needed = PdfiumNative.FPDFText_GetFontInfo(text, index, name, (uint)name.Length, out var flags);
+        if ((flags & 0x40000) != 0) return true; // ForceBold
+        if (needed is 0 or > 128) return false;
+        var font = Encoding.UTF8.GetString(name[..(int)(needed - 1)]);
+        return font.Contains("Bold", StringComparison.OrdinalIgnoreCase)
+            || font.Contains("Black", StringComparison.OrdinalIgnoreCase)
+            || font.Contains("Heavy", StringComparison.OrdinalIgnoreCase)
+            || font.Contains("Semibold", StringComparison.OrdinalIgnoreCase)
+            || font.Contains("Demi", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static double EffectiveFontSize(IntPtr text, int index, double angle)
+    {
+        var reported = PdfiumNative.FPDFText_GetFontSize(text, index);
+        if (PdfiumNative.FPDFText_GetLooseCharBox(text, index, out var loose) == 0)
+            return reported > 0 ? reported : 12;
+
+        // Extent across the reading direction (ascent + descent ≈ 1.2 em for typical fonts).
+        var across = Math.Abs(Math.Cos(angle)) >= Math.Abs(Math.Sin(angle))
+            ? Math.Abs(loose.Top - loose.Bottom)
+            : Math.Abs(loose.Right - loose.Left);
+        var fromExtent = across / 1.2;
+        if (fromExtent <= 0) return reported > 0 ? reported : 12;
+        return reported > 0 && reported >= fromExtent * 0.6 ? reported : fromExtent;
+    }
+
     private static IEnumerable<RawWord> SplitWords(IReadOnlyList<Glyph> glyphs)
     {
         WordBuilder? cur = null;
@@ -307,7 +380,7 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
                 yield return Finish(cur);
                 cur = null;
             }
-            cur ??= new WordBuilder { FontSize = g.FontSize, Orientation = g.Orientation };
+            cur ??= new WordBuilder { FontSize = g.FontSize, Orientation = g.Orientation, Color = g.Color, Bold = g.Bold };
             cur.Text.Append(g.Ch);
             cur.Left = Math.Min(cur.Left, g.Left);
             cur.Top = Math.Min(cur.Top, g.Top);
@@ -317,7 +390,7 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
         }
         if (cur is not null) yield return Finish(cur);
 
-        static RawWord Finish(WordBuilder w) => new(w.Text.ToString(), w.Left, w.Top, w.Right, w.Bottom, w.FontSize, w.Orientation);
+        static RawWord Finish(WordBuilder w) => new(w.Text.ToString(), w.Left, w.Top, w.Right, w.Bottom, w.FontSize, w.Orientation, w.Color, w.Bold);
     }
 
     private static bool Continues(Glyph prev, Glyph next)
@@ -379,37 +452,110 @@ internal sealed class PdfTextExtractor : IPdfTextExtractor
     internal static IReadOnlyList<TextSearchResult> FindMatches(
         IReadOnlyList<(string Text, PdfRect Box)> words, int pageIndex, string needle, TextSearchOptions options)
     {
-        var comparison = options.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-
-        var sb = new StringBuilder();
-        var spans = new List<(int Start, int End, PdfRect Box)>(words.Count);
-        foreach (var (text, box) in words)
+        var (haystack, spans) = JoinWords(words.Select(w => w.Text));
+        var results = new List<TextSearchResult>();
+        foreach (var (hit, end) in MatchRanges(haystack, needle, options))
         {
-            if (string.IsNullOrEmpty(text)) continue;
-            if (sb.Length > 0) sb.Append(' ');
-            var start = sb.Length;
-            sb.Append(text);
-            spans.Add((start, sb.Length, box));
+            var boxes = spans.Where(s => s.Start < end && s.End > hit).Select(s => words[s.Word].Box).ToList();
+            if (boxes.Count > 0)
+                results.Add(new TextSearchResult { MatchedText = haystack[hit..end], PageIndex = pageIndex, Boxes = boxes });
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// Replace counterpart of <see cref="FindMatches"/>: the same matches (so <paramref name="matchOrdinal"/> indexes
+    /// the page's search results), widened to the whole words they touch. Matches sharing a word are merged into one
+    /// edit, so "catcat" with "cat"→"dog" yields a single "dogdog" rather than two overlapping retypes. Edits touching
+    /// rotated words are dropped. Pure and PDFium-free so it can be unit-tested directly.
+    /// </summary>
+    internal static IReadOnlyList<TextReplacement> PlanReplacements(
+        IReadOnlyList<TextWord> words, int pageIndex, string needle, string replacement, TextSearchOptions options,
+        int? matchOrdinal = null)
+    {
+        var (haystack, spans) = JoinWords(words.Select(w => w.Text));
+        var matches = MatchRanges(haystack, needle, options).ToList();
+        if (matchOrdinal is int only)
+            matches = (uint)only < (uint)matches.Count ? [matches[only]] : [];
+
+        // Group matches by the run of spans they touch; a match touching the previous group's last span joins it.
+        var groups = new List<(int First, int Last, List<(int Hit, int End)> Hits)>();
+        foreach (var m in matches)
+        {
+            var first = spans.FindIndex(s => s.End > m.Hit);
+            var last = spans.FindLastIndex(s => s.Start < m.End);
+            if (first < 0 || last < first) continue;
+            if (groups.Count > 0 && groups[^1].Last >= first)
+            {
+                var g = groups[^1];
+                g.Hits.Add(m);
+                groups[^1] = (g.First, Math.Max(g.Last, last), g.Hits);
+            }
+            else groups.Add((first, last, [m]));
         }
 
-        var haystack = sb.ToString();
-        var results = new List<TextSearchResult>();
+        var edits = new List<TextReplacement>(groups.Count);
+        foreach (var (first, last, hits) in groups)
+        {
+            var touched = spans.GetRange(first, last - first + 1).Select(s => words[s.Word]).ToList();
+            if (touched.Any(w => !w.IsHorizontal)) continue;
+
+            var sb = new StringBuilder();
+            var pos = spans[first].Start;
+            foreach (var (hit, end) in hits)
+            {
+                sb.Append(haystack, pos, hit - pos).Append(replacement);
+                pos = end;
+            }
+            sb.Append(haystack, pos, spans[last].End - pos);
+
+            edits.Add(new TextReplacement
+            {
+                PageIndex = pageIndex,
+                Covers = touched.Select(w => w.BoundingBox).ToList(),
+                NewText = CollapseWhitespace(sb.ToString()),
+                OriginalText = haystack[spans[first].Start..spans[last].End],
+                FontSizePoints = touched[0].FontSizePoints,
+                ColorArgb = touched[0].ColorArgb,
+                IsBold = touched[0].IsBold,
+            });
+        }
+        return edits;
+    }
+
+    /// <summary>Joins the non-empty words with single spaces; each span maps a word's range back to its index.</summary>
+    private static (string Haystack, List<(int Start, int End, int Word)> Spans) JoinWords(IEnumerable<string> words)
+    {
+        var sb = new StringBuilder();
+        var spans = new List<(int Start, int End, int Word)>();
+        var index = 0;
+        foreach (var text in words)
+        {
+            if (!string.IsNullOrEmpty(text))
+            {
+                if (sb.Length > 0) sb.Append(' ');
+                var start = sb.Length;
+                sb.Append(text);
+                spans.Add((start, sb.Length, index));
+            }
+            index++;
+        }
+        return (sb.ToString(), spans);
+    }
+
+    /// <summary>Non-overlapping occurrences of <paramref name="needle"/>, like a normal find-in-page.</summary>
+    private static IEnumerable<(int Hit, int End)> MatchRanges(string haystack, string needle, TextSearchOptions options)
+    {
+        var comparison = options.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         var from = 0;
         while (needle.Length > 0 && from <= haystack.Length - needle.Length)
         {
             var hit = haystack.IndexOf(needle, from, comparison);
-            if (hit < 0) break;
+            if (hit < 0) yield break;
             var end = hit + needle.Length;
-
-            if (!options.WholeWord || IsWholeWord(haystack, hit, end))
-            {
-                var boxes = spans.Where(s => s.Start < end && s.End > hit).Select(s => s.Box).ToList();
-                if (boxes.Count > 0)
-                    results.Add(new TextSearchResult { MatchedText = haystack[hit..end], PageIndex = pageIndex, Boxes = boxes });
-            }
-            from = end; // non-overlapping matches, like a normal find-in-page
+            if (!options.WholeWord || IsWholeWord(haystack, hit, end)) yield return (hit, end);
+            from = end;
         }
-        return results;
     }
 
     private static string CollapseWhitespace(string s)
