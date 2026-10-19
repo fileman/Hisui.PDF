@@ -36,6 +36,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(AllRecentFiles));
         OnPropertyChanged(nameof(HasRecentFiles));
         OnPropertyChanged(nameof(HasUnpinnedRecentFiles));
+        Hisui.Pdf.App.Services.WindowsJumpList.Update(RecentFiles.Select(r => r.FullPath), _loc["Menu.Recent"]);
         _ = LoadThumbnailsAsync([.. RecentFiles]);
     }
 
