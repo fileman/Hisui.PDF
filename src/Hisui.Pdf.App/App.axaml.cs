@@ -63,6 +63,7 @@ public partial class App : Application
 
             var window = _host.Services.GetRequiredService<MainWindow>();
             desktop.MainWindow = window;
+            desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnMainWindowClose; // detached windows are closed (after prompts) with it
 
             // Silent startup check (first window only); only prompts if a newer, non-skipped release exists.
             if (settings.Settings.CheckForUpdates)
@@ -74,8 +75,9 @@ public partial class App : Application
             // Arguments forwarded by later launches (single instance) open as extra tabs here.
             SingleInstance.Received = args => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                window.Bring();
-                window.OpenArgs(args);
+                var target = MainWindow.Active ?? window;
+                target.Bring();
+                target.OpenArgs(args);
             });
 
             desktop.Exit += async (_, _) =>

@@ -20,6 +20,8 @@
   "Tab.SplitStacked": "Mostra sotto la scheda corrente",
   "Tab.SplitSwitch": "Alterna affiancata / sovrapposta",
   "Tab.SplitClose": "Chiudi vista divisa",
+  "Tab.MoveNewWindow": "Sposta in una nuova finestra",
+  "Tab.MoveMainWindow": "Sposta nella finestra principale",
   "Ribbon.FilePill.Tooltip": "Apri, salva, stampa, recenti, preferenze",
   "Cmd.Open": "Apri",
   "Cmd.Open.Tooltip": "Apri un PDF",

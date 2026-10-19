@@ -126,7 +126,7 @@ internal sealed class FileDialogService : IFileDialogService
     private static IStorageProvider? GetStorageProvider()
     {
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            return TopLevel.GetTopLevel(desktop.MainWindow)?.StorageProvider;
+            return TopLevel.GetTopLevel(Views.MainWindow.Active ?? desktop.MainWindow)?.StorageProvider;
         return null;
     }
 }

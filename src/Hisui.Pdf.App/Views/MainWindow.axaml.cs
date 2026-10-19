@@ -25,6 +25,15 @@ public partial class MainWindow : Window
     private GridSplitter? _splitter;
     private TabItem? _splitLeft, _splitRight;
     private bool _splitStacked;
+
+    // Windows: the first one is the main window (closing it exits the app); tabs can be moved between windows.
+    private static readonly List<MainWindow> Open = [];
+    private readonly Dictionary<TabItem, PropertyChangedEventHandler> _hooks = [];
+
+    /// <summary>The window the user is working in (falls back to the main window).</summary>
+    public static MainWindow? Active => Open.FirstOrDefault(w => w.IsActive) ?? Open.FirstOrDefault();
+
+    private bool IsMain => Open.Count > 0 && ReferenceEquals(this, Open[0]);
     private TabItem? _previousTab; // tab selected before the current one (right-click selects the clicked tab first)
 
     public MainWindow(IServiceProvider services)
@@ -77,6 +86,8 @@ public partial class MainWindow : Window
             }
         };
         AddTab();
+        Open.Add(this);
+        Closed += (_, _) => Open.Remove(this);
         Closing += OnClosing;
         Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(FitCaptionButtons, Avalonia.Threading.DispatcherPriority.Loaded);
     }
@@ -149,6 +160,42 @@ public partial class MainWindow : Window
     private DocumentView AddTab()
     {
         var view = _services.GetRequiredService<DocumentView>();
+        AttachView(view);
+        return view;
+    }
+
+    /// <summary>Creates a new window that adopts an existing document view (a tab moved out of another window).</summary>
+    private static MainWindow CreateDetached(IServiceProvider services, DocumentView view, MainWindow from)
+    {
+        var w = new MainWindow(services);
+        foreach (var t in w.Tabs.Items.OfType<TabItem>().ToList()) w.Tabs.Items.Remove(t); // drop its initial empty tab
+        w.AttachView(view);
+        w.Width = from.Width;
+        w.Height = from.Height;
+        w.WindowStartupLocation = WindowStartupLocation.Manual;
+        w.Position = from.Position + new PixelPoint(40, 40);
+        return w;
+    }
+
+    /// <summary>Moves a tab (document, unsaved changes and all) to a new window, or to <paramref name="target"/>.</summary>
+    private void MoveTab(TabItem item, MainWindow? target)
+    {
+        if (ViewOf(item) is not { } view) return;
+        if (target is null && Tabs.ItemCount < 2) return; // moving the only tab out would just rename the window
+        if (item == _splitLeft || item == _splitRight) CloseSplit();
+        _claimed.Remove(view);
+        if (_hooks.Remove(item, out var hook) && view.DataContext is MainViewModel vm) vm.PropertyChanged -= hook;
+        Tabs.Items.Remove(item);
+        LayoutPanes(); // release the view from its pane before another window hosts it
+
+        if (target is null) CreateDetached(_services, view, this).Show();
+        else { target.AttachView(view); target.Activate(); }
+
+        if (Tabs.ItemCount == 0) { _closeConfirmed = true; Close(); }
+    }
+
+    private TabItem AttachView(DocumentView view)
+    {
         var vm = (MainViewModel)view.DataContext!;
 
         var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 180, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis };
@@ -170,18 +217,25 @@ public partial class MainWindow : Window
         var splitStacked = new MenuItem { Header = loc["Tab.SplitStacked"] };
         var splitSwitch = new MenuItem { Header = loc["Tab.SplitSwitch"] };
         var splitClose = new MenuItem { Header = loc["Tab.SplitClose"] };
+        var moveNew = new MenuItem { Header = loc["Tab.MoveNewWindow"] };
+        var moveMain = new MenuItem { Header = loc["Tab.MoveMainWindow"] };
+        moveNew.Click += (_, _) => MoveTab(item, null);
+        moveMain.Click += (_, _) => { if (Open.Count > 0) MoveTab(item, Open[0]); };
         splitSide.Click += (_, _) => StartSplit(item, stacked: false);
         splitStacked.Click += (_, _) => StartSplit(item, stacked: true);
         splitSwitch.Click += (_, _) => { _splitStacked = !_splitStacked; LayoutPanes(); };
         splitClose.Click += (_, _) => CloseSplit();
         var menu = new ContextMenu
         {
-            Items = { closeThis, closeOthers, closeAll, new Separator(), splitSide, splitStacked, splitSwitch, splitClose },
+            Items = { closeThis, closeOthers, closeAll, new Separator(), splitSide, splitStacked, splitSwitch, splitClose,
+                      new Separator(), moveNew, moveMain },
         };
         menu.Opening += (_, _) =>
         {
             splitSide.IsEnabled = splitStacked.IsEnabled = Tabs.ItemCount > 1;
             splitSwitch.IsEnabled = splitClose.IsEnabled = _splitLeft is not null;
+            moveNew.IsEnabled = Tabs.ItemCount > 1;
+            moveMain.IsVisible = !IsMain;
         };
         item.ContextMenu = menu;
 
@@ -193,12 +247,14 @@ public partial class MainWindow : Window
             ToolTip.SetTip(item, vm.CurrentPath is { } p ? $"{Path.GetFileName(p)}\n{p}" : label.Text);
             if (ReferenceEquals(Tabs.SelectedItem, item)) UpdateWindowTitle();
         }
-        vm.PropertyChanged += (_, e) => { if (e.PropertyName is nameof(MainViewModel.Title) or nameof(MainViewModel.HasUnsavedChanges)) Refresh(); };
+        PropertyChangedEventHandler hook = (_, e) => { if (e.PropertyName is nameof(MainViewModel.Title) or nameof(MainViewModel.HasUnsavedChanges)) Refresh(); };
+        vm.PropertyChanged += hook;
+        _hooks[item] = hook;
         Refresh();
 
         Tabs.Items.Add(item);
         Tabs.SelectedItem = item;
-        return view;
+        return item;
     }
 
     /// <summary>Closes a tab after offering to save unsaved changes; false when the user cancels. Closing the last tab
@@ -262,10 +318,21 @@ public partial class MainWindow : Window
     {
         if (_closeConfirmed) return;
         e.Cancel = true;
-        foreach (var tab in Tabs.Items.OfType<TabItem>().ToList())
-            if (!await ConfirmDiscardAsync(tab)) return;
+        // Closing the main window exits the app, so every other window gets its unsaved-changes prompts first.
+        var others = IsMain ? Open.Skip(1).ToList() : [];
+        foreach (var w in others)
+            if (!await w.ConfirmAllAsync()) return;
+        if (!await ConfirmAllAsync()) return;
+        foreach (var w in others) { w._closeConfirmed = true; w.Close(); }
         _closeConfirmed = true;
         Close();
+    }
+
+    private async Task<bool> ConfirmAllAsync()
+    {
+        foreach (var tab in Tabs.Items.OfType<TabItem>().ToList())
+            if (!await ConfirmDiscardAsync(tab)) return false;
+        return true;
     }
 
     /// <summary>Closes every tab and leaves one empty tab (the window stays open).</summary>
