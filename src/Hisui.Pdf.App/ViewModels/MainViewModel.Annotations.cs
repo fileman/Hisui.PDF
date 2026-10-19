@@ -81,6 +81,7 @@ public partial class MainViewModel
     {
         OnPropertyChanged(nameof(PageInfo));
         OnPropertyChanged(nameof(PageCountLabel));
+        RaisePageNavigationChanged();
         RaiseCanExecute();
     }
 
@@ -111,6 +112,9 @@ public partial class MainViewModel
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
         SearchCommand.NotifyCanExecuteChanged();
+        OpenFindCommand.NotifyCanExecuteChanged();
+        ReplaceCommand.NotifyCanExecuteChanged();
+        ReplaceAllCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsDocumentLoaded));
         OnPropertyChanged(nameof(ShowContinuousPages));
         OnPropertyChanged(nameof(ShowSinglePage));

@@ -33,6 +33,7 @@
                     <SolidColorBrush x:Key="RibbonCriticalBorderBrush" Color="#F1C7C2" />
                     <SolidColorBrush x:Key="RibbonPageBrush"        Color="#FFFFFF" />
                     <SolidColorBrush x:Key="RibbonPageBorderBrush"  Color="#22000000" />
+                    <SolidColorBrush x:Key="RibbonFloatBorderBrush" Color="#1F000000" />
                 </ResourceDictionary>
 
                 <!-- ── Dark · Mica ── -->
@@ -58,6 +59,7 @@
                     <SolidColorBrush x:Key="RibbonCriticalBorderBrush" Color="#5C2C28" />
                     <SolidColorBrush x:Key="RibbonPageBrush"        Color="#FFFFFF" />
                     <SolidColorBrush x:Key="RibbonPageBorderBrush"  Color="#33000000" />
+                    <SolidColorBrush x:Key="RibbonFloatBorderBrush" Color="#24FFFFFF" />
                 </ResourceDictionary>
 
             </ResourceDictionary.ThemeDictionaries>

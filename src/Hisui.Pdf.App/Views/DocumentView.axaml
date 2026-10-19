@@ -72,6 +72,20 @@
         <StreamGeometry x:Key="IconAddChild">M2.5 2.5v7h6 M6.5 7.5l2 2-2 2 M12 2.5v5 M9.5 5h5</StreamGeometry>
         <StreamGeometry x:Key="IconReply">M6 4L2.5 7.5 6 11 M2.5 7.5h6.5a4 4 0 0 1 4 4v1</StreamGeometry>
         <StreamGeometry x:Key="IconSignature">M2 10.5c1-2.5 2-2.5 3 0s2 2.5 3 0 2-2.5 3 0 M2 13.5h11</StreamGeometry>
+
+        <!-- Find widget and view toolbar glyphs (16-unit coordinate space, stroked, no fill) -->
+        <StreamGeometry x:Key="IconSearch">M7 2.5a4.5 4.5 0 1 0 .01 0 M10.3 10.3L14 14</StreamGeometry>
+        <StreamGeometry x:Key="IconClose">M4 4l8 8 M12 4l-8 8</StreamGeometry>
+        <StreamGeometry x:Key="IconChevronRight">M6 3.5L10.5 8 6 12.5</StreamGeometry>
+        <StreamGeometry x:Key="IconChevronLeft">M10 3.5L5.5 8 10 12.5</StreamGeometry>
+        <StreamGeometry x:Key="IconFirstPage">M4 3.5v9 M11.5 3.5L7 8l4.5 4.5</StreamGeometry>
+        <StreamGeometry x:Key="IconLastPage">M12 3.5v9 M4.5 3.5L9 8l-4.5 4.5</StreamGeometry>
+        <StreamGeometry x:Key="IconReplaceOne">M2.5 4h6 M2.5 7h4 M9.5 9.5h4v4h-4z M5 9.5v2.5h3 M6.5 10.5L8 12l-1.5 1.5</StreamGeometry>
+        <StreamGeometry x:Key="IconReplaceAll">M2.5 3h6 M2.5 5.5h6 M2.5 8h4 M9.5 9.5h4v4h-4z M5 10v2.5h3 M6.5 11L8 12.5 6.5 14</StreamGeometry>
+        <StreamGeometry x:Key="IconFitWidth">M2 3v10 M14 3v10 M4.5 8h7 M6 6.5L4.5 8 6 9.5 M10 6.5l1.5 1.5L10 9.5</StreamGeometry>
+        <StreamGeometry x:Key="IconFitPage">M4 2h8v12H4z M6.5 5.5v5 M9.5 5.5v5</StreamGeometry>
+        <StreamGeometry x:Key="IconContinuous">M4 1.5h8v5H4z M4 9.5h8v5H4z</StreamGeometry>
+        <StreamGeometry x:Key="IconSinglePage">M4 2h8v12H4z</StreamGeometry>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -273,6 +287,134 @@
             <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
         </Style>
 
+        <!-- ── Floating surfaces over the page: find widget (top right) and view toolbar (bottom centre) ── -->
+        <Style Selector="Border.floating">
+            <Setter Property="Background" Value="{DynamicResource RibbonTabStripBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource RibbonFloatBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="BoxShadow" Value="0 6 20 0 #2A000000, 0 1 3 0 #1A000000" />
+        </Style>
+        <Style Selector="Border.floating TextBlock.fw-muted">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+            <Setter Property="FontFeatures" Value="+tnum" />
+        </Style>
+        <Style Selector="Border.floating TextBox">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <!-- Icon buttons on the floating surfaces: 30×30 hit area, 16px glyph, visible keyboard focus. -->
+        <Style Selector="Button.fw, ToggleButton.fw">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
+        </Style>
+        <Style Selector="Button.fw:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ToggleButton.fw:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         Button.fw:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.fw:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Opacity" Value="0.35" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.fw:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <!-- A view-mode toggle shows its on state (unlike the chevron, whose rotation already does). -->
+        <Style Selector="ToggleButton.view-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentSoftBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.view-toggle:checked">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.fw Path.glyph, ToggleButton.opt Path.glyph">
+            <Setter Property="Stroke" Value="{Binding $parent[ToggleButton].Foreground}" />
+        </Style>
+        <!-- The replace chevron turns to point down while the replace row is open. -->
+        <Style Selector="ToggleButton.fw-chevron Path">
+            <Setter Property="RenderTransform" Value="rotate(0deg)" />
+            <Setter Property="Transitions">
+                <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" /></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.fw-chevron:checked Path">
+            <Setter Property="RenderTransform" Value="rotate(90deg)" />
+        </Style>
+
+        <!-- Search options inside the find box (match case, whole word): small, accent when on. -->
+        <Style Selector="ToggleButton.opt">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.opt:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.opt:checked /template/ ContentPresenter#PART_ContentPresenter,
+                         ToggleButton.opt:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.opt:checked, ToggleButton.opt:checked:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+
+        <!-- Replace actions: labelled, so the two are never confused; Replace all is the quieter one. -->
+        <Style Selector="Button.fw-text">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
+        </Style>
+        <Style Selector="Button.fw-text.primary">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonOnAccentBrush}" />
+        </Style>
+        <Style Selector="Button.fw-text.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonOnAccentBrush}" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+        <Style Selector="Button.fw-text:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+
+        <!-- Hairline between groups on the floating surfaces -->
+        <Style Selector="Border.fw-sep">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Margin" Value="4,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource RibbonFloatBorderBrush}" />
+        </Style>
+
         <!-- Recent-file links in the empty state -->
         <Style Selector="Button.recent-link">
             <Setter Property="Background" Value="Transparent" />
@@ -419,84 +561,14 @@
                                    Foreground="{DynamicResource RibbonSubtleTextBrush}" />
                     </Grid>
 
-                    <!-- Find-in-document bar -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center"
-                                IsEnabled="{Binding IsDocumentLoaded}">
-                        <TextBox x:Name="SearchBox" Width="190" Height="27" Padding="8,2" VerticalContentAlignment="Center"
-                                 PlaceholderText="{loc:Tr Search.Placeholder}" Text="{Binding SearchQuery}">
-                            <TextBox.KeyBindings>
-                                <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
-                            </TextBox.KeyBindings>
-                        </TextBox>
-                        <ToggleButton Content="Aa" FontSize="12" MinWidth="30" Height="27" Padding="6,0"
-                                      IsChecked="{Binding SearchMatchCase}" ToolTip.Tip="{loc:Tr Search.MatchCase}"
-                                      AutomationProperties.Name="{loc:Tr Search.MatchCase}" />
-                        <ToggleButton MinWidth="34" Height="27" Padding="6,0"
-                                      IsChecked="{Binding SearchWholeWord}" ToolTip.Tip="{loc:Tr Search.WholeWord}"
-                                      AutomationProperties.Name="{loc:Tr Search.WholeWord}">
-                            <TextBlock Text="ab" FontSize="12" TextDecorations="Underline" />
-                        </ToggleButton>
-                        <TextBlock Text="{Binding SearchSummary}" VerticalAlignment="Center" MinWidth="46"
-                                   TextAlignment="Center" FontSize="11.5"
-                                   AutomationProperties.LiveSetting="Polite"
-                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
-                        <Button Classes="ribbon-icon" Command="{Binding PrevMatchCommand}" ToolTip.Tip="{loc:Tr Search.Prev}"
-                                AutomationProperties.Name="{loc:Tr Search.Prev}">
-                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconUp}" />
-                        </Button>
-                        <Button Classes="ribbon-icon" Command="{Binding NextMatchCommand}" ToolTip.Tip="{loc:Tr Search.Next}"
-                                AutomationProperties.Name="{loc:Tr Search.Next}">
-                            <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconDown}" />
-                        </Button>
-                    </StackPanel>
+                    <!-- Find (opens the floating find widget over the page) -->
+                    <Button Grid.Column="2" Classes="ribbon-icon" Click="OnFindClick" IsEnabled="{Binding IsDocumentLoaded}"
+                            ToolTip.Tip="{loc:Tr Find.Open.Tooltip}" AutomationProperties.Name="{loc:Tr Find.Open}">
+                        <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconSearch}" />
+                    </Button>
 
                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Width="1" Height="18" Background="{DynamicResource RibbonDividerBrush}" Margin="6,0" />
-                        <!-- Zoom controls: − [percentage ▾ presets] + -->
-                        <StackPanel Orientation="Horizontal" Spacing="1" VerticalAlignment="Center"
-                                    IsEnabled="{Binding IsDocumentLoaded}">
-                            <Button Classes="zoombtn" Command="{Binding ZoomOutCommand}"
-                                    ToolTip.Tip="{loc:Tr Zoom.Out}" AutomationProperties.Name="{loc:Tr Zoom.Out}">
-                                <Path Classes="glyph" Width="12" Height="12" Data="M3 8h10" />
-                            </Button>
-                            <Button Classes="zoombtn" MinWidth="62" ToolTip.Tip="{loc:Tr Zoom.Presets}"
-                                    AutomationProperties.Name="{loc:Tr Zoom.Presets}">
-                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding ZoomLabel}" VerticalAlignment="Center" />
-                                    <Path Classes="glyph" Width="8" Height="6" Data="M1 2l3 3 3-3" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <Button.Flyout>
-                                    <MenuFlyout Placement="Bottom">
-                                        <MenuItem Header="50%"  Command="{Binding SetZoomPercentCommand}" CommandParameter="50" />
-                                        <MenuItem Header="75%"  Command="{Binding SetZoomPercentCommand}" CommandParameter="75" />
-                                        <MenuItem Header="100%" Command="{Binding SetZoomPercentCommand}" CommandParameter="100" />
-                                        <MenuItem Header="125%" Command="{Binding SetZoomPercentCommand}" CommandParameter="125" />
-                                        <MenuItem Header="150%" Command="{Binding SetZoomPercentCommand}" CommandParameter="150" />
-                                        <MenuItem Header="200%" Command="{Binding SetZoomPercentCommand}" CommandParameter="200" />
-                                        <Separator />
-                                        <MenuItem Header="{loc:Tr Zoom.FitWidth}"  Command="{Binding FitWidthCommand}" />
-                                        <MenuItem Header="{loc:Tr Zoom.FitHeight}" Command="{Binding FitHeightCommand}" />
-                                        <Separator />
-                                        <MenuItem Header="{loc:Tr View.SinglePage}" Command="{Binding SetContinuousViewCommand}"
-                                                  CommandParameter="{x:False}">
-                                            <MenuItem.Icon><TextBlock Text="✓" IsVisible="{Binding !IsContinuousView}" /></MenuItem.Icon>
-                                        </MenuItem>
-                                        <MenuItem Header="{loc:Tr View.Continuous}" Command="{Binding SetContinuousViewCommand}"
-                                                  CommandParameter="{x:True}">
-                                            <MenuItem.Icon><TextBlock Text="✓" IsVisible="{Binding IsContinuousView}" /></MenuItem.Icon>
-                                        </MenuItem>
-                                    </MenuFlyout>
-                                </Button.Flyout>
-                            </Button>
-                            <Button Classes="zoombtn" Command="{Binding ZoomInCommand}"
-                                    ToolTip.Tip="{loc:Tr Zoom.In}" AutomationProperties.Name="{loc:Tr Zoom.In}">
-                                <Path Classes="glyph" Width="12" Height="12" Data="M8 3v10 M3 8h10" />
-                            </Button>
-                        </StackPanel>
-                        <TextBlock Text="{Binding PageInfo}" FontSize="12" Margin="10,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource RibbonSubtleTextBrush}" />
-                        <Border Width="1" Height="18" Background="{DynamicResource RibbonDividerBrush}" Margin="10,0,6,0" />
                         <!-- Help in plain sight: report, request, share, updates, about. -->
                         <Button Classes="ribbon-filepill" Content="{loc:Tr Ribbon.Help}" Click="OnHelpClick"
                                 ToolTip.Tip="{loc:Tr Ribbon.Help.Tooltip}" />
@@ -619,10 +691,10 @@
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <Panel Margin="10,6,10,12">
 
-                            <!-- HOME -->
+                            <!-- HOME: document tools, grouped by task the way Acrobat's Tools centre is -->
                             <StackPanel Spacing="2"
                                         IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Home}">
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Pages}" />
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Organize}" />
                                 <Button Classes="ribbon-small" Command="{Binding RotateRightCommand}" ToolTip.Tip="{loc:Tr Cmd.RotateRight.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCw}" />
@@ -633,12 +705,6 @@
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCcw}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.RotateLeft}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Classes="ribbon-small" Command="{Binding DeleteSelectedCommand}" ToolTip.Tip="{loc:Tr Cmd.Delete.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Delete}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding MoveUpCommand}" ToolTip.Tip="{loc:Tr Cmd.MoveUp.Tooltip}">
@@ -653,7 +719,18 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.MoveDown.Tooltip}" />
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Tools}" />
+                                <Button Classes="ribbon-small" Command="{Binding DeleteSelectedCommand}" ToolTip.Tip="{loc:Tr Cmd.Delete.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Delete}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding AddFilesCommand}" ToolTip.Tip="{loc:Tr Cmd.Add.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAdd}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ExtractSelectedCommand}" ToolTip.Tip="{loc:Tr Cmd.Extract.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconExtract}" />
@@ -666,41 +743,24 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Split}" />
                                     </StackPanel>
                                 </Button>
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Edit}" />
+                                <Button Classes="ribbon-small" Command="{Binding AddHeaderFooterCommand}" ToolTip.Tip="{loc:Tr Stamp.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M3 2h10v12H3z M5 4h6 M5 12h6" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Stamp.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding AddWatermarkCommand}" ToolTip.Tip="{loc:Tr Tool.Watermark.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconWatermark}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Watermark}" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Optimize}" />
                                 <Button Classes="ribbon-small" Command="{Binding MakeSearchableCommand}" ToolTip.Tip="{loc:Tr Cmd.Ocr.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconOcr}" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Ocr}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Classes="ribbon-small" Command="{Binding CompressCommand}" ToolTip.Tip="{loc:Tr Cmd.Compress.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconCompress}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Compress}" />
-                                    </StackPanel>
-                                </Button>
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Document}" />
-                                <Button Classes="ribbon-small" Click="OnDocumentPropertiesClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.DocumentProperties}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconInfo}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Properties}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Classes="ribbon-small" Click="OnProtectClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.Protect}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconLock}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Protect}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Classes="ribbon-small" Command="{Binding ExtractImagesCommand}" ToolTip.Tip="{loc:Tr Menu.ExtractImages}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconImage}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.ExtractImages}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Classes="ribbon-small" Command="{Binding AddFilesCommand}" ToolTip.Tip="{loc:Tr Cmd.Add.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconAdd}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Add}" />
                                     </StackPanel>
                                 </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ChooseOcrLanguagesCommand}" ToolTip.Tip="{loc:Tr Ocr.Button.Tooltip}">
@@ -709,12 +769,26 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Ocr.Button}" />
                                     </StackPanel>
                                 </Button>
-                                <Button Classes="ribbon-small" Command="{Binding BatchCommand}" ToolTip.Tip="{loc:Tr Batch.Tooltip}">
+                                <Button Classes="ribbon-small" Command="{Binding CompressCommand}" ToolTip.Tip="{loc:Tr Cmd.Compress.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="M5 2h7v9H5z M3 4v9h7 M7 5h3 M7 7h3" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Batch.Button}" />
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconCompress}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Compress}" />
                                     </StackPanel>
                                 </Button>
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Protect}" />
+                                <Button Classes="ribbon-small" Click="OnProtectClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.Protect}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconLock}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Protect}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding RedactPatternsCommand}" ToolTip.Tip="{loc:Tr Redact.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 4h12 M2 8h5 M10 7h4v3h-4z M2 12h12" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Redact.Button}" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Standards}" />
                                 <Button Classes="ribbon-small" Command="{Binding SaveAsProfileCommand}" ToolTip.Tip="{loc:Tr Conf.Button.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M4 2h6l2.5 2.5V14H4z M6 9l1.5 1.5L10.5 7" />
@@ -733,16 +807,23 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Compare.Button}" />
                                     </StackPanel>
                                 </Button>
-                                <Button Classes="ribbon-small" Command="{Binding RedactPatternsCommand}" ToolTip.Tip="{loc:Tr Redact.Tooltip}">
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Document}" />
+                                <Button Classes="ribbon-small" Click="OnDocumentPropertiesClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.DocumentProperties}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="M2 4h12 M2 8h5 M10 7h4v3h-4z M2 12h12" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Redact.Button}" />
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconInfo}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Properties}" />
                                     </StackPanel>
                                 </Button>
-                                <Button Classes="ribbon-small" Command="{Binding AddHeaderFooterCommand}" ToolTip.Tip="{loc:Tr Stamp.Tooltip}">
+                                <Button Classes="ribbon-small" Command="{Binding ExtractImagesCommand}" ToolTip.Tip="{loc:Tr Menu.ExtractImages}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="M3 2h10v12H3z M5 4h6 M5 12h6" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Stamp.Button}" />
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconImage}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.ExtractImages}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding BatchCommand}" ToolTip.Tip="{loc:Tr Batch.Tooltip}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="M5 2h7v9H5z M3 4v9h7 M7 5h3 M7 7h3" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Batch.Button}" />
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -808,12 +889,6 @@
                                     </StackPanel>
                                 </RadioButton>
                                 <Border Height="1" Background="{DynamicResource RibbonDividerBrush}" Margin="0,6" />
-                                <Button Classes="ribbon-small" Command="{Binding AddWatermarkCommand}" ToolTip.Tip="{loc:Tr Tool.Watermark.Tooltip}">
-                                    <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconWatermark}" />
-                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Watermark}" />
-                                    </StackPanel>
-                                </Button>
                                 <Button Classes="ribbon-small" Command="{Binding ClearActiveToolCommand}"
                                         IsEnabled="{Binding IsAnnotationActive}" ToolTip.Tip="{loc:Tr Tool.Clear.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
@@ -1298,6 +1373,168 @@
 
                         </Grid>
                     </ScrollViewer>
+
+                    <!-- ── Find widget: floats top-right over the page (Ctrl+F, Ctrl+H for replace, Esc closes) ── -->
+                    <Border x:Name="FindWidget" Classes="floating" Padding="4,5,6,5" Margin="0,12,22,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                            AutomationProperties.Name="{loc:Tr Find.Title}">
+                        <Border.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="IsFindVisible" />
+                                <Binding Path="IsDocumentLoaded" />
+                            </MultiBinding>
+                        </Border.IsVisible>
+                        <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto">
+                            <ToggleButton Grid.RowSpan="2" Classes="fw fw-chevron" VerticalAlignment="Top" Margin="0,0,2,0"
+                                          Width="22" IsChecked="{Binding IsReplaceVisible}"
+                                          ToolTip.Tip="{loc:Tr Replace.Toggle}" AutomationProperties.Name="{loc:Tr Replace.Toggle}">
+                                <Path Classes="glyph" Width="12" Height="12" Data="{StaticResource IconChevronRight}" />
+                            </ToggleButton>
+
+                            <!-- Find row: field (with options inside) · count · previous · next · close -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                                <TextBox x:Name="SearchBox" Width="260" Text="{Binding SearchQuery}"
+                                         PlaceholderText="{loc:Tr Search.Placeholder}"
+                                         AutomationProperties.Name="{loc:Tr Search.Placeholder}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+                                        <KeyBinding Gesture="Shift+Enter" Command="{Binding PrevMatchCommand}" />
+                                    </TextBox.KeyBindings>
+                                    <TextBox.InnerLeftContent>
+                                        <Path Classes="glyph" Width="13" Height="13" Margin="8,0,0,0" Opacity="0.6"
+                                              Stroke="{DynamicResource RibbonSubtleTextBrush}" Data="{StaticResource IconSearch}" />
+                                    </TextBox.InnerLeftContent>
+                                    <TextBox.InnerRightContent>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,3,0" VerticalAlignment="Center">
+                                            <ToggleButton Classes="opt" Content="Aa" IsChecked="{Binding SearchMatchCase}"
+                                                          ToolTip.Tip="{loc:Tr Search.MatchCase}"
+                                                          AutomationProperties.Name="{loc:Tr Search.MatchCase}" />
+                                            <ToggleButton Classes="opt" IsChecked="{Binding SearchWholeWord}"
+                                                          ToolTip.Tip="{loc:Tr Search.WholeWord}"
+                                                          AutomationProperties.Name="{loc:Tr Search.WholeWord}">
+                                                <TextBlock Text="ab" FontSize="11.5" TextDecorations="Underline"
+                                                           Foreground="{Binding $parent[ToggleButton].Foreground}" />
+                                            </ToggleButton>
+                                        </StackPanel>
+                                    </TextBox.InnerRightContent>
+                                </TextBox>
+                                <TextBlock Classes="fw-muted" Text="{Binding SearchSummary}" MinWidth="70"
+                                           TextAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+                                <Button Classes="fw" Command="{Binding PrevMatchCommand}"
+                                        ToolTip.Tip="{loc:Tr Search.Prev}" AutomationProperties.Name="{loc:Tr Search.Prev}">
+                                    <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconUp}" />
+                                </Button>
+                                <Button Classes="fw" Command="{Binding NextMatchCommand}"
+                                        ToolTip.Tip="{loc:Tr Search.Next}" AutomationProperties.Name="{loc:Tr Search.Next}">
+                                    <Path Classes="glyph" Width="14" Height="14" Data="{StaticResource IconDown}" />
+                                </Button>
+                                <Border Classes="fw-sep" />
+                                <Button Classes="fw" Command="{Binding CloseFindCommand}"
+                                        ToolTip.Tip="{loc:Tr Find.Close}" AutomationProperties.Name="{loc:Tr Find.Close}">
+                                    <Path Classes="glyph" Width="12" Height="12" Data="{StaticResource IconClose}" />
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Replace row: field · Replace (primary) · Replace all -->
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,5,0,0"
+                                        IsVisible="{Binding IsReplaceVisible}">
+                                <TextBox x:Name="ReplaceBox" Width="260" Text="{Binding ReplaceText}"
+                                         PlaceholderText="{loc:Tr Replace.Placeholder}"
+                                         AutomationProperties.Name="{loc:Tr Replace.Placeholder}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ReplaceCommand}" />
+                                        <KeyBinding Gesture="Ctrl+Alt+Enter" Command="{Binding ReplaceAllCommand}" />
+                                    </TextBox.KeyBindings>
+                                    <TextBox.InnerLeftContent>
+                                        <Path Classes="glyph" Width="13" Height="13" Margin="8,0,0,0" Opacity="0.6"
+                                              Stroke="{DynamicResource RibbonSubtleTextBrush}" Data="{StaticResource IconReplaceOne}" />
+                                    </TextBox.InnerLeftContent>
+                                </TextBox>
+                                <Button Classes="fw-text primary" Content="{loc:Tr Replace.One}" Command="{Binding ReplaceCommand}"
+                                        ToolTip.Tip="{loc:Tr Replace.One.Tooltip}" />
+                                <Button Classes="fw-text" Content="{loc:Tr Replace.All}" Command="{Binding ReplaceAllCommand}"
+                                        ToolTip.Tip="{loc:Tr Replace.All.Tooltip}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- ── View toolbar: floats bottom-centre over the page — pages · zoom · fit · layout ── -->
+                    <Border Classes="floating" Padding="4" Margin="0,0,0,18"
+                            HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                            IsVisible="{Binding IsDocumentLoaded}" AutomationProperties.Name="{loc:Tr ViewBar.Title}">
+                        <StackPanel Orientation="Horizontal" Spacing="1">
+                            <Button Classes="fw" Command="{Binding FirstPageCommand}"
+                                    ToolTip.Tip="{loc:Tr ViewBar.FirstPage}" AutomationProperties.Name="{loc:Tr ViewBar.FirstPage}">
+                                <Path Classes="glyph" Width="12" Height="12" Data="{StaticResource IconFirstPage}" />
+                            </Button>
+                            <Button Classes="fw" Command="{Binding PreviousPageCommand}"
+                                    ToolTip.Tip="{loc:Tr ViewBar.PrevPage}" AutomationProperties.Name="{loc:Tr ViewBar.PrevPage}">
+                                <Path Classes="glyph" Width="12" Height="12" Data="{StaticResource IconChevronLeft}" />
+                            </Button>
+                            <TextBox x:Name="PageNumberBox" Width="44" Height="28" MinHeight="28" Padding="4,0"
+                                     TextAlignment="Center" VerticalContentAlignment="Center" FontSize="12.5"
+                                     Text="{Binding PageNumberText, UpdateSourceTrigger=LostFocus}"
+                                     KeyDown="OnPageNumberKeyDown"
+                                     ToolTip.Tip="{loc:Tr ViewBar.PageNumber}" AutomationProperties.Name="{loc:Tr ViewBar.PageNumber}" />
+                            <TextBlock Classes="fw-muted" Text="{Binding PageTotalText}" Margin="5,0,4,0" />
+                            <Button Classes="fw" Command="{Binding NextPageCommand}"
+                                    ToolTip.Tip="{loc:Tr ViewBar.NextPage}" AutomationProperties.Name="{loc:Tr ViewBar.NextPage}">
+                                <Path Classes="glyph" Width="12" Height="12" Data="{StaticResource IconChevronRight}" />
+                            </Button>
+                            <Button Classes="fw" Command="{Binding LastPageCommand}"
+                                    ToolTip.Tip="{loc:Tr ViewBar.LastPage}" AutomationProperties.Name="{loc:Tr ViewBar.LastPage}">
+                                <Path Classes="glyph" Width="12" Height="12" Data="{StaticResource IconLastPage}" />
+                            </Button>
+
+                            <Border Classes="fw-sep" />
+
+                            <Button Classes="fw" Command="{Binding ZoomOutCommand}"
+                                    ToolTip.Tip="{loc:Tr Zoom.Out}" AutomationProperties.Name="{loc:Tr Zoom.Out}">
+                                <!-- Unscaled 16-unit frame: a flat line has no height to Stretch="Uniform" against. -->
+                                <Path Classes="glyph" Width="16" Height="16" Stretch="None" Data="M4 8h8" />
+                            </Button>
+                            <Button Classes="fw" Width="66" ToolTip.Tip="{loc:Tr Zoom.Presets}"
+                                    AutomationProperties.Name="{loc:Tr Zoom.Presets}">
+                                <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding ZoomLabel}" FontSize="12.5" VerticalAlignment="Center" />
+                                    <Path Classes="glyph" Width="8" Height="5" Data="M1 1.5l3 3 3-3" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Top">
+                                        <MenuItem Header="50%"  Command="{Binding SetZoomPercentCommand}" CommandParameter="50" />
+                                        <MenuItem Header="75%"  Command="{Binding SetZoomPercentCommand}" CommandParameter="75" />
+                                        <MenuItem Header="100%" Command="{Binding SetZoomPercentCommand}" CommandParameter="100" InputGesture="Ctrl+D0" />
+                                        <MenuItem Header="125%" Command="{Binding SetZoomPercentCommand}" CommandParameter="125" />
+                                        <MenuItem Header="150%" Command="{Binding SetZoomPercentCommand}" CommandParameter="150" />
+                                        <MenuItem Header="200%" Command="{Binding SetZoomPercentCommand}" CommandParameter="200" />
+                                        <MenuItem Header="400%" Command="{Binding SetZoomPercentCommand}" CommandParameter="400" />
+                                        <Separator />
+                                        <MenuItem Header="{loc:Tr Zoom.FitWidth}"  Command="{Binding FitWidthCommand}" />
+                                        <MenuItem Header="{loc:Tr Zoom.FitHeight}" Command="{Binding FitHeightCommand}" />
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Classes="fw" Command="{Binding ZoomInCommand}"
+                                    ToolTip.Tip="{loc:Tr Zoom.In}" AutomationProperties.Name="{loc:Tr Zoom.In}">
+                                <Path Classes="glyph" Width="16" Height="16" Stretch="None" Data="M8 4v8 M4 8h8" />
+                            </Button>
+
+                            <Border Classes="fw-sep" />
+
+                            <Button Classes="fw" Command="{Binding FitWidthCommand}"
+                                    ToolTip.Tip="{loc:Tr Zoom.FitWidth}" AutomationProperties.Name="{loc:Tr Zoom.FitWidth}">
+                                <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconFitWidth}" />
+                            </Button>
+                            <Button Classes="fw" Command="{Binding FitHeightCommand}"
+                                    ToolTip.Tip="{loc:Tr Zoom.FitHeight}" AutomationProperties.Name="{loc:Tr Zoom.FitHeight}">
+                                <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconFitPage}" />
+                            </Button>
+                            <ToggleButton Classes="fw view-toggle" IsChecked="{Binding IsContinuousView}"
+                                          ToolTip.Tip="{loc:Tr View.Continuous}" AutomationProperties.Name="{loc:Tr View.Continuous}">
+                                <Path Classes="glyph" Width="16" Height="16" Data="{StaticResource IconContinuous}" />
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Empty state (shown when no document is open). Without recent files: a centred open prompt.
                          With recent files: a compact header, then the recent files as a full-width table. -->
