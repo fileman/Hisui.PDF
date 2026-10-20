@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Hisui.Pdf.App.Localization"
         x:Class="Hisui.Pdf.App.Views.PrintDialog"
-        Width="760" Height="560"
-        MinWidth="680" MinHeight="480"
+        Width="880" Height="660"
+        MinWidth="780" MinHeight="560"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
@@ -24,28 +24,95 @@
         <Style Selector="Button.navbtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
         </Style>
+
+        <!-- Link-style button (printer properties) -->
+        <Style Selector="Button.link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+
+        <!-- Segmented choice: radio buttons drawn as chips, accent when selected. -->
+        <Style Selector="RadioButton.seg">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="root" Background="Transparent" CornerRadius="5" Padding="12,5"
+                            BorderThickness="1" BorderBrush="{DynamicResource RibbonFloatBorderBrush}">
+                        <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
+        </Style>
+        <Style Selector="RadioButton.seg:pointerover /template/ Border#root">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+        </Style>
+        <Style Selector="RadioButton.seg:checked /template/ Border#root">
+            <Setter Property="Background" Value="{DynamicResource RibbonAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+        <Style Selector="RadioButton.seg:checked">
+            <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
+        </Style>
+
+        <!-- Mode-specific options under the layout chips -->
+        <Style Selector="Border.subpanel">
+            <Setter Property="Background" Value="{DynamicResource RibbonHoverBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+        </Style>
+        <Style Selector="Border.subpanel TextBlock.sublabel">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource RibbonSubtleTextBrush}" />
+        </Style>
+        <Style Selector="Border.subpanel RadioButton, Border.subpanel CheckBox">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
     </Window.Styles>
 
-    <Grid Margin="18" ColumnDefinitions="300,18,*">
+    <Grid Margin="18" ColumnDefinitions="320,18,*">
 
         <!-- ── Preview ── -->
         <DockPanel Grid.Column="0">
-            <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0" ColumnDefinitions="Auto,*,Auto">
-                <Button Grid.Column="0" Classes="navbtn" x:Name="PrevButton" Content="‹"
-                        ToolTip.Tip="{loc:Tr Print.Prev}" />
-                <TextBlock Grid.Column="1" x:Name="PageLabel" HorizontalAlignment="Center"
-                           VerticalAlignment="Center" FontSize="12"
-                           Foreground="{DynamicResource RibbonSubtleTextBrush}" />
-                <Button Grid.Column="2" Classes="navbtn" x:Name="NextButton" Content="›"
-                        ToolTip.Tip="{loc:Tr Print.Next}" />
-            </Grid>
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0" Spacing="2">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Button Grid.Column="0" Classes="navbtn" x:Name="PrevButton" Content="‹"
+                            ToolTip.Tip="{loc:Tr Print.Prev}" />
+                    <TextBlock Grid.Column="1" x:Name="PageLabel" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" FontSize="12"
+                               Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                    <Button Grid.Column="2" Classes="navbtn" x:Name="NextButton" Content="›"
+                            ToolTip.Tip="{loc:Tr Print.Next}" />
+                </Grid>
+                <TextBlock x:Name="InfoLabel" HorizontalAlignment="Center" FontSize="11.5"
+                           Foreground="{DynamicResource RibbonCaptionBrush}" />
+            </StackPanel>
 
             <Border Background="{DynamicResource RibbonPreviewBrush}" CornerRadius="4"
-                    BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" Padding="14">
-                <Border Background="{DynamicResource RibbonPageBrush}"
-                        BorderBrush="{DynamicResource RibbonPageBorderBrush}" BorderThickness="1">
-                    <Image x:Name="PreviewImage" Stretch="Uniform" />
-                </Border>
+                    BorderBrush="{DynamicResource RibbonDividerBrush}" BorderThickness="1" Padding="16">
+                <Viewbox Stretch="Uniform">
+                    <!-- Paper in points; the padding is the printer's unprintable border. -->
+                    <Border x:Name="PaperHost" Background="{DynamicResource RibbonPageBrush}"
+                            BorderBrush="{DynamicResource RibbonPageBorderBrush}" BorderThickness="1"
+                            Width="595" Height="842">
+                        <Canvas x:Name="SheetCanvas" ClipToBounds="True" />
+                    </Border>
+                </Viewbox>
             </Border>
         </DockPanel>
 
@@ -59,40 +126,183 @@
                 <Button x:Name="PrintButton" Content="{loc:Tr Print.Ok}" Classes="primary" IsDefault="True" />
             </StackPanel>
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,10,0">
                 <StackPanel Spacing="14">
 
+                    <!-- Printer -->
                     <StackPanel Spacing="3">
-                        <TextBlock Classes="caption" Text="{loc:Tr Print.Printer}" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="caption" Text="{loc:Tr Print.Printer}" VerticalAlignment="Bottom" />
+                            <Button Grid.Column="1" x:Name="PropertiesButton" Classes="link"
+                                    Content="{loc:Tr Print.Properties}" />
+                        </Grid>
                         <ComboBox x:Name="PrinterCombo" HorizontalAlignment="Stretch" />
+                        <TextBlock x:Name="PrinterInfo" FontSize="11.5" Margin="2,2,0,0"
+                                   Foreground="{DynamicResource RibbonCaptionBrush}" />
                         <TextBlock x:Name="NoPrintersLabel" Text="{loc:Tr Print.NoPrinters}" IsVisible="False"
                                    Classes="error-text" Margin="0,3,0,0" />
                     </StackPanel>
 
+                    <!-- Copies · pages · duplex -->
+                    <Grid ColumnDefinitions="96,10,*,10,*">
+                        <StackPanel Grid.Column="0" Spacing="3">
+                            <TextBlock Classes="caption" Text="{loc:Tr Print.Copies}" />
+                            <NumericUpDown x:Name="CopiesBox" Minimum="1" Maximum="99" Increment="1" Value="1"
+                                           FormatString="0" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="3">
+                            <TextBlock Classes="caption" Text="{loc:Tr Print.Range}" />
+                            <ComboBox x:Name="RangeCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                <ComboBoxItem Content="{loc:Tr Print.Range.All}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Range.Current}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Range.Custom}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Range.Odd}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Range.Even}" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4" Spacing="3">
+                            <TextBlock Classes="caption" Text="{loc:Tr Print.Duplex}" />
+                            <ComboBox x:Name="DuplexCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                <ComboBoxItem Content="{loc:Tr Print.Duplex.Simplex}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Duplex.Long}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Duplex.Short}" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+                    <TextBox x:Name="RangeBox" PlaceholderText="{loc:Tr Print.Range.Hint}" IsVisible="False"
+                             Margin="0,-6,0,0" />
+
+                    <!-- Colour -->
                     <StackPanel Spacing="3">
-                        <TextBlock Classes="caption" Text="{loc:Tr Print.Copies}" />
-                        <NumericUpDown x:Name="CopiesBox" Minimum="1" Maximum="99" Increment="1" Value="1"
-                                       FormatString="0" Width="120" HorizontalAlignment="Left" />
+                        <TextBlock Classes="caption" Text="{loc:Tr Print.Color}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <RadioButton x:Name="ColorRadio" Classes="seg" GroupName="Color" IsChecked="True"
+                                         Content="{loc:Tr Print.Color.Color}" />
+                            <RadioButton x:Name="GreyRadio" Classes="seg" GroupName="Color"
+                                         Content="{loc:Tr Print.Color.Grey}" />
+                            <RadioButton x:Name="BlackTextRadio" Classes="seg" GroupName="Color"
+                                         Content="{loc:Tr Print.Color.BlackText}" />
+                        </StackPanel>
                     </StackPanel>
 
+                    <!-- Layout -->
                     <StackPanel Spacing="3">
-                        <TextBlock Classes="caption" Text="{loc:Tr Print.Duplex}" />
-                        <ComboBox x:Name="DuplexCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
-                            <ComboBoxItem Content="{loc:Tr Print.Duplex.Simplex}" />
-                            <ComboBoxItem Content="{loc:Tr Print.Duplex.Long}" />
-                            <ComboBoxItem Content="{loc:Tr Print.Duplex.Short}" />
-                        </ComboBox>
+                        <TextBlock Classes="caption" Text="{loc:Tr Print.Layout}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <RadioButton x:Name="SizeModeRadio" Classes="seg" GroupName="Mode" IsChecked="True"
+                                         Content="{loc:Tr Print.Layout.Size}" />
+                            <RadioButton x:Name="PosterModeRadio" Classes="seg" GroupName="Mode"
+                                         Content="{loc:Tr Print.Layout.Poster}" />
+                            <RadioButton x:Name="MultipleModeRadio" Classes="seg" GroupName="Mode"
+                                         Content="{loc:Tr Print.Layout.Multiple}" />
+                            <RadioButton x:Name="BookletModeRadio" Classes="seg" GroupName="Mode"
+                                         Content="{loc:Tr Print.Layout.Booklet}" />
+                        </StackPanel>
+
+                        <!-- Size -->
+                        <Border x:Name="SizePanel" Classes="subpanel">
+                            <StackPanel Spacing="2">
+                                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                                    <RadioButton x:Name="FitRadio" GroupName="Scaling" Content="{loc:Tr Print.Size.Fit}" />
+                                    <RadioButton Grid.Column="1" x:Name="ShrinkRadio" GroupName="Scaling" IsChecked="True"
+                                                 Content="{loc:Tr Print.Size.Shrink}" />
+                                    <RadioButton Grid.Row="1" x:Name="ActualRadio" GroupName="Scaling"
+                                                 Content="{loc:Tr Print.Size.Actual}" />
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                        <RadioButton x:Name="CustomRadio" GroupName="Scaling" Content="{loc:Tr Print.Size.Custom}" />
+                                        <NumericUpDown x:Name="CustomScaleBox" Minimum="10" Maximum="400" Increment="5"
+                                                       Value="100" FormatString="0" Width="64" IsEnabled="False"
+                                                       ShowButtonSpinner="False" VerticalAlignment="Center" />
+                                        <TextBlock Classes="sublabel" Text="%" />
+                                    </StackPanel>
+                                </Grid>
+                                <CheckBox x:Name="MatchPaperCheck" Content="{loc:Tr Print.Size.MatchPaper}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Poster -->
+                        <Border x:Name="PosterPanel" Classes="subpanel" IsVisible="False">
+                            <Grid ColumnDefinitions="Auto,8,Auto,24,Auto,8,Auto" RowDefinitions="Auto,6,Auto">
+                                <TextBlock Classes="sublabel" Text="{loc:Tr Print.Poster.Scale}" />
+                                <NumericUpDown Grid.Column="2" x:Name="PosterScaleBox" Minimum="100" Maximum="1000"
+                                               Increment="25" Value="200" FormatString="0" Width="110" />
+                                <TextBlock Grid.Column="4" Classes="sublabel" Text="{loc:Tr Print.Poster.Overlap}" />
+                                <NumericUpDown Grid.Column="6" x:Name="PosterOverlapBox" Minimum="0" Maximum="50"
+                                               Increment="1" Value="10" FormatString="0" Width="100" />
+                                <CheckBox Grid.Row="2" Grid.ColumnSpan="3" x:Name="CutMarksCheck" IsChecked="True"
+                                          Content="{loc:Tr Print.Poster.CutMarks}" />
+                                <CheckBox Grid.Row="2" Grid.Column="4" Grid.ColumnSpan="3" x:Name="LabelsCheck"
+                                          IsChecked="True" Content="{loc:Tr Print.Poster.Labels}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Multiple -->
+                        <Border x:Name="MultiplePanel" Classes="subpanel" IsVisible="False">
+                            <Grid ColumnDefinitions="Auto,8,Auto,24,Auto,8,*" RowDefinitions="Auto,6,Auto">
+                                <TextBlock Classes="sublabel" Text="{loc:Tr Print.Multiple.PerSheet}" />
+                                <ComboBox Grid.Column="2" x:Name="PerSheetCombo" SelectedIndex="1" MinWidth="70">
+                                    <ComboBoxItem Content="2" />
+                                    <ComboBoxItem Content="4" />
+                                    <ComboBoxItem Content="6" />
+                                    <ComboBoxItem Content="9" />
+                                    <ComboBoxItem Content="16" />
+                                </ComboBox>
+                                <TextBlock Grid.Column="4" Classes="sublabel" Text="{loc:Tr Print.Multiple.Order}" />
+                                <ComboBox Grid.Column="6" x:Name="OrderCombo" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="{loc:Tr Print.Multiple.Order.Horizontal}" />
+                                    <ComboBoxItem Content="{loc:Tr Print.Multiple.Order.Vertical}" />
+                                </ComboBox>
+                                <CheckBox Grid.Row="2" Grid.ColumnSpan="3" x:Name="BordersCheck" IsChecked="True"
+                                          Content="{loc:Tr Print.Multiple.Borders}" />
+                                <CheckBox Grid.Row="2" Grid.Column="4" Grid.ColumnSpan="3" x:Name="AutoRotateCheck"
+                                          IsChecked="True" Content="{loc:Tr Print.Multiple.AutoRotate}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Booklet -->
+                        <Border x:Name="BookletPanel" Classes="subpanel" IsVisible="False">
+                            <Grid ColumnDefinitions="Auto,8,*,24,Auto,8,*" RowDefinitions="Auto,6,Auto">
+                                <TextBlock Classes="sublabel" Text="{loc:Tr Print.Booklet.Binding}" />
+                                <ComboBox Grid.Column="2" x:Name="BindingCombo" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="{loc:Tr Print.Booklet.Binding.Left}" />
+                                    <ComboBoxItem Content="{loc:Tr Print.Booklet.Binding.Right}" />
+                                </ComboBox>
+                                <TextBlock Grid.Column="4" Classes="sublabel" Text="{loc:Tr Print.Booklet.Sides}" />
+                                <ComboBox Grid.Column="6" x:Name="SidesCombo" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="{loc:Tr Print.Booklet.Sides.Both}" />
+                                    <ComboBoxItem Content="{loc:Tr Print.Booklet.Sides.Front}" />
+                                    <ComboBoxItem Content="{loc:Tr Print.Booklet.Sides.Back}" />
+                                </ComboBox>
+                                <TextBlock Grid.Row="2" Classes="sublabel" Text="{loc:Tr Print.Booklet.Gutter}" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="2" x:Name="GutterBox" Minimum="0" Maximum="50"
+                                               Increment="1" Value="0" FormatString="0" HorizontalAlignment="Stretch" />
+                                <TextBlock Grid.Row="2" Grid.Column="4" Classes="sublabel" Text="{loc:Tr Print.Booklet.Signature}" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="6" x:Name="SignatureBox" Minimum="0" Maximum="50"
+                                               Increment="1" Value="0" FormatString="0" HorizontalAlignment="Stretch"
+                                               ToolTip.Tip="{loc:Tr Print.Booklet.Signature.Hint}" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
 
-                    <StackPanel Spacing="5">
-                        <TextBlock Classes="caption" Text="{loc:Tr Print.Range}" />
-                        <RadioButton x:Name="AllRadio" GroupName="Range" IsChecked="True"
-                                     Content="{loc:Tr Print.Range.All}" />
-                        <RadioButton x:Name="CurrentRadio" GroupName="Range" Content="{loc:Tr Print.Range.Current}" />
-                        <RadioButton x:Name="RangeRadio" GroupName="Range" Content="{loc:Tr Print.Range.Custom}" />
-                        <TextBox x:Name="RangeBox" PlaceholderText="{loc:Tr Print.Range.Hint}" IsEnabled="False"
-                                 Margin="22,0,0,0" />
-                    </StackPanel>
+                    <!-- Orientation · paper source · paper size -->
+                    <Grid ColumnDefinitions="*,10,*,10,*">
+                        <StackPanel Grid.Column="0" Spacing="3">
+                            <TextBlock Classes="caption" Text="{loc:Tr Print.Orientation}" />
+                            <ComboBox x:Name="OrientationCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                <ComboBoxItem Content="{loc:Tr Print.Orientation.Auto}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Orientation.Portrait}" />
+                                <ComboBoxItem Content="{loc:Tr Print.Orientation.Landscape}" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="3">
+                            <TextBlock Classes="caption" Text="{loc:Tr Print.Source}" />
+                            <ComboBox x:Name="SourceCombo" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4" Spacing="3">
+                            <TextBlock Classes="caption" Text="{loc:Tr Print.Paper}" />
+                            <ComboBox x:Name="PaperCombo" HorizontalAlignment="Stretch" MaxDropDownHeight="320" />
+                        </StackPanel>
+                    </Grid>
 
                     <TextBlock x:Name="ErrorLabel" Classes="error-text" IsVisible="False" />
                 </StackPanel>

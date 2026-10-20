@@ -23,6 +23,15 @@ public interface IPdfRenderer
     Task<RenderedPage> RenderPageAsync(byte[] pdf, int pageIndex, int dpi = 150, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// As <see cref="RenderPageAsync(byte[], int, int, CancellationToken)"/>, with colour handling and
+    /// print-mode rendering from <paramref name="options"/>. Never modifies the document.
+    /// </summary>
+    Task<RenderedPage> RenderPageAsync(byte[] pdf, int pageIndex, int dpi, PdfRenderOptions options, CancellationToken cancellationToken = default);
+
+    /// <summary>Every page's displayed size in points (rotation applied), in page order.</summary>
+    Task<IReadOnlyList<PdfPageSize>> GetPageSizesAsync(byte[] pdf, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Closes the cached document for <paramref name="pdf"/>, if any, so its buffer can be collected.
     /// Optional: the renderer also evicts least-recently-used documents on its own.
     /// </summary>
