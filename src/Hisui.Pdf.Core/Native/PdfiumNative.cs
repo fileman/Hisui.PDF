@@ -15,6 +15,18 @@ internal static partial class PdfiumNative
     /// <summary><c>FPDF_ANNOT</c>: render annotations as well as page content.</summary>
     public const int FpdfAnnot = 0x01;
 
+    /// <summary><c>FPDF_GRAYSCALE</c>: render in shades of grey.</summary>
+    public const int FpdfGrayscale = 0x08;
+
+    /// <summary><c>FPDF_PRINTING</c>: render for printing (annotation print flags apply).</summary>
+    public const int FpdfPrinting = 0x800;
+
+    /// <summary><c>FPDF_PAGEOBJ_TEXT</c>.</summary>
+    public const int PageObjText = 1;
+
+    /// <summary><c>FPDF_PAGEOBJ_FORM</c>.</summary>
+    public const int PageObjForm = 5;
+
     /// <summary><c>FPDFBitmap_BGRA</c>: 4 bytes per pixel, byte order B, G, R, A.</summary>
     public const int BitmapBgra = 4;
 
@@ -70,6 +82,45 @@ internal static partial class PdfiumNative
     [LibraryImport(Lib)]
     public static partial void FPDF_FFLDraw(
         IntPtr formHandle, IntPtr bitmap, IntPtr page, int startX, int startY, int sizeX, int sizeY, int rotate, int flags);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDF_GetPageSizeByIndexF(IntPtr document, int pageIndex, out FsSizeF size);
+
+    /// <summary>FS_SIZEF: width, height in points.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct FsSizeF
+    {
+        public float Width, Height;
+    }
+
+    // ── page objects (fpdf_edit.h) ───────────────────────────────────────────
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFPage_CountObjects(IntPtr page);
+
+    [LibraryImport(Lib)]
+    public static partial IntPtr FPDFPage_GetObject(IntPtr page, int index);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFPageObj_GetType(IntPtr pageObject);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFPageObj_GetFillColor(IntPtr pageObject, out uint r, out uint g, out uint b, out uint a);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFPageObj_GetStrokeColor(IntPtr pageObject, out uint r, out uint g, out uint b, out uint a);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFPageObj_SetFillColor(IntPtr pageObject, uint r, uint g, uint b, uint a);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFPageObj_SetStrokeColor(IntPtr pageObject, uint r, uint g, uint b, uint a);
+
+    [LibraryImport(Lib)]
+    public static partial int FPDFFormObj_CountObjects(IntPtr formObject);
+
+    [LibraryImport(Lib)]
+    public static partial IntPtr FPDFFormObj_GetObject(IntPtr formObject, uint index);
 
     // ── text API (fpdf_text.h) ───────────────────────────────────────────────
 

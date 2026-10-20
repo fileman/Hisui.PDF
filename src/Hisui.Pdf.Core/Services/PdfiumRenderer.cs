@@ -58,9 +58,25 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IPdfiumDocumentHost, IDispo
         return await Task.Run(() => EncodePng(page), cancellationToken).ConfigureAwait(false);
     }
 
-    public Task<RenderedPage> RenderPageAsync(byte[] pdf, int pageIndex, int dpi = 150, CancellationToken cancellationToken = default)
+    public Task<RenderedPage> RenderPageAsync(byte[] pdf, int pageIndex, int dpi = 150, CancellationToken cancellationToken = default) =>
+        RenderPageAsync(pdf, pageIndex, dpi, PdfRenderOptions.Default, cancellationToken);
+
+    public Task<IReadOnlyList<PdfPageSize>> GetPageSizesAsync(byte[] pdf, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<IReadOnlyList<PdfPageSize>>(
+            () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                lock (Gate) return GetDocument(pdf).PageSizes();
+            },
+            cancellationToken);
+    }
+
+    public Task<RenderedPage> RenderPageAsync(byte[] pdf, int pageIndex, int dpi, PdfRenderOptions options, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentOutOfRangeException.ThrowIfNegative(pageIndex);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(dpi);
 
@@ -71,7 +87,7 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IPdfiumDocumentHost, IDispo
                 lock (Gate)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    return GetDocument(pdf).Render(pageIndex, dpi);
+                    return GetDocument(pdf).Render(pageIndex, dpi, options);
                 }
             },
             cancellationToken);
@@ -208,7 +224,20 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IPdfiumDocumentHost, IDispo
             if (_form != IntPtr.Zero) PdfiumNative.FPDF_RemoveFormFieldHighlight(_form);
         }
 
-        public RenderedPage Render(int pageIndex, int dpi)
+        public PdfPageSize[] PageSizes()
+        {
+            var sizes = new PdfPageSize[PageCount];
+            for (var i = 0; i < sizes.Length; i++)
+            {
+                // Falls back to A4 for a page whose box can't be read, so layout never divides by zero.
+                sizes[i] = PdfiumNative.FPDF_GetPageSizeByIndexF(_document, i, out var size) != 0 && size.Width > 0 && size.Height > 0
+                    ? new PdfPageSize(size.Width, size.Height)
+                    : new PdfPageSize(595.276, 841.89);
+            }
+            return sizes;
+        }
+
+        public RenderedPage Render(int pageIndex, int dpi, PdfRenderOptions options)
         {
             if ((uint)pageIndex >= (uint)PageCount)
                 throw new ArgumentOutOfRangeException(nameof(pageIndex), $"Page index {pageIndex} is out of range (0..{PageCount - 1}).");
@@ -236,12 +265,21 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IPdfiumDocumentHost, IDispo
                 if (bitmap == IntPtr.Zero)
                     throw new InvalidOperationException("PDFium could not initialize the rendering bitmap.");
 
+                var flags = PdfiumNative.FpdfAnnot;
+                if (options.ColorMode == PdfRenderColorMode.Grayscale) flags |= PdfiumNative.FpdfGrayscale;
+                if (options.ForPrinting) flags |= PdfiumNative.FpdfPrinting;
+
+                // Recolouring edits only this transient page object tree (no content is regenerated), and
+                // the page is closed below, so the document itself never changes.
+                if (options.ColorMode == PdfRenderColorMode.BlackText)
+                    BlackenText(page, PdfiumNative.FPDFPage_CountObjects(page), static (owner, i) => PdfiumNative.FPDFPage_GetObject(owner, i));
+
                 try
                 {
                     PdfiumNative.FPDFBitmap_FillRect(bitmap, 0, 0, width, height, White);
-                    PdfiumNative.FPDF_RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, PdfiumNative.FpdfAnnot);
+                    PdfiumNative.FPDF_RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, flags);
                     if (_form != IntPtr.Zero)
-                        PdfiumNative.FPDF_FFLDraw(_form, bitmap, page, 0, 0, width, height, 0, PdfiumNative.FpdfAnnot);
+                        PdfiumNative.FPDF_FFLDraw(_form, bitmap, page, 0, 0, width, height, 0, flags);
                 }
                 finally
                 {
@@ -273,6 +311,33 @@ internal sealed class PdfiumRenderer : IPdfRenderer, IPdfiumDocumentHost, IDispo
                 _formInfo = IntPtr.Zero;
             }
             _pin.Free();
+        }
+
+        /// <summary>
+        /// Sets the fill and stroke of every text object to black (keeping its opacity), descending into
+        /// form XObjects, where headers and footers often live.
+        /// </summary>
+        private static void BlackenText(IntPtr owner, int count, Func<IntPtr, int, IntPtr> getObject)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                var obj = getObject(owner, i);
+                if (obj == IntPtr.Zero) continue;
+
+                switch (PdfiumNative.FPDFPageObj_GetType(obj))
+                {
+                    case PdfiumNative.PageObjText:
+                        var fillAlpha = PdfiumNative.FPDFPageObj_GetFillColor(obj, out _, out _, out _, out var fa) != 0 ? fa : 255;
+                        var strokeAlpha = PdfiumNative.FPDFPageObj_GetStrokeColor(obj, out _, out _, out _, out var sa) != 0 ? sa : 255;
+                        PdfiumNative.FPDFPageObj_SetFillColor(obj, 0, 0, 0, fillAlpha);
+                        PdfiumNative.FPDFPageObj_SetStrokeColor(obj, 0, 0, 0, strokeAlpha);
+                        break;
+                    case PdfiumNative.PageObjForm:
+                        BlackenText(obj, PdfiumNative.FPDFFormObj_CountObjects(obj),
+                            static (form, j) => PdfiumNative.FPDFFormObj_GetObject(form, (uint)j));
+                        break;
+                }
+            }
         }
 
         private static int ScaleToPixels(float points, int dpi) =>

@@ -19,6 +19,16 @@ public interface IPrintService
     /// <summary>True if the named printer reports duplex (double-sided) capability.</summary>
     bool SupportsDuplex(string printerName);
 
+    /// <summary>Trays, paper sizes, duplex and colour support of the named printer.</summary>
+    PrinterCapabilities GetCapabilities(string printerName);
+
+    /// <summary>
+    /// Opens the printer driver's own properties dialog, modal to <paramref name="ownerHandle"/>, seeded with
+    /// <paramref name="current"/> driver settings (or the printer defaults). Returns the confirmed settings,
+    /// or null if the user cancelled or the platform has no such dialog.
+    /// </summary>
+    PrinterDriverSettings? ShowPrinterProperties(string printerName, IntPtr ownerHandle, byte[]? current);
+
     /// <summary>Prints <paramref name="pdf"/> with the resolved <paramref name="job"/>. Returns true on success.</summary>
     Task<bool> PrintAsync(byte[] pdf, PrintJob job, CancellationToken ct = default);
 
