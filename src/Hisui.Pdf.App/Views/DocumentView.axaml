@@ -182,6 +182,14 @@
             <Setter Property="Foreground" Value="{DynamicResource RibbonCaptionBrush}" />
             <Setter Property="Margin" Value="4,10,0,4" />
         </Style>
+        <!-- Collapsible tool-panel section: the caption becomes the expander header, no box around it -->
+        <Style Selector="Expander.panel-section">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
 
         <!-- Left rail toggles (panel pickers) -->
         <Style Selector="ToggleButton.rail">
@@ -694,7 +702,11 @@
                             <!-- HOME: document tools, grouped by task the way Acrobat's Tools centre is -->
                             <StackPanel Spacing="2"
                                         IsVisible="{Binding RibbonTab, Converter={StaticResource EnumToBool}, ConverterParameter=Home}">
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Organize}" />
+                                <Expander Classes="panel-section" IsExpanded="True">
+                                    <Expander.Header>
+                                        <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Organize}" />
+                                    </Expander.Header>
+                                    <StackPanel Spacing="2">
                                 <Button Classes="ribbon-small" Command="{Binding RotateRightCommand}" ToolTip.Tip="{loc:Tr Cmd.RotateRight.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconRotateCw}" />
@@ -743,7 +755,13 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Split}" />
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Edit}" />
+                                    </StackPanel>
+                                </Expander>
+                                <Expander Classes="panel-section" IsExpanded="True">
+                                    <Expander.Header>
+                                        <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Edit}" />
+                                    </Expander.Header>
+                                    <StackPanel Spacing="2">
                                 <Button Classes="ribbon-small" Command="{Binding AddHeaderFooterCommand}" ToolTip.Tip="{loc:Tr Stamp.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M3 2h10v12H3z M5 4h6 M5 12h6" />
@@ -756,7 +774,13 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Watermark}" />
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Optimize}" />
+                                    </StackPanel>
+                                </Expander>
+                                <Expander Classes="panel-section" IsExpanded="True">
+                                    <Expander.Header>
+                                        <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Optimize}" />
+                                    </Expander.Header>
+                                    <StackPanel Spacing="2">
                                 <Button Classes="ribbon-small" Command="{Binding MakeSearchableCommand}" ToolTip.Tip="{loc:Tr Cmd.Ocr.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconOcr}" />
@@ -775,7 +799,13 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Cmd.Compress}" />
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Protect}" />
+                                    </StackPanel>
+                                </Expander>
+                                <Expander Classes="panel-section" IsExpanded="True">
+                                    <Expander.Header>
+                                        <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Protect}" />
+                                    </Expander.Header>
+                                    <StackPanel Spacing="2">
                                 <Button Classes="ribbon-small" Click="OnProtectClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.Protect}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconLock}" />
@@ -788,7 +818,13 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Redact.Button}" />
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Standards}" />
+                                    </StackPanel>
+                                </Expander>
+                                <Expander Classes="panel-section" IsExpanded="True">
+                                    <Expander.Header>
+                                        <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Standards}" />
+                                    </Expander.Header>
+                                    <StackPanel Spacing="2">
                                 <Button Classes="ribbon-small" Command="{Binding SaveAsProfileCommand}" ToolTip.Tip="{loc:Tr Conf.Button.Tooltip}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="M4 2h6l2.5 2.5V14H4z M6 9l1.5 1.5L10.5 7" />
@@ -807,7 +843,13 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Compare.Button}" />
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Document}" />
+                                    </StackPanel>
+                                </Expander>
+                                <Expander Classes="panel-section" IsExpanded="True">
+                                    <Expander.Header>
+                                        <TextBlock Classes="panel-caption" Text="{loc:Tr Panel.Section.Document}" />
+                                    </Expander.Header>
+                                    <StackPanel Spacing="2">
                                 <Button Classes="ribbon-small" Click="OnDocumentPropertiesClick" IsEnabled="{Binding IsDocumentLoaded}" ToolTip.Tip="{loc:Tr Menu.DocumentProperties}">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconInfo}" />
@@ -826,6 +868,8 @@
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Batch.Button}" />
                                     </StackPanel>
                                 </Button>
+                                    </StackPanel>
+                                </Expander>
                             </StackPanel>
 
                             <!-- ANNOTA -->
@@ -1224,10 +1268,11 @@
                                     <StackPanel HorizontalAlignment="Center" Spacing="6">
                                         <Border Background="{DynamicResource RibbonPageBrush}"
                                                 BorderBrush="#22000000" BorderThickness="1"
-                                                CornerRadius="3" Width="96" Height="130"
+                                                CornerRadius="3" Width="{Binding ThumbWidth}" Height="{Binding ThumbHeight}"
                                                 ClipToBounds="True" HorizontalAlignment="Center">
                                             <Image Source="{Binding Thumbnail}"
-                                                   Stretch="Uniform" Margin="3"
+                                                   Width="{Binding ImageWidth}" Height="{Binding ImageHeight}"
+                                                   Stretch="Fill" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                    RenderTransformOrigin="50%,50%">
                                                 <Image.RenderTransform>
                                                     <RotateTransform Angle="{Binding RotationAngle}" />

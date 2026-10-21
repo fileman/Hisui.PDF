@@ -650,7 +650,7 @@ public partial class DocumentView : UserControl
             var update = await _updates.CheckForUpdateAsync();
             if (update is null)
             {
-                if (manual) vm.StatusMessage = Localizer.Instance["Update.UpToDate"];
+                if (manual) await new UpToDateDialog(_updates.CurrentVersion).ShowDialog(Owner);
                 return;
             }
 

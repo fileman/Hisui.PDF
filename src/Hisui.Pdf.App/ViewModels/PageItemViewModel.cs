@@ -23,6 +23,22 @@ public partial class PageItemViewModel : ObservableObject
     [ObservableProperty]
     private IImage? _thumbnail;
 
+    // Thumbnail slot: the page's own proportions fitted into a 96×130 box (1px border included).
+    // The box follows the page's visual orientation; the image keeps its unrotated size and is rotated inside it.
+    private const double ThumbSlotWidth = 94, ThumbSlotHeight = 128, ThumbBorder = 2;
+
+    [ObservableProperty]
+    private double _thumbWidth = ThumbSlotWidth + ThumbBorder;
+
+    [ObservableProperty]
+    private double _thumbHeight = ThumbSlotHeight + ThumbBorder;
+
+    [ObservableProperty]
+    private double _imageWidth = ThumbSlotWidth;
+
+    [ObservableProperty]
+    private double _imageHeight = ThumbSlotHeight;
+
     /// <summary>Full-size render, loaded lazily while the page is near the viewport in continuous view.</summary>
     [ObservableProperty]
     private IImage? _preview;
@@ -63,4 +79,33 @@ public partial class PageItemViewModel : ObservableObject
     /// <summary>On-screen rotation in degrees (0/90/180/270). Baked into the PDF only on save.</summary>
     [ObservableProperty]
     private double _rotationAngle;
+
+    partial void OnThumbnailChanged(IImage? value) => UpdateThumbSlot();
+
+    partial void OnRotationAngleChanged(double value) => UpdateThumbSlot();
+
+    private void UpdateThumbSlot()
+    {
+        if (Thumbnail is not { } image || image.Size.Width <= 0 || image.Size.Height <= 0)
+        {
+            ThumbWidth = ThumbSlotWidth + ThumbBorder;
+            ThumbHeight = ThumbSlotHeight + ThumbBorder;
+            ImageWidth = ThumbSlotWidth;
+            ImageHeight = ThumbSlotHeight;
+            return;
+        }
+
+        var (w, h) = (image.Size.Width, image.Size.Height);
+        var rotated = RotationAngle % 180 != 0;
+        // Visual size after rotation decides the fit; the image itself is laid out unrotated.
+        var (visualW, visualH) = rotated ? (h, w) : (w, h);
+        var scale = Math.Min(ThumbSlotWidth / visualW, ThumbSlotHeight / visualH);
+        var (imgW, imgH) = (Math.Round(w * scale), Math.Round(h * scale));
+        var (boxW, boxH) = rotated ? (imgH, imgW) : (imgW, imgH);
+
+        ImageWidth = imgW;
+        ImageHeight = imgH;
+        ThumbWidth = boxW + ThumbBorder;
+        ThumbHeight = boxH + ThumbBorder;
+    }
 }
