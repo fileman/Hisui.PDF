@@ -1309,6 +1309,7 @@
                                                 Background="{DynamicResource RibbonPageBrush}">
                                             <Panel>
                                                 <Image Source="{Binding Preview}" Stretch="Fill" />
+                                                <views:TextSelectionLayer Page="{Binding}" />
                                                 <views:LinkLayer Page="{Binding}" />
                                                 <views:FieldLayer Page="{Binding}" />
                                                 <views:CommentLayer Page="{Binding}" />
@@ -1364,6 +1365,16 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+
+                            <views:TextSelectionLayer Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:TextSelectionLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:TextSelectionLayer.RenderTransform>
+                            </views:TextSelectionLayer>
 
                             <views:LinkLayer Page="{Binding SelectedPage}"
                                     HorizontalAlignment="Left" VerticalAlignment="Top"

@@ -71,6 +71,10 @@ public partial class PageItemViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<Hisui.Pdf.Core.Model.PdfLink> _links = [];
 
+    /// <summary>Text words of this page in reading order (for mouse selection and copy).</summary>
+    [ObservableProperty]
+    private IReadOnlyList<Hisui.Pdf.Core.Model.TextWord> _words = [];
+
     /// <summary>Updates <see cref="Fields"/> without notifying: the live editors already show these values.</summary>
 #pragma warning disable MVVMTK0034
     internal void SetFieldsSilently(IReadOnlyList<Hisui.Pdf.Core.Model.PdfFormWidget> fields) => _fields = fields;

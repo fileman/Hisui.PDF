@@ -512,6 +512,7 @@
   "Links.ToWeb": "Open web address",
   "Links.GoToPage": "Go to page {0}",
   "Links.Remove": "Remove link",
+  "Text.Copy": "Copy",
   "Links.Open": "Open",
   "Links.OpenConfirm": "Open this address in the browser?\n{0}",
   "Links.SameDocumentOnly": "A link can only point to pages of the same source file.",

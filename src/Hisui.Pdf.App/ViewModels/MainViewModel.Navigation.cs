@@ -230,6 +230,22 @@ public partial class MainViewModel
         }
         var links = cached.Links.Where(l => l.PageIndex == item.SourcePageIndex).ToList();
         if (!links.SequenceEqual(item.Links)) item.Links = links;
+        await LoadWordsAsync(item, bytes);
+    }
+
+    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, IReadOnlyList<TextWord> Words)> _wordCache = [];
+
+    /// <summary>Loads the page's text words so the preview can offer mouse selection and copy.</summary>
+    private async Task LoadWordsAsync(PageItemViewModel item, byte[] bytes)
+    {
+        var key = (item.SourceDocumentId, item.SourcePageIndex);
+        if (!_wordCache.TryGetValue(key, out var cached) || !ReferenceEquals(cached.Bytes, bytes))
+        {
+            try { cached = (bytes, await _textExtractor.ExtractWordsAsync(bytes, item.SourcePageIndex)); }
+            catch (Exception) { cached = (bytes, []); }
+            _wordCache[key] = cached;
+        }
+        if (!ReferenceEquals(cached.Words, item.Words)) item.Words = cached.Words;
     }
 
     /// <summary>Goes to a link's page, or opens its web address after confirmation (http, https, mailto only).</summary>
