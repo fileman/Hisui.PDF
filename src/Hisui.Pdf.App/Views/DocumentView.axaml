@@ -1425,7 +1425,7 @@
                                     IsVisible="{Binding CanAnnotate}"
                                     IsEnabled="{Binding CanAnnotate}"
                                     RenderTransformOrigin="50%,50%"
-                                    ToolTip.Tip="{Binding CanvasTooltip}" ToolTip.ShowDelay="0">
+                                    Cursor="{Binding CanvasCursor}" ToolTip.Tip="{Binding CanvasTooltip}" ToolTip.ShowDelay="0">
                                 <Canvas.RenderTransform>
                                     <RotateTransform Angle="{Binding PreviewRotationAngle}" />
                                 </Canvas.RenderTransform>

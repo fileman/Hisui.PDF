@@ -152,6 +152,9 @@ public partial class MainViewModel
 
     public bool CanAnnotate => IsAnnotationActive;
 
+    /// <summary>Crosshair over the page while a tool is active: press the left button and drag to mark the area.</summary>
+    public Avalonia.Input.Cursor CanvasCursor { get; } = new(Avalonia.Input.StandardCursorType.Cross);
+
     /// <summary>Tooltip following the pointer over the page while a tool is active: what a drag does, and the shortcuts.</summary>
     public string CanvasTooltip => ActiveTool == AnnotationTool.CaptureArea
         ? _loc["Annotate.CaptureTooltip"]
