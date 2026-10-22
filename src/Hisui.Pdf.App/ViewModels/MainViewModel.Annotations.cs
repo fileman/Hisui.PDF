@@ -152,12 +152,18 @@ public partial class MainViewModel
 
     public bool CanAnnotate => IsAnnotationActive;
 
+    /// <summary>Tooltip following the pointer over the page while a tool is active: what a drag does, and the shortcuts.</summary>
+    public string CanvasTooltip => ActiveTool == AnnotationTool.CaptureArea
+        ? _loc["Annotate.CaptureTooltip"]
+        : _loc["Annotate.CanvasTooltip"];
+
     partial void OnActiveToolChanged(AnnotationTool value)
     {
         IsDragging = false;
         DragRect = default;
         OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
+        OnPropertyChanged(nameof(CanvasTooltip));
         RaiseFormLayoutModeChanged();
         OnPropertyChanged(nameof(ShowContinuous));
         OnPropertyChanged(nameof(ShowContinuousPages));
@@ -302,9 +308,8 @@ public partial class MainViewModel
         if (_session is null || SelectedPage is null) return;
         var pageIndex = Pages.IndexOf(SelectedPage);
         var baseName = Path.GetFileNameWithoutExtension(_currentPath ?? "documento.pdf");
-        var path = await _dialogs.SaveFileAsync($"{baseName}-p{pageIndex + 1}.png", ".png", _loc["Picker.PngType"]);
-        if (path is null) return;
 
+        Avalonia.Media.Imaging.Bitmap? bitmap = null;
         await RunBusyAsync(_loc["Status.CapturingArea"], async ct =>
         {
             // The built document has the on-screen page rotation baked in, so rotate the region the same way.
@@ -320,12 +325,30 @@ public partial class MainViewModel
             var crop = new byte[w * h * 4];
             for (var y = 0; y < h; y++)
                 Buffer.BlockCopy(page.Bgra, (y0 + y) * page.Stride + x0 * 4, crop, y * w * 4, w * 4);
-
-            using var bitmap = Imaging.BitmapConversions.ToFrozenBitmap(new RenderedPage(w, h, w * 4, crop));
-            await using var stream = File.Create(path);
-            bitmap.Save(stream);
-            StatusMessage = _loc.Format("Status.AreaCaptured", Path.GetFileName(path), w, h);
+            bitmap = Imaging.BitmapConversions.ToFrozenBitmap(new RenderedPage(w, h, w * 4, crop));
         });
+        if (bitmap is null) return;
+
+        using (bitmap)
+        {
+            // The image goes to the clipboard right away; saving it as a PNG file is optional (cancel keeps the copy).
+            var copied = false;
+            try
+            {
+                if (GetMainWindow()?.Clipboard is { } cb) { await cb.SetBitmapAsync(bitmap); copied = true; }
+            }
+            catch (Exception) { /* clipboard unavailable: fall through to saving */ }
+
+            var path = await _dialogs.SaveFileAsync($"{baseName}-p{pageIndex + 1}.png", ".png", _loc["Picker.PngType"]);
+            if (path is not null)
+            {
+                await using var stream = File.Create(path);
+                bitmap.Save(stream);
+                StatusMessage = _loc.Format(copied ? "Status.AreaCapturedCopied" : "Status.AreaCaptured",
+                    Path.GetFileName(path), bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            }
+            else if (copied) StatusMessage = _loc.Format("Status.AreaCopied", bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+        }
     }
 
     // ── Watermark ─────────────────────────────────────────────────────────────
