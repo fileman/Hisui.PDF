@@ -520,6 +520,7 @@
   "Links.ToWeb": "Apri l'indirizzo web",
   "Links.GoToPage": "Vai a pagina {0}",
   "Links.Remove": "Rimuovi collegamento",
+  "Text.SelectAll": "Seleziona tutto",
   "Text.Copy": "Copia",
   "Links.Open": "Apri",
   "Links.OpenConfirm": "Aprire questo indirizzo nel browser?\n{0}",

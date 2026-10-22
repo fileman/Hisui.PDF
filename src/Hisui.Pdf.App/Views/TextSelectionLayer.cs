@@ -38,10 +38,53 @@ public sealed class TextSelectionLayer : Canvas
         Background = Brushes.Transparent;
         Focusable = true;
         Cursor = new Cursor(StandardCursorType.Ibeam);
-        var copy = new MenuItem { Header = Localizer.Instance["Text.Copy"] };
+        ContextMenu = new ContextMenu();
+        ContextMenu.Opening += (_, _) => BuildMenu();
+    }
+
+    /// <summary>Right-click menu: copy / select all text, capture an area, rotate. Built on open so it reflects the selection.</summary>
+    private void BuildMenu()
+    {
+        if (ContextMenu is not { } menu) return;
+        var loc = Localizer.Instance;
+        menu.Items.Clear();
+
+        var copy = new MenuItem
+        {
+            Header = loc["Text.Copy"], InputGesture = new KeyGesture(Key.C, KeyModifiers.Control),
+            IsEnabled = SelectedText().Length > 0,
+        };
         copy.Click += async (_, _) => await CopyAsync();
-        ContextMenu = new ContextMenu { Items = { copy } };
-        ContextMenu.Opening += (_, e) => { if (SelectedText().Length == 0) e.Cancel = true; };
+        var all = new MenuItem
+        {
+            Header = loc["Text.SelectAll"], InputGesture = new KeyGesture(Key.A, KeyModifiers.Control),
+            IsEnabled = Words.Count > 0,
+        };
+        all.Click += (_, _) => SelectAll();
+        menu.Items.Add(copy);
+        menu.Items.Add(all);
+        menu.Items.Add(new Separator());
+
+        var capture = new MenuItem
+        {
+            Header = loc["Tool.CaptureArea"], InputGesture = new KeyGesture(Key.C, KeyModifiers.Control | KeyModifiers.Shift),
+        };
+        capture.Click += (_, _) => { if (_vm is not null) _vm.ActiveTool = AnnotationTool.CaptureArea; };
+        menu.Items.Add(capture);
+
+        if (_vm is { } vm)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = loc["Cmd.RotateRight"], Command = vm.RotateRightCommand, InputGesture = new KeyGesture(Key.R, KeyModifiers.Control) });
+            menu.Items.Add(new MenuItem { Header = loc["Cmd.RotateLeft"], Command = vm.RotateLeftCommand, InputGesture = new KeyGesture(Key.R, KeyModifiers.Control | KeyModifiers.Shift) });
+        }
+    }
+
+    private void SelectAll()
+    {
+        if (Words.Count == 0) return;
+        (_anchor, _caret) = (0, Words.Count - 1);
+        Redraw();
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -161,6 +204,11 @@ public sealed class TextSelectionLayer : Canvas
         {
             e.Handled = true;
             await CopyAsync();
+        }
+        else if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.A && Words.Count > 0)
+        {
+            e.Handled = true;
+            SelectAll();
         }
         else if (e.Key == Key.Escape) ClearSelection();
     }
