@@ -334,23 +334,31 @@ public partial class MainViewModel
 
         using (bitmap)
         {
-            // The image goes to the clipboard right away; saving it as a PNG file is optional (cancel keeps the copy).
-            var copied = false;
-            try
+            var (w, h) = (bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            // Ask where the image should go: clipboard or a PNG file (cancel discards the capture).
+            var choice = ChooseAsync is null
+                ? 1
+                : await ChooseAsync(_loc.Format("Capture.Choose", w, h), [_loc["Dialog.Cancel"], _loc["Capture.Copy"], _loc["Capture.Save"]]);
+            if (choice == 1)
             {
-                if (GetMainWindow()?.Clipboard is { } cb) { await cb.SetBitmapAsync(bitmap); copied = true; }
+                try
+                {
+                    if (GetMainWindow()?.Clipboard is { } cb)
+                    {
+                        await cb.SetBitmapAsync(bitmap);
+                        StatusMessage = _loc.Format("Status.AreaCopied", w, h);
+                    }
+                }
+                catch (Exception) { StatusMessage = _loc["Status.AreaCopyFailed"]; }
             }
-            catch (Exception) { /* clipboard unavailable: fall through to saving */ }
-
-            var path = await _dialogs.SaveFileAsync($"{baseName}-p{pageIndex + 1}.png", ".png", _loc["Picker.PngType"]);
-            if (path is not null)
+            else if (choice == 2)
             {
+                var path = await _dialogs.SaveFileAsync($"{baseName}-p{pageIndex + 1}.png", ".png", _loc["Picker.PngType"]);
+                if (path is null) return;
                 await using var stream = File.Create(path);
                 bitmap.Save(stream);
-                StatusMessage = _loc.Format(copied ? "Status.AreaCapturedCopied" : "Status.AreaCaptured",
-                    Path.GetFileName(path), bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+                StatusMessage = _loc.Format("Status.AreaCaptured", Path.GetFileName(path), w, h);
             }
-            else if (copied) StatusMessage = _loc.Format("Status.AreaCopied", bitmap.PixelSize.Width, bitmap.PixelSize.Height);
         }
     }
 
