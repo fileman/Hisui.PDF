@@ -24,4 +24,6 @@ public enum AnnotationTool
     Link,
     /// <summary>A certificate (PAdES) signature in the dragged area.</summary>
     DigitalSignature,
+    /// <summary>Saves the dragged area of the page as a PNG image.</summary>
+    CaptureArea,
 }
