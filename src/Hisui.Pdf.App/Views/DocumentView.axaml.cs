@@ -352,6 +352,32 @@ public partial class DocumentView : UserControl
                 ShowFind(vm, replace: true);
                 e.Handled = true;
                 break;
+            case Key.C when ctrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift) && vm.IsDocumentLoaded:
+                vm.ActiveTool = vm.ActiveTool == AnnotationTool.CaptureArea ? AnnotationTool.None : AnnotationTool.CaptureArea;
+                e.Handled = true;
+                break;
+            case Key.G when ctrl && vm.IsDocumentLoaded:
+                // Go to page: focus the page-number box.
+                if (this.FindControl<TextBox>("PageNumberBox") is { } pageBox) { pageBox.Focus(); pageBox.SelectAll(); }
+                e.Handled = true;
+                break;
+            case Key.Escape when vm.IsAnnotationActive:
+                vm.ActiveTool = AnnotationTool.None;
+                e.Handled = true;
+                break;
+            case Key.PageDown or Key.PageUp or Key.Home or Key.End when !vm.IsAnnotationActive && e.Source is not TextBox && !ctrl:
+                // Page navigation; in continuous view the scroll viewer already pages itself.
+                if (vm.ShowContinuousPages) break;
+                var nav = e.Key switch
+                {
+                    Key.PageDown => vm.NextPageCommand,
+                    Key.PageUp => vm.PreviousPageCommand,
+                    Key.Home => vm.FirstPageCommand,
+                    _ => vm.LastPageCommand,
+                };
+                if (nav.CanExecute(null)) nav.Execute(null);
+                e.Handled = true;
+                break;
             case Key.F3:
                 var prev = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
                 var cmd = prev ? vm.PrevMatchCommand : vm.NextMatchCommand;

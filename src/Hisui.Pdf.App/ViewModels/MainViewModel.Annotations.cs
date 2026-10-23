@@ -1,3 +1,4 @@
+using System.IO;
 using Avalonia;
 using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -151,12 +152,21 @@ public partial class MainViewModel
 
     public bool CanAnnotate => IsAnnotationActive;
 
+    /// <summary>Crosshair over the page while a tool is active: press the left button and drag to mark the area.</summary>
+    public Avalonia.Input.Cursor CanvasCursor { get; } = new(Avalonia.Input.StandardCursorType.Cross);
+
+    /// <summary>Tooltip following the pointer over the page while a tool is active: what a drag does, and the shortcuts.</summary>
+    public string CanvasTooltip => ActiveTool == AnnotationTool.CaptureArea
+        ? _loc["Annotate.CaptureTooltip"]
+        : _loc["Annotate.CanvasTooltip"];
+
     partial void OnActiveToolChanged(AnnotationTool value)
     {
         IsDragging = false;
         DragRect = default;
         OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
+        OnPropertyChanged(nameof(CanvasTooltip));
         RaiseFormLayoutModeChanged();
         OnPropertyChanged(nameof(ShowContinuous));
         OnPropertyChanged(nameof(ShowContinuousPages));
@@ -256,6 +266,13 @@ public partial class MainViewModel
             return;
         }
 
+        if (ActiveTool == AnnotationTool.CaptureArea)
+        {
+            ActiveTool = AnnotationTool.None; // one-shot
+            await CaptureAreaAsync(normRect);
+            return;
+        }
+
         var model = await getInput(ActiveTool);
         if (model is null) return;
 
@@ -283,6 +300,66 @@ public partial class MainViewModel
                 StatusMessage = _loc.Format("Status.OcrUnavailable", ex.Message);
             }
         });
+    }
+
+    // ── Capture a selected area as a PNG image ───────────────────────────────
+
+    private const int CaptureDpi = 300;
+
+    private async Task CaptureAreaAsync(PdfRect region)
+    {
+        if (_session is null || SelectedPage is null) return;
+        var pageIndex = Pages.IndexOf(SelectedPage);
+        var baseName = Path.GetFileNameWithoutExtension(_currentPath ?? "documento.pdf");
+
+        Avalonia.Media.Imaging.Bitmap? bitmap = null;
+        await RunBusyAsync(_loc["Status.CapturingArea"], async ct =>
+        {
+            // The built document has the on-screen page rotation baked in, so rotate the region the same way.
+            var current = await _pageService.BuildFromSessionAsync(_session, ct);
+            var page = await _renderer.RenderPageAsync(current, pageIndex, CaptureDpi, ct);
+            var r = region.RotateClockwise(PageTurns);
+            var x0 = Math.Clamp((int)Math.Floor(r.Left * page.Width), 0, page.Width - 1);
+            var y0 = Math.Clamp((int)Math.Floor(r.Top * page.Height), 0, page.Height - 1);
+            var x1 = Math.Clamp((int)Math.Ceiling(r.Right * page.Width), x0 + 1, page.Width);
+            var y1 = Math.Clamp((int)Math.Ceiling(r.Bottom * page.Height), y0 + 1, page.Height);
+            var (w, h) = (x1 - x0, y1 - y0);
+
+            var crop = new byte[w * h * 4];
+            for (var y = 0; y < h; y++)
+                Buffer.BlockCopy(page.Bgra, (y0 + y) * page.Stride + x0 * 4, crop, y * w * 4, w * 4);
+            bitmap = Imaging.BitmapConversions.ToFrozenBitmap(new RenderedPage(w, h, w * 4, crop));
+        });
+        if (bitmap is null) return;
+
+        using (bitmap)
+        {
+            var (w, h) = (bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            // Ask where the image should go: clipboard or a PNG file (cancel discards the capture).
+            var choice = ChooseAsync is null
+                ? 1
+                : await ChooseAsync(_loc.Format("Capture.Choose", w, h), [_loc["Dialog.Cancel"], _loc["Capture.Copy"], _loc["Capture.Save"]]);
+            if (choice == 1)
+            {
+                try
+                {
+                    if (GetMainWindow()?.Clipboard is { } cb)
+                    {
+                        await cb.SetBitmapAsync(bitmap);
+                        StatusMessage = _loc.Format("Status.AreaCopied", w, h);
+                    }
+                }
+                catch (Exception) { StatusMessage = _loc["Status.AreaCopyFailed"]; }
+            }
+            else if (choice == 2)
+            {
+                var path = await _dialogs.SaveFileAsync($"{baseName}-p{pageIndex + 1}.png", ".png", _loc["Picker.PngType"]);
+                if (path is null) return;
+                await using var stream = File.Create(path);
+                bitmap.Save(stream);
+                StatusMessage = _loc.Format("Status.AreaCaptured", Path.GetFileName(path), w, h);
+            }
+        }
     }
 
     // ── Watermark ─────────────────────────────────────────────────────────────
