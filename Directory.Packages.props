@@ -5,28 +5,28 @@
   <!-- PDF engine: all free/MIT-Apache. PDFsharp = structural+write ops, PdfPig = read/extract,
        PDFtoImage = page rendering to PNG (PDFium + SkiaSharp, pulled transitively). -->
   <ItemGroup Label="PDF engine">
-    <PackageVersion Include="PDFsharp" Version="6.2.4" />
+    <PackageVersion Include="PDFsharp" Version="[6.2.4]" />
     <PackageVersion Include="PdfPig" Version="0.1.16" />
     <PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageVersion Include="PDFtoImage" Version="5.4.0" />
     <!-- OCR for scanned PDFs (Tesseract 5 engine). Apache-2.0; bundles Windows natives,
          uses system libtesseract/libleptonica on Linux/macOS. -->
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="4.153.1" />
-    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
     <PackageVersion Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
   <!-- Windows printing (System.Drawing.Printing): printer enumeration, duplex, page ranges. Used only
        behind OperatingSystem.IsWindows() guards; throws on other platforms (which use the shell fallback). -->
   <ItemGroup Label="Printing (Windows)">
-    <PackageVersion Include="System.Drawing.Common" Version="10.0.13" />
+    <PackageVersion Include="System.Drawing.Common" Version="10.0.14" />
   </ItemGroup>
   <!-- MVVM + Generic Host for the app. -->
   <ItemGroup Label="App / MVVM / Hosting">
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.14" />
   </ItemGroup>
   <!-- Avalonia UI — cross-platform desktop (Windows / Linux / macOS). -->
   <ItemGroup Label="Avalonia">
