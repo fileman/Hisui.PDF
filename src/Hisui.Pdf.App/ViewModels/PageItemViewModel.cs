@@ -67,6 +67,10 @@ public partial class PageItemViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<Hisui.Pdf.Core.Model.PdfFormWidget> _fields = [];
 
+    /// <summary>Annotations placed on this page (selectable, movable, resizable and editable from the Annotate panel).</summary>
+    [ObservableProperty]
+    private IReadOnlyList<Hisui.Pdf.Core.Model.PlacedAnnotation> _placed = [];
+
     /// <summary>Link annotations on this page (clickable in normal viewing).</summary>
     [ObservableProperty]
     private IReadOnlyList<Hisui.Pdf.Core.Model.PdfLink> _links = [];

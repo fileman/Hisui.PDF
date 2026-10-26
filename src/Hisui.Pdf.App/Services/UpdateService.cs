@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
@@ -11,6 +12,9 @@ namespace Hisui.Pdf.App.Services;
 internal sealed class UpdateService : IUpdateService
 {
     private const string LatestReleaseUrl = "https://api.github.com/repos/fileman/Hisui.PDF/releases/latest";
+    // Only pages and assets of this repository are ever opened or run, whatever the API response says.
+    private const string ReleasePagePrefix = "https://github.com/fileman/Hisui.PDF/releases/";
+    private const string AssetPrefix = "https://github.com/fileman/Hisui.PDF/releases/download/";
 
     private static readonly HttpClient Http = CreateClient();
     private readonly ILogger<UpdateService> _log;
@@ -39,12 +43,12 @@ internal sealed class UpdateService : IUpdateService
             var msi = FindMsi(root);
             // MSI name (HisuiPDF-X.Y.<commits>-win-x64.msi) carries the real version; the tag only has X.Y.Z
             var versionSource = msi is { } m ? m.Name[(m.Name.IndexOf('-') + 1)..] : tag;
-            if (!TryParseVersion(versionSource, out var latest) || url is null || !url.StartsWith("https://", StringComparison.Ordinal))
+            if (!TryParseVersion(versionSource, out var latest) || url is null || !url.StartsWith(ReleasePagePrefix, StringComparison.Ordinal))
                 return null;
             if (latest <= CurrentVersion) return null;
 
             var notes = root.TryGetProperty("body", out var body) ? body.GetString() : null;
-            return new UpdateInfo(latest, tag!, url, notes, msi?.Url);
+            return new UpdateInfo(latest, tag!, url, notes, msi?.Url, msi?.Sha256);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -55,7 +59,7 @@ internal sealed class UpdateService : IUpdateService
 
     public async Task<string?> DownloadInstallerAsync(UpdateInfo update, CancellationToken ct = default)
     {
-        if (update.MsiUrl is null) return null;
+        if (update.MsiUrl is null || !update.MsiUrl.StartsWith(AssetPrefix, StringComparison.Ordinal)) return null;
         try
         {
             var path = Path.Combine(Path.GetTempPath(), Path.GetFileName(new Uri(update.MsiUrl).LocalPath));
@@ -63,6 +67,24 @@ internal sealed class UpdateService : IUpdateService
             response.EnsureSuccessStatusCode();
             await using (var file = File.Create(path))
                 await response.Content.CopyToAsync(file, ct);
+
+            // The file is about to run elevated: it must be byte-for-byte the asset GitHub published.
+            if (update.MsiSha256 is { } expected)
+            {
+                string actual;
+                await using (var file = File.OpenRead(path))
+                    actual = Convert.ToHexString(await SHA256.HashDataAsync(file, ct));
+                if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
+                {
+                    _log.LogWarning("Installer digest mismatch: expected {Expected}, got {Actual}", expected, actual);
+                    File.Delete(path);
+                    return null;
+                }
+            }
+            else
+            {
+                _log.LogWarning("Release asset has no digest; the installer could not be verified");
+            }
             return path;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -72,7 +94,7 @@ internal sealed class UpdateService : IUpdateService
         }
     }
 
-    private static (string Name, string Url)? FindMsi(JsonElement release)
+    private static (string Name, string Url, string? Sha256)? FindMsi(JsonElement release)
     {
         if (!release.TryGetProperty("assets", out var assets)) return null;
         foreach (var a in assets.EnumerateArray())
@@ -80,8 +102,13 @@ internal sealed class UpdateService : IUpdateService
             var name = a.GetProperty("name").GetString();
             var url = a.GetProperty("browser_download_url").GetString();
             if (name is not null && url is not null && name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
-                && url.StartsWith("https://", StringComparison.Ordinal))
-                return (name, url);
+                && url.StartsWith(AssetPrefix, StringComparison.Ordinal))
+            {
+                // GitHub publishes "sha256:<hex>" for uploaded assets.
+                var digest = a.TryGetProperty("digest", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
+                var sha = digest is not null && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) ? digest[7..] : null;
+                return (name, url, sha);
+            }
         }
         return null;
     }

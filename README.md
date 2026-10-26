@@ -52,7 +52,10 @@ the release page. Pre-releases are never offered.
   an unsaved-changes prompt on close.
 - **Annotations** — highlight, rectangle, free text, sticky notes, image
   overlays, editable watermarks and header/footer with page, date and Bates
-  tokens (all undoable).
+  tokens (all undoable). Free text is typed straight onto the page, with
+  optional character spacing for boxed forms (IBAN, tax codes) and snaps to a
+  row of printed boxes on click. Placed annotations (highlight, rectangle,
+  free text, image) stay selectable: move, resize, edit and delete them later.
 - **Comments, bookmarks & links** — real PDF comments with replies and a
   comments panel; bookmarks panel (add, nest, rename, reorder); link tool with
   clickable links. Saving keeps outline, links, tags and metadata.

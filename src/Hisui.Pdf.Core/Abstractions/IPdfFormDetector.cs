@@ -14,4 +14,11 @@ public interface IPdfFormDetector
     /// row label + column header). Areas already covered by an existing form field are skipped.
     /// </summary>
     Task<IReadOnlyList<FormFieldSpec>> DetectFieldsAsync(byte[] pdf, CancellationToken ct = default);
+
+    /// <summary>
+    /// The row of at least three equal, adjacent, empty boxes (one character each) containing the point
+    /// (<paramref name="nx"/>, <paramref name="ny"/>: normalised, rendered orientation, origin top-left);
+    /// null when the point is not inside such a box.
+    /// </summary>
+    Task<CellRow?> FindCellRowAsync(byte[] pdf, int pageIndex, double nx, double ny, CancellationToken ct = default);
 }

@@ -20,6 +20,124 @@ public partial class MainViewModel
 
     private Point _dragStart;
 
+    // ── Pending annotation: placed on the page but not burned in yet, so it can still be moved, resized and
+    //    (for free text) typed into; the view shows it as an overlay box. Committing burns it in.
+
+    [ObservableProperty] private AnnotationInputModel? _pending;
+
+    // Last free-text settings, so the next box starts the way the previous one was typed (handy for forms).
+    private AnnotationInputModel _lastFreeText = new() { Tool = AnnotationTool.FreeText, ColorHex = "#000000", Background = false };
+
+    // An annotation already on the page being edited through the pending box: it is replaced on commit. While it is
+    // open the preview is shown without it, so the box is not drawn over the burned-in content.
+    private string? _editingPlacedId;
+    private bool _committingPending;
+
+    /// <summary>Burns the pending annotation in with its final position and content; empty text is dropped
+    /// (or, when an existing text was being edited, deletes it).</summary>
+    public async Task CommitPendingAsync(AnnotationInputModel model)
+    {
+        var replace = _editingPlacedId;
+        _committingPending = true;
+        try { Pending = null; }
+        finally { _committingPending = false; }
+
+        if (model.Tool == AnnotationTool.FreeText)
+        {
+            _lastFreeText = model with { Text = string.Empty, Rect = default };
+            if (string.IsNullOrWhiteSpace(model.Text) && replace is null) return;
+        }
+        if (model.Tool == AnnotationTool.StickyNote && string.IsNullOrWhiteSpace(model.Text)) return;
+        await ApplyAnnotationAsync(model, replace);
+        // Editing an existing highlight/rectangle/image armed its tool only for the box: back to viewing.
+        if (replace is not null && model.Tool != AnnotationTool.FreeText) ActiveTool = AnnotationTool.None;
+    }
+
+    public void CancelPending()
+    {
+        var disarm = _editingPlacedId is not null && Pending is { Tool: not AnnotationTool.FreeText };
+        Pending = null;
+        if (disarm) ActiveTool = AnnotationTool.None;
+    }
+
+    /// <summary>True while the pending box edits an annotation already on the page (so it can offer to delete it).</summary>
+    public bool IsEditingExistingFreeText => _editingPlacedId is not null;
+
+    partial void OnPendingChanged(AnnotationInputModel? value)
+    {
+        if (value is not null || _editingPlacedId is null) return;
+        // The box of an existing annotation closed without committing (Esc, tool/page/zoom change): show it again.
+        _editingPlacedId = null;
+        if (!_committingPending) _ = UpdatePreviewAsync(SelectedPage);
+    }
+
+    /// <summary>Placed annotations show as quiet boxes to select, move, resize, edit and delete while the Annotate panel
+    /// is open or the free-text tool is active.</summary>
+    public bool IsPlacedLayerVisible => (IsToolPanelOpen && RibbonTab == RibbonTab.Annota) || ActiveTool == AnnotationTool.FreeText;
+
+    private bool _placedLayerWasVisible;
+
+    private void RaisePlacedLayerChanged()
+    {
+        OnPropertyChanged(nameof(IsPlacedLayerVisible));
+        // The hint goes out when the panel brings the layer up; with a tool active the tool's own tooltip is showing.
+        if (IsPlacedLayerVisible && !_placedLayerWasVisible && !IsAnnotationActive) StatusMessage = _loc["Annotate.PlacedHint"];
+        _placedLayerWasVisible = IsPlacedLayerVisible;
+    }
+
+    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, IReadOnlyList<PlacedAnnotation> Placed)> _placedCache = [];
+
+    private async Task LoadPlacedAsync(PageItemViewModel item, byte[] bytes)
+    {
+        var key = (item.SourceDocumentId, item.SourcePageIndex);
+        IReadOnlyList<PlacedAnnotation> placed;
+        if (_placedCache.TryGetValue(key, out var cached) && ReferenceEquals(cached.Bytes, bytes)) placed = cached.Placed;
+        else
+        {
+            try { placed = await _annotations.ReadPlacedAsync(bytes, item.SourcePageIndex); }
+            catch (Exception) { placed = []; }
+            _placedCache[key] = (bytes, placed);
+        }
+        if (!placed.SequenceEqual(item.Placed)) item.Placed = placed;
+    }
+
+    /// <summary>Opens an existing annotation in the pending box: a free text gets its editor, the others are moved and
+    /// resized; Enter re-applies it with the same id (one undo step), Esc leaves it as it was.</summary>
+    public async Task BeginEditPlacedAsync(PageItemViewModel page, PlacedAnnotation placed)
+    {
+        if (_session is null || IsBusy) return;
+        if (!ReferenceEquals(page, SelectedPage)) SelectedPage = page;
+        ActiveTool = placed.Tool;       // the pending box lives on the tool canvas
+        await UpdatePreviewAsync(page); // the cached preview first, so a late render can't overwrite the one below
+        try
+        {
+            var without = await _annotations.RemovePlacedAsync(_session.GetSource(page.SourceDocumentId), page.SourcePageIndex, placed.Id);
+            var rendered = await _renderer.RenderPageAsync(without, page.SourcePageIndex, _settings.Settings.PreviewDpi);
+            PreviewImage = Imaging.BitmapConversions.ToFrozenBitmap(rendered);
+        }
+        catch (Exception) { /* the box then sits over the burned-in content; still usable */ }
+        _editingPlacedId = placed.Id;
+        Pending = placed.ToInputModel();
+    }
+
+    /// <summary>Moves an existing annotation by a normalised offset (one undo step).</summary>
+    public Task MovePlacedAsync(PageItemViewModel page, PlacedAnnotation placed, double dx, double dy)
+    {
+        var r = placed.Rect;
+        var left = Math.Clamp(r.Left + dx, 0, Math.Max(0, 1 - r.Width));
+        var top = Math.Clamp(r.Top + dy, 0, Math.Max(0, 1 - r.Height));
+        return ResizePlacedAsync(page, placed, PdfRect.FromLTWH(left, top, r.Width, r.Height));
+    }
+
+    /// <summary>Redraws an existing annotation in <paramref name="rect"/> with its own settings (one undo step).</summary>
+    public Task ResizePlacedAsync(PageItemViewModel page, PlacedAnnotation placed, PdfRect rect) =>
+        EditSourceAsync(page.SourceDocumentId, page, async src =>
+            await DrawAsync(await _annotations.RemovePlacedAsync(src, page.SourcePageIndex, placed.Id),
+                page.SourcePageIndex, placed.ToInputModel() with { Rect = rect }, placed.Id));
+
+    public Task DeletePlacedAsync(PageItemViewModel page, PlacedAnnotation placed) =>
+        EditSourceAsync(page.SourceDocumentId, page, src => _annotations.RemovePlacedAsync(src, page.SourcePageIndex, placed.Id));
+
     // ── Ribbon tab ────────────────────────────────────────────────────────────
 
     [ObservableProperty] private RibbonTab _ribbonTab = RibbonTab.Home;
@@ -155,18 +273,23 @@ public partial class MainViewModel
     /// <summary>Crosshair over the page while a tool is active: press the left button and drag to mark the area.</summary>
     public Avalonia.Input.Cursor CanvasCursor { get; } = new(Avalonia.Input.StandardCursorType.Cross);
 
-    /// <summary>Tooltip following the pointer over the page while a tool is active: what a drag does, and the shortcuts.</summary>
-    public string CanvasTooltip => ActiveTool == AnnotationTool.CaptureArea
-        ? _loc["Annotate.CaptureTooltip"]
-        : _loc["Annotate.CanvasTooltip"];
+    /// <summary>Status-bar hint while a tool is active: what a click or drag on the page does, and the shortcuts.</summary>
+    public string CanvasTooltip => ActiveTool switch
+    {
+        AnnotationTool.CaptureArea => _loc["Annotate.CaptureTooltip"],
+        AnnotationTool.FreeText => _loc["Annotate.FreeTextTooltip"],
+        _ => _loc["Annotate.CanvasTooltip"],
+    };
 
     partial void OnActiveToolChanged(AnnotationTool value)
     {
         IsDragging = false;
         DragRect = default;
+        Pending = null;
         OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
         OnPropertyChanged(nameof(CanvasTooltip));
+        if (value != AnnotationTool.None) StatusMessage = CanvasTooltip;
         RaiseFormLayoutModeChanged();
         OnPropertyChanged(nameof(ShowContinuous));
         OnPropertyChanged(nameof(ShowContinuousPages));
@@ -216,9 +339,10 @@ public partial class MainViewModel
         if (canvasSize.Width <= 0 || canvasSize.Height <= 0) return;
 
         // Area tools need a real drag; ignore an accidental click / near-zero drag so we don't
-        // produce a degenerate (invisible) annotation. StickyNote is a click gesture, so it's exempt.
-        if (ActiveTool is not (AnnotationTool.StickyNote or AnnotationTool.Comment) &&
-            (Math.Abs(pos.X - _dragStart.X) < 5 || Math.Abs(pos.Y - _dragStart.Y) < 5))
+        // produce a degenerate (invisible) annotation. StickyNote is a click gesture, so it's exempt,
+        // and a FreeText click opens a default-sized box to type into.
+        var tinyDrag = Math.Abs(pos.X - _dragStart.X) < 5 || Math.Abs(pos.Y - _dragStart.Y) < 5;
+        if (tinyDrag && ActiveTool is not (AnnotationTool.StickyNote or AnnotationTool.Comment or AnnotationTool.FreeText))
             return;
 
         // Normalize against the canvas (which now exactly overlays the page image) and clamp to the
@@ -273,8 +397,48 @@ public partial class MainViewModel
             return;
         }
 
+        if (ActiveTool == AnnotationTool.FreeText)
+        {
+            // Typed straight on the page: no dialog, an editable box appears where the user clicked or dragged.
+            if (tinyDrag)
+            {
+                // A click on an annotation already there opens that one for editing.
+                var (px, py) = (_dragStart.X / w, _dragStart.Y / h);
+                if (SelectedPage.Placed.LastOrDefault(a => px >= a.Rect.Left && px <= a.Rect.Right && py >= a.Rect.Top && py <= a.Rect.Bottom) is { } hit)
+                {
+                    await BeginEditPlacedAsync(SelectedPage, hit);
+                    return;
+                }
+                // A click on a row of printed boxes (IBAN, tax code): the text fits the row, one character per box.
+                if (await FindCellRowAsync(SelectedPage, px, py) is { } row)
+                {
+                    Pending = _lastFreeText with
+                    {
+                        Rect = row.Bounds, Text = string.Empty, CharPitchPoints = row.CellWidthPoints, Background = false,
+                        FontSizePoints = Math.Clamp(Math.Round(row.CellHeightPoints * 0.7 * 2) / 2, 6, 72),
+                    };
+                    StatusMessage = _loc.Format("Annotate.CellRowFound", row.CellCount, row.CellWidthPoints);
+                    return;
+                }
+                var boxH = (_lastFreeText.FontSizePoints * 1.5 + 6) * PixelsPerPoint / h;
+                normRect = new PdfRect(C(_dragStart.X / w), C(_dragStart.Y / h), C(_dragStart.X / w + 0.35), C(_dragStart.Y / h + boxH));
+            }
+            Pending = _lastFreeText with { Rect = normRect, Text = string.Empty };
+            return;
+        }
+
         var model = await getInput(ActiveTool);
         if (model is null) return;
+
+        // These are placed as a movable box first and burned in on confirmation; the rest apply at once.
+        if (model.Tool is AnnotationTool.Highlight or AnnotationTool.Rectangle or AnnotationTool.StickyNote
+            or AnnotationTool.ImageOverlay or AnnotationTool.Signature)
+        {
+            if (model.Tool == AnnotationTool.StickyNote) // the note's own size, centred on the click
+                normRect = PdfRect.FromLTWH(C(normRect.Left - 0.09), C(normRect.Top - 0.05), 0.18, 0.10);
+            Pending = model with { Rect = normRect };
+            return;
+        }
 
         await ApplyAnnotationAsync(model with { Rect = normRect });
     }
@@ -422,7 +586,9 @@ public partial class MainViewModel
 
     // ── Apply ─────────────────────────────────────────────────────────────────
 
-    private async Task ApplyAnnotationAsync(AnnotationInputModel model)
+    /// <param name="replaceId">An existing placed annotation to remove first, so the edit is one undo step; the new
+    /// drawing keeps its id.</param>
+    private async Task ApplyAnnotationAsync(AnnotationInputModel model, string? replaceId = null)
     {
         if (_session is null || SelectedPage is null) return;
 
@@ -433,65 +599,71 @@ public partial class MainViewModel
         await RunBusyAsync(_loc["Status.ApplyingAnnotation"], async ct =>
         {
             var source = _session.GetSource(srcId);
+            if (replaceId is not null)
+                source = await _annotations.RemovePlacedAsync(source, srcIdx, replaceId, ct);
 
-            var updated = model.Tool switch
-            {
-                AnnotationTool.Highlight =>
-                    await _annotations.AddHighlightAsync(source, srcIdx, model.Rect,
-                        model.ColorHex, model.Opacity, ct),
-
-                AnnotationTool.Rectangle =>
-                    await _annotations.AddRectangleAsync(source, srcIdx, model.Rect,
-                        model.ColorHex, model.FillHex, model.LineWidth, ct),
-
-                AnnotationTool.FreeText =>
-                    await _annotations.AddFreeTextAsync(source, srcIdx, model.Rect,
-                        model.Text, model.ColorHex, model.FontSizePoints, ct),
-
-                AnnotationTool.StickyNote =>
-                    await _annotations.AddStickyNoteAsync(source, srcIdx,
-                        model.Rect.Left, model.Rect.Top, model.Text, ct),
-
-                AnnotationTool.ImageOverlay when model.ImageBytes is not null =>
-                    await _annotations.AddImageOverlayAsync(source, srcIdx,
-                        model.ImageBytes, model.Rect, ct),
-
-                // A signature is a reusable PNG burned in exactly like an image overlay.
-                AnnotationTool.Signature when model.ImageBytes is not null =>
-                    await _annotations.AddImageOverlayAsync(source, srcIdx,
-                        model.ImageBytes, model.Rect, ct),
-
-                AnnotationTool.FormText =>
-                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.Text, model.FieldName, null, ct),
-
-                AnnotationTool.FormCheckBox =>
-                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.CheckBox, model.FieldName, null, ct),
-
-                AnnotationTool.FormComboBox =>
-                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.ComboBox, model.FieldName,
-                        model.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), ct),
-
-                AnnotationTool.FormRadio =>
-                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.RadioButton, model.FieldName,
-                        string.IsNullOrWhiteSpace(model.Text) ? null : [model.Text], ct),
-
-                AnnotationTool.FormListBox =>
-                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.ListBox, model.FieldName,
-                        model.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), ct),
-
-                AnnotationTool.FormSignature =>
-                    await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.Signature, model.FieldName, null, ct),
-
-                _ => source, // Watermark is handled by AddWatermarkAsync (document-wide).
-            };
-
-            _session.UpdateSource(srcId, updated);
+            _session.UpdateSource(srcId, await DrawAsync(source, srcIdx, model, replaceId, ct));
             InvalidatePageCache(srcId, srcIdx);
             await RenderThumbnailsAsync(ct); // re-render the now-invalidated strip thumbnail
             await UpdatePreviewAsync(SelectedPage);
             RaiseCanExecute(); // the new content edit just became undoable
         });
     }
+
+    /// <summary>Draws <paramref name="model"/> on a page of <paramref name="source"/>; <paramref name="id"/> keeps the
+    /// identity of a placed annotation being redrawn.</summary>
+    private async Task<byte[]> DrawAsync(byte[] source, int srcIdx, AnnotationInputModel model, string? id = null, CancellationToken ct = default) =>
+        model.Tool switch
+        {
+            AnnotationTool.Highlight =>
+                await _annotations.AddHighlightAsync(source, srcIdx, model.Rect,
+                    model.ColorHex, model.Opacity, id, ct),
+
+            AnnotationTool.Rectangle =>
+                await _annotations.AddRectangleAsync(source, srcIdx, model.Rect,
+                    model.ColorHex, model.FillHex, model.LineWidth, id, ct),
+
+            AnnotationTool.FreeText when !string.IsNullOrWhiteSpace(model.Text) =>
+                await _annotations.AddFreeTextAsync(source, srcIdx, model.Rect,
+                    model.Text, model.ColorHex, model.FontSizePoints, model.CharPitchPoints, model.Background, model.Bold, model.Italic, id, ct),
+
+            // The note is drawn centred on a point: the centre of the placed box.
+            AnnotationTool.StickyNote =>
+                await _annotations.AddStickyNoteAsync(source, srcIdx,
+                    (model.Rect.Left + model.Rect.Right) / 2, (model.Rect.Top + model.Rect.Bottom) / 2, model.Text, ct),
+
+            AnnotationTool.ImageOverlay when model.ImageBytes is not null =>
+                await _annotations.AddImageOverlayAsync(source, srcIdx,
+                    model.ImageBytes, model.Rect, id, ct),
+
+            // A signature is a reusable PNG burned in exactly like an image overlay.
+            AnnotationTool.Signature when model.ImageBytes is not null =>
+                await _annotations.AddImageOverlayAsync(source, srcIdx,
+                    model.ImageBytes, model.Rect, id, ct),
+
+            AnnotationTool.FormText =>
+                await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.Text, model.FieldName, null, ct),
+
+            AnnotationTool.FormCheckBox =>
+                await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.CheckBox, model.FieldName, null, ct),
+
+            AnnotationTool.FormComboBox =>
+                await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.ComboBox, model.FieldName,
+                    model.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), ct),
+
+            AnnotationTool.FormRadio =>
+                await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.RadioButton, model.FieldName,
+                    string.IsNullOrWhiteSpace(model.Text) ? null : [model.Text], ct),
+
+            AnnotationTool.FormListBox =>
+                await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.ListBox, model.FieldName,
+                    model.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), ct),
+
+            AnnotationTool.FormSignature =>
+                await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.Signature, model.FieldName, null, ct),
+
+            _ => source, // Watermark is handled by AddWatermarkAsync (document-wide); emptied free text = deleted.
+        };
 
     // ── Cache invalidation ────────────────────────────────────────────────────
 

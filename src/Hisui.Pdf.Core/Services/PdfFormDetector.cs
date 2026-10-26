@@ -256,58 +256,8 @@ internal sealed class PdfFormDetector : IPdfFormDetector
     /// </summary>
     private static void DetectRuledCells(Page page, List<L> letters, List<Candidate> output)
     {
-        var hRaw = new List<(double Pos, double Lo, double Hi)>(); // y, x0, x1
-        var vRaw = new List<(double Pos, double Lo, double Hi)>(); // x, y0, y1
-        foreach (var path in page.Paths)
-        {
-            var bb = path.GetBoundingRectangle();
-            if (path.IsFilled && !path.IsStroked && !(bb is { } b && (b.Width < 1.5 || b.Height < 1.5))) continue;
-            foreach (var sub in path.Where(s => s.Commands.Count > 0))
-            {
-                var first = default(UglyToad.PdfPig.Core.PdfPoint);
-                var last = first;
-                foreach (var cmd in sub.Commands)
-                {
-                    switch (cmd)
-                    {
-                        case UglyToad.PdfPig.Core.PdfSubpath.Move m: first = last = m.Location; break;
-                        case UglyToad.PdfPig.Core.PdfSubpath.Line ln: AddSegment(ln.From, ln.To); last = ln.To; break;
-                        case UglyToad.PdfPig.Core.PdfSubpath.Close: AddSegment(last, first); last = first; break;
-                    }
-                }
-            }
-        }
-
-        void AddSegment(UglyToad.PdfPig.Core.PdfPoint a, UglyToad.PdfPig.Core.PdfPoint b)
-        {
-            if (Math.Abs(a.Y - b.Y) < 0.6 && Math.Abs(a.X - b.X) >= 4) hRaw.Add(((a.Y + b.Y) / 2, Math.Min(a.X, b.X), Math.Max(a.X, b.X)));
-            else if (Math.Abs(a.X - b.X) < 0.6 && Math.Abs(a.Y - b.Y) >= 4) vRaw.Add(((a.X + b.X) / 2, Math.Min(a.Y, b.Y), Math.Max(a.Y, b.Y)));
-        }
-
-        var hs = MergeLines(hRaw);
-        var vs = MergeLines(vRaw);
-        if (hs.Count < 2 || vs.Count < 2) return;
-
-        // Minimal rectangles: top edge h, left edge v1, nearest right edge v2, nearest bottom edge spanning both.
         const double T = 1.5;
-        var cells = new List<PigRect>();
-        foreach (var h in hs)
-        {
-            var down = vs.Where(v => v.Pos >= h.Lo - T && v.Pos <= h.Hi + T && v.Hi >= h.Pos - T && v.Lo < h.Pos - 4)
-                .OrderBy(v => v.Pos).ToList();
-            for (var i = 0; i + 1 < down.Count; i++)
-            {
-                var v1 = down[i];
-                var v2 = down[i + 1];
-                if (v2.Pos - v1.Pos < 8) continue;
-                var bottom = hs.Where(b => b.Pos < h.Pos - 4 && b.Lo <= v1.Pos + T && b.Hi >= v2.Pos - T &&
-                                           v1.Lo <= b.Pos + T && v2.Lo <= b.Pos + T)
-                    .OrderByDescending(b => b.Pos).FirstOrDefault();
-                if (bottom == default) continue;
-                var cell = new PigRect(v1.Pos, bottom.Pos, v2.Pos, h.Pos);
-                if (cell.Height >= 7 && cell.Width >= 10 && !cells.Any(c => Near(c, cell))) cells.Add(cell);
-            }
-        }
+        var cells = RuledCells(page, minWidth: 10, minHeight: 7);
 
         var text = letters.Where(l => !l.IsSpace && l.Value != "_").ToList();
         string TextIn(PigRect c)
@@ -366,10 +316,127 @@ internal sealed class PdfFormDetector : IPdfFormDetector
             output.Add(new Candidate(rect, PdfFormFieldType.Text, Truncate(name, 90), Truncate(tip, 160), rect));
         }
 
-        static bool Near(PigRect a, PigRect b) =>
-            Math.Abs(a.Left - b.Left) < 1 && Math.Abs(a.Right - b.Right) < 1 && Math.Abs(a.Top - b.Top) < 1 && Math.Abs(a.Bottom - b.Bottom) < 1;
         static (double, double) Center(L l) => ((l.Left + l.Right) / 2, (l.Bottom + l.Top) / 2);
         static (double, double) Center2(PigRect r) => ((r.Left + r.Right) / 2, (r.Bottom + r.Top) / 2);
+    }
+
+    /// <summary>
+    /// Every minimal rectangle bounded by stroked lines (table cells, separate boxes, a box divided by lines):
+    /// top edge h, left edge v1, nearest right edge v2, nearest bottom edge spanning both. Raw page space.
+    /// </summary>
+    private static List<PigRect> RuledCells(Page page, double minWidth, double minHeight)
+    {
+        var hRaw = new List<(double Pos, double Lo, double Hi)>(); // y, x0, x1
+        var vRaw = new List<(double Pos, double Lo, double Hi)>(); // x, y0, y1
+        foreach (var path in page.Paths)
+        {
+            var bb = path.GetBoundingRectangle();
+            if (path.IsFilled && !path.IsStroked && !(bb is { } b && (b.Width < 1.5 || b.Height < 1.5))) continue;
+            foreach (var sub in path.Where(s => s.Commands.Count > 0))
+            {
+                var first = default(UglyToad.PdfPig.Core.PdfPoint);
+                var last = first;
+                foreach (var cmd in sub.Commands)
+                {
+                    switch (cmd)
+                    {
+                        case UglyToad.PdfPig.Core.PdfSubpath.Move m: first = last = m.Location; break;
+                        case UglyToad.PdfPig.Core.PdfSubpath.Line ln: AddSegment(ln.From, ln.To); last = ln.To; break;
+                        case UglyToad.PdfPig.Core.PdfSubpath.Close: AddSegment(last, first); last = first; break;
+                    }
+                }
+            }
+        }
+
+        void AddSegment(UglyToad.PdfPig.Core.PdfPoint a, UglyToad.PdfPig.Core.PdfPoint b)
+        {
+            if (Math.Abs(a.Y - b.Y) < 0.6 && Math.Abs(a.X - b.X) >= 4) hRaw.Add(((a.Y + b.Y) / 2, Math.Min(a.X, b.X), Math.Max(a.X, b.X)));
+            else if (Math.Abs(a.X - b.X) < 0.6 && Math.Abs(a.Y - b.Y) >= 4) vRaw.Add(((a.X + b.X) / 2, Math.Min(a.Y, b.Y), Math.Max(a.Y, b.Y)));
+        }
+
+        var hs = MergeLines(hRaw);
+        var vs = MergeLines(vRaw);
+        var cells = new List<PigRect>();
+        if (hs.Count < 2 || vs.Count < 2) return cells;
+
+        const double T = 1.5;
+        foreach (var h in hs)
+        {
+            var down = vs.Where(v => v.Pos >= h.Lo - T && v.Pos <= h.Hi + T && v.Hi >= h.Pos - T && v.Lo < h.Pos - 4)
+                .OrderBy(v => v.Pos).ToList();
+            for (var i = 0; i + 1 < down.Count; i++)
+            {
+                var v1 = down[i];
+                var v2 = down[i + 1];
+                if (v2.Pos - v1.Pos < minWidth) continue;
+                var bottom = hs.Where(b => b.Pos < h.Pos - 4 && b.Lo <= v1.Pos + T && b.Hi >= v2.Pos - T &&
+                                           v1.Lo <= b.Pos + T && v2.Lo <= b.Pos + T)
+                    .OrderByDescending(b => b.Pos).FirstOrDefault();
+                if (bottom == default) continue;
+                var cell = new PigRect(v1.Pos, bottom.Pos, v2.Pos, h.Pos);
+                if (cell.Height >= minHeight && cell.Width >= minWidth && !cells.Any(c => Near(c, cell))) cells.Add(cell);
+            }
+        }
+        return cells;
+    }
+
+    private static bool Near(PigRect a, PigRect b) =>
+        Math.Abs(a.Left - b.Left) < 1 && Math.Abs(a.Right - b.Right) < 1 && Math.Abs(a.Top - b.Top) < 1 && Math.Abs(a.Bottom - b.Bottom) < 1;
+
+    // ── character boxes ──────────────────────────────────────────────────────
+
+    public Task<CellRow?> FindCellRowAsync(byte[] pdf, int pageIndex, double nx, double ny, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<CellRow?>(() =>
+        {
+            var (flat, rotations) = PageGeometry.Unrotate(pdf);
+            using var doc = UglyToad.PdfPig.PdfDocument.Open(flat);
+            if (pageIndex < 0 || pageIndex >= doc.NumberOfPages) return null;
+            var page = doc.GetPage(pageIndex + 1);
+            var turn = pageIndex < rotations.Length ? rotations[pageIndex] : 0;
+
+            // The click arrives in rendered orientation: undo /Rotate to land in the unrotated page (y up).
+            var p = new PdfRect(nx, ny, nx, ny).RotateClockwise(-turn);
+            if (FindCellRow(page, p.Left * page.Width, (1 - p.Top) * page.Height) is not { } row) return null;
+            return new CellRow(Normalize(row.Bounds, page.Width, page.Height).RotateClockwise(turn), row.Count, row.Pitch, row.Height);
+        }, ct);
+    }
+
+    /// <summary>
+    /// The run of empty, equal, adjacent boxes containing (<paramref name="x"/>, <paramref name="y"/>), raw page space.
+    /// Boxes are the ruled cells plus any filled (non-black) rectangle, so a row of light boxes with no border is found too.
+    /// </summary>
+    private static (PigRect Bounds, int Count, double Pitch, double Height)? FindCellRow(Page page, double x, double y)
+    {
+        var cells = RuledCells(page, minWidth: 5, minHeight: 5);
+        foreach (var path in page.Paths)
+        {
+            if (!path.IsFilled || path.FillColor is null || path.FillColor.ToRGBValues() is var (r, g, b) && r + g + b < 1.5) continue;
+            if (path.GetBoundingRectangle() is { Width: >= 5 and <= 60, Height: >= 5 and <= 60 } bb && !cells.Any(c => Near(c, bb))) cells.Add(bb);
+        }
+        // A box with text in it is already used; the run stops there.
+        var text = page.Letters.Where(l => !string.IsNullOrWhiteSpace(l.Value)).Select(l => l.BoundingBox.Centroid).ToList();
+        cells.RemoveAll(c => text.Any(t => t.X > c.Left && t.X < c.Right && t.Y > c.Bottom && t.Y < c.Top));
+
+        var seed = cells.Where(c => x >= c.Left && x <= c.Right && y >= c.Bottom && y <= c.Top)
+            .OrderBy(c => c.Width * c.Height).FirstOrDefault();
+        if (seed == default) return null;
+
+        var (w, h) = (seed.Width, seed.Height);
+        bool Like(PigRect c) => Math.Abs(c.Width - w) <= 0.15 * w && Math.Abs(c.Top - seed.Top) <= 0.25 * h;
+        var run = new List<PigRect> { seed };
+        for (var next = Next(run[^1]); next is { } n; next = Next(n)) run.Add(n);
+        for (var prev = Prev(run[0]); prev is { } n; prev = Prev(n)) run.Insert(0, n);
+        if (run.Count < 3) return null;
+
+        var bounds = new PigRect(run[0].Left, run.Min(c => c.Bottom), run[^1].Right, run.Max(c => c.Top));
+        return (bounds, run.Count, (run[^1].Left - run[0].Left) / (run.Count - 1), run.Average(c => c.Height));
+
+        PigRect? Next(PigRect cur) => cells.Where(c => Like(c) && c.Left >= cur.Right - 1 && c.Left - cur.Right <= 0.25 * w)
+            .OrderBy(c => c.Left).Select(c => (PigRect?)c).FirstOrDefault();
+        PigRect? Prev(PigRect cur) => cells.Where(c => Like(c) && c.Right <= cur.Left + 1 && cur.Left - c.Right <= 0.25 * w)
+            .OrderByDescending(c => c.Right).Select(c => (PigRect?)c).FirstOrDefault();
     }
 
     /// <summary>Merges collinear (±1 pt) segments that touch or overlap into single lines.</summary>
