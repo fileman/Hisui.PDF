@@ -53,6 +53,9 @@ public partial class MainViewModel
 
     public void CancelPending() => Pending = null;
 
+    /// <summary>True while the pending box edits a text already on the page (so it can offer to delete it).</summary>
+    public bool IsEditingExistingFreeText => _editingFreeTextId is not null;
+
     partial void OnPendingChanged(AnnotationInputModel? value)
     {
         if (value is not null || _editingFreeTextId is null) return;
@@ -113,7 +116,7 @@ public partial class MainViewModel
         var moved = PdfRect.FromLTWH(left, top, r.Width, r.Height);
         return EditSourceAsync(page.SourceDocumentId, page, async src =>
             await _annotations.AddFreeTextAsync(await _annotations.RemoveFreeTextAsync(src, page.SourcePageIndex, info.Id),
-                page.SourcePageIndex, moved, info.Text, info.ColorHex, info.FontSizePoints, info.CharPitchPoints, info.Background));
+                page.SourcePageIndex, moved, info.Text, info.ColorHex, info.FontSizePoints, info.CharPitchPoints, info.Background, info.Id));
     }
 
     public Task DeleteFreeTextAsync(PageItemViewModel page, FreeTextInfo info) =>
@@ -254,7 +257,7 @@ public partial class MainViewModel
     /// <summary>Crosshair over the page while a tool is active: press the left button and drag to mark the area.</summary>
     public Avalonia.Input.Cursor CanvasCursor { get; } = new(Avalonia.Input.StandardCursorType.Cross);
 
-    /// <summary>Tooltip following the pointer over the page while a tool is active: what a drag does, and the shortcuts.</summary>
+    /// <summary>Status-bar hint while a tool is active: what a click or drag on the page does, and the shortcuts.</summary>
     public string CanvasTooltip => ActiveTool switch
     {
         AnnotationTool.CaptureArea => _loc["Annotate.CaptureTooltip"],
@@ -270,6 +273,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
         OnPropertyChanged(nameof(CanvasTooltip));
+        if (value != AnnotationTool.None) StatusMessage = CanvasTooltip;
         RaiseFormLayoutModeChanged();
         OnPropertyChanged(nameof(ShowContinuous));
         OnPropertyChanged(nameof(ShowContinuousPages));
@@ -582,7 +586,7 @@ public partial class MainViewModel
 
                 AnnotationTool.FreeText when !string.IsNullOrWhiteSpace(model.Text) =>
                     await _annotations.AddFreeTextAsync(source, srcIdx, model.Rect,
-                        model.Text, model.ColorHex, model.FontSizePoints, model.CharPitchPoints, model.Background, ct),
+                        model.Text, model.ColorHex, model.FontSizePoints, model.CharPitchPoints, model.Background, replaceFreeTextId, ct),
 
                 // The note is drawn centred on a point: the centre of the placed box.
                 AnnotationTool.StickyNote =>

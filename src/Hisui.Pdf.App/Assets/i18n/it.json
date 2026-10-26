@@ -126,6 +126,7 @@
   "Annotate.FreeText.Existing": "Trascina per spostare, clicca per modificare, Canc per eliminare",
   "Annotate.Pending.Apply": "Applica (Invio)",
   "Annotate.Pending.Cancel": "Annulla (Esc)",
+  "Annotate.Pending.Delete": "Elimina questo testo",
   "Annotate.Pending.Move": "Trascina per spostare",
   "Annotate.Pending.Resize": "Trascina per ridimensionare",
   "Annotate.Pending.FontSize": "Dimensione del testo (pt)",

@@ -28,9 +28,10 @@ public interface IPdfAnnotationService
     /// Draws free text on a single page, one line per newline. With <paramref name="charPitchPoints"/> &gt; 0 each
     /// character is centred in its own cell of that width (for boxed forms such as IBAN fields); with
     /// <paramref name="background"/> false the text goes straight onto the page with no box behind it.
+    /// <paramref name="id"/> keeps the identity of a text being redrawn after an edit or move (null = a new one).
     /// </summary>
     Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12,
-        double charPitchPoints = 0, bool background = true, CancellationToken ct = default);
+        double charPitchPoints = 0, bool background = true, string? id = null, CancellationToken ct = default);
 
     /// <summary>The free texts drawn by <see cref="AddFreeTextAsync"/> on a page, so they can be edited, moved or removed.</summary>
     Task<IReadOnlyList<FreeTextInfo>> ReadFreeTextsAsync(byte[] pdf, int pageIndex, CancellationToken ct = default);

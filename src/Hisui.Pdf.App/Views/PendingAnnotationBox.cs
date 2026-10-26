@@ -55,7 +55,6 @@ public sealed class PendingAnnotationBox : Border
         Background = Brushes.Transparent;
         Focusable = true;
         Cursor = new Cursor(StandardCursorType.SizeAll);
-        ToolTip.SetTip(this, Localizer.Instance["Annotate.Pending.Move"]);
 
         var accent = Resource("RibbonAccentBrush") ?? Brushes.DodgerBlue;
         var panel = new Panel();
@@ -206,10 +205,17 @@ public sealed class PendingAnnotationBox : Border
         var pitchPx = Number(_pitch, _model.CharPitchPoints) * _scale;
         var pad = 3 * _scale;
         _editor.FontSize = fontPx;
-        _editor.Foreground = new SolidColorBrush(Parse(NormalizeHex(_color?.Text, _model.ColorHex), Colors.Black));
-        _editor.Background = _background?.IsChecked == true
-            ? new SolidColorBrush(Color.FromArgb(220, 255, 255, 240))
-            : Brushes.Transparent;
+        var fg = new SolidColorBrush(Parse(NormalizeHex(_color?.Text, _model.ColorHex), Colors.Black));
+        IBrush bg = _background?.IsChecked == true ? new SolidColorBrush(Color.FromArgb(220, 255, 255, 240)) : Brushes.Transparent;
+        _editor.Foreground = fg;
+        _editor.Background = bg;
+        // The Fluent template swaps in its own (opaque, theme-coloured) brushes on hover and focus: pin them all.
+        foreach (var key in new[] { "TextControlBackground", "TextControlBackgroundPointerOver", "TextControlBackgroundFocused" })
+            _editor.Resources[key] = bg;
+        foreach (var key in new[] { "TextControlForeground", "TextControlForegroundPointerOver", "TextControlForegroundFocused" })
+            _editor.Resources[key] = fg;
+        foreach (var key in new[] { "TextControlBorderBrush", "TextControlBorderBrushPointerOver", "TextControlBorderBrushFocused" })
+            _editor.Resources[key] = Brushes.Transparent;
         if (pitchPx > 0)
         {
             // ponytail: the PDF centres each Arial glyph in its cell; the preview approximates that with a monospace
@@ -246,9 +252,9 @@ public sealed class PendingAnnotationBox : Border
 
         if (_model.Tool == AnnotationTool.FreeText)
         {
-            _size = new NumericUpDown { Minimum = 4, Maximum = 200, Increment = 1, Value = (decimal)_model.FontSizePoints, FormatString = "0", Width = 92, Height = 30 };
+            _size = new NumericUpDown { Minimum = 4, Maximum = 200, Increment = 1, Value = (decimal)_model.FontSizePoints, FormatString = "0", Width = 54, Height = 30, ShowButtonSpinner = false };
             ToolTip.SetTip(_size, loc["Annotate.Pending.FontSize"]);
-            _pitch = new NumericUpDown { Minimum = 0, Maximum = 100, Increment = 0.5m, Value = (decimal)_model.CharPitchPoints, FormatString = "0.0", Width = 96, Height = 30 };
+            _pitch = new NumericUpDown { Minimum = 0, Maximum = 100, Increment = 0.5m, Value = (decimal)_model.CharPitchPoints, FormatString = "0.0", Width = 60, Height = 30, ShowButtonSpinner = false };
             ToolTip.SetTip(_pitch, loc["Annotate.Pending.Spacing"]);
             _color = new TextBox { Text = _model.ColorHex, Width = 84, Height = 30, PlaceholderText = "#RRGGBB" };
             ToolTip.SetTip(_color, loc["Annotate.Pending.Color"]);
@@ -268,6 +274,8 @@ public sealed class PendingAnnotationBox : Border
             ApplyTextStyle();
         }
 
+        if (_editor is not null && _vm.IsEditingExistingFreeText)
+            row.Children.Add(Glyph("M3 5h10M6 5V3h4v2M5 5l.7 9h4.6L11 5", loc["Annotate.Pending.Delete"], () => { _editor.Text = string.Empty; _ = CommitAsync(); }, null));
         row.Children.Add(Glyph("M3 8l3.5 3.5L13 4", loc["Annotate.Pending.Apply"], () => _ = CommitAsync(), accent));
         row.Children.Add(Glyph("M4 4l8 8 M12 4l-8 8", loc["Annotate.Pending.Cancel"], Cancel, null));
 
@@ -288,13 +296,15 @@ public sealed class PendingAnnotationBox : Border
         return btn;
     }
 
-    /// <summary>Toolbar above the box, or below it when the box touches the top of the page.</summary>
+    /// <summary>Toolbar above the box (below it when the box touches the top of the page), kept inside the page width.</summary>
     private void PlaceToolbar()
     {
         var (l, t) = (Canvas.GetLeft(this), Canvas.GetTop(this));
         var top = t - ToolbarHeight - ToolbarGap;
         if (top < 0) top = t + Height + ToolbarGap;
-        Canvas.SetLeft(_toolbar, Math.Max(0, l));
+        _toolbar.Measure(Size.Infinity);
+        var width = _toolbar.Bounds.Width > 0 ? _toolbar.Bounds.Width : _toolbar.DesiredSize.Width;
+        Canvas.SetLeft(_toolbar, Math.Max(0, Math.Min(l, _canvasW - width)));
         Canvas.SetTop(_toolbar, top);
     }
 

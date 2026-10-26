@@ -161,7 +161,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
     }
 
     public Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12,
-        double charPitchPoints = 0, bool background = true, CancellationToken ct = default)
+        double charPitchPoints = 0, bool background = true, string? id = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
@@ -174,7 +174,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
             if (page.Contents.Elements.Count > before && Resolve(page.Contents.Elements[^1]) is PdfDictionary added)
             {
                 var d = new PdfDictionary();
-                d.Elements["/Id"] = new PdfString(Guid.NewGuid().ToString("N"));
+                d.Elements["/Id"] = new PdfString(string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id);
                 d.Elements["/Text"] = new PdfString(text, PdfStringEncoding.Unicode);
                 d.Elements["/L"] = new PdfReal(rect.Left);
                 d.Elements["/T"] = new PdfReal(rect.Top);

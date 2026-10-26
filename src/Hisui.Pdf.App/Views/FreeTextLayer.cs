@@ -4,7 +4,6 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.VisualTree;
-using Hisui.Pdf.App.Localization;
 using Hisui.Pdf.App.ViewModels;
 using Hisui.Pdf.Core.Model;
 
@@ -13,6 +12,7 @@ namespace Hisui.Pdf.App.Views;
 /// <summary>
 /// While the Annotate panel is open (or the free-text tool is active): a box over each free text of the page.
 /// Drag moves it, click opens it for editing (text, size, spacing, position), Del deletes it.
+/// Boxes are kept by text id across reloads, so the one being worked on keeps the keyboard focus (Ctrl+Z, Del).
 /// </summary>
 public sealed class FreeTextLayer : Canvas
 {
@@ -30,6 +30,7 @@ public sealed class FreeTextLayer : Canvas
     private MainViewModel? _vm;
     private PageItemViewModel? _page;
     private Size _builtFor;
+    private readonly Dictionary<string, Border> _boxes = [];
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -75,69 +76,87 @@ public sealed class FreeTextLayer : Canvas
             Rebuild();
     }
 
+    /// <summary>Brings the boxes in line with the page's texts: existing ones are moved, not recreated.</summary>
     private void Rebuild()
     {
-        Children.Clear();
         _builtFor = Bounds.Size;
-        if (_vm is not { IsFreeTextLayerVisible: true, Pending: null } vm || Page is not { } page) return;
         var (w, h) = (Bounds.Width, Bounds.Height);
-        if (w <= 0 || h <= 0) return;
+        var texts = _vm is { IsFreeTextLayerVisible: true, Pending: null } && Page is { } page && w > 0 && h > 0
+            ? page.FreeTexts : [];
         // With a tool active the annotation canvas sits on top and takes the pointer; the outlines still show.
-        IsHitTestVisible = !vm.IsAnnotationActive;
+        IsHitTestVisible = _vm is { IsAnnotationActive: false };
 
-        foreach (var info in page.FreeTexts)
+        foreach (var id in _boxes.Keys.Except(texts.Select(t => t.Id)).ToList())
         {
-            var r = info.Rect;
-            var box = new Border
+            Children.Remove(_boxes[id]);
+            _boxes.Remove(id);
+        }
+        foreach (var info in texts)
+        {
+            if (!_boxes.TryGetValue(info.Id, out var box))
             {
-                Background = Fill,
-                BorderBrush = Stroke,
-                BorderThickness = new Thickness(1),
-                Width = Math.Max(8, r.Width * w),
-                Height = Math.Max(8, r.Height * h),
-                Focusable = true,
-                Cursor = new Cursor(StandardCursorType.SizeAll),
-            };
-            ToolTip.SetTip(box, Localizer.Instance["Annotate.FreeText.Existing"]);
+                box = CreateBox();
+                _boxes[info.Id] = box;
+                Children.Add(box);
+            }
+            box.Tag = info;
+            var r = info.Rect;
+            box.Width = Math.Max(8, r.Width * w);
+            box.Height = Math.Max(8, r.Height * h);
             SetLeft(box, r.Left * w);
             SetTop(box, r.Top * h);
-
-            Point start = default;
-            Point origin = default;
-            var dragging = false;
-            box.PointerPressed += (_, e) =>
-            {
-                if (!e.GetCurrentPoint(box).Properties.IsLeftButtonPressed) return;
-                box.Focus();
-                e.Handled = true;
-                dragging = true;
-                start = e.GetPosition(this);
-                origin = new Point(GetLeft(box), GetTop(box));
-                e.Pointer.Capture(box);
-            };
-            box.PointerMoved += (_, e) =>
-            {
-                if (!dragging) return;
-                var d = e.GetPosition(this) - start;
-                SetLeft(box, Math.Clamp(origin.X + d.X, 0, Math.Max(0, w - box.Width)));
-                SetTop(box, Math.Clamp(origin.Y + d.Y, 0, Math.Max(0, h - box.Height)));
-            };
-            box.PointerReleased += async (_, e) =>
-            {
-                if (!dragging) return;
-                dragging = false;
-                e.Pointer.Capture(null);
-                var (dx, dy) = ((GetLeft(box) - origin.X) / w, (GetTop(box) - origin.Y) / h);
-                if (Math.Abs(dx * w) >= 2 || Math.Abs(dy * h) >= 2) await vm.MoveFreeTextAsync(page, info, dx, dy);
-                else await vm.BeginEditFreeTextAsync(page, info); // a click: open it for editing
-            };
-            box.KeyDown += async (_, e) =>
-            {
-                if (e.Key is not (Key.Delete or Key.Back)) return;
-                e.Handled = true;
-                await vm.DeleteFreeTextAsync(page, info);
-            };
-            Children.Add(box);
         }
+    }
+
+    private Border CreateBox()
+    {
+        var box = new Border
+        {
+            Background = Fill,
+            BorderBrush = Stroke,
+            BorderThickness = new Thickness(1),
+            Focusable = true,
+            Cursor = new Cursor(StandardCursorType.SizeAll),
+        };
+        // No tooltip: its popup would open under the pointer and take the click meant for the box.
+
+        Point start = default;
+        Point origin = default;
+        var dragging = false;
+        box.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(box).Properties.IsLeftButtonPressed) return;
+            box.Focus();
+            e.Handled = true;
+            dragging = true;
+            start = e.GetPosition(this);
+            origin = new Point(GetLeft(box), GetTop(box));
+            e.Pointer.Capture(box);
+        };
+        box.PointerMoved += (_, e) =>
+        {
+            if (!dragging) return;
+            var d = e.GetPosition(this) - start;
+            SetLeft(box, Math.Clamp(origin.X + d.X, 0, Math.Max(0, Bounds.Width - box.Width)));
+            SetTop(box, Math.Clamp(origin.Y + d.Y, 0, Math.Max(0, Bounds.Height - box.Height)));
+        };
+        box.PointerReleased += async (_, e) =>
+        {
+            if (!dragging) return;
+            dragging = false;
+            e.Pointer.Capture(null);
+            if (_vm is not { } vm || Page is not { } page || box.Tag is not FreeTextInfo info) return;
+            var (w, h) = (Bounds.Width, Bounds.Height);
+            var (dx, dy) = ((GetLeft(box) - origin.X) / w, (GetTop(box) - origin.Y) / h);
+            if (Math.Abs(dx * w) >= 2 || Math.Abs(dy * h) >= 2) await vm.MoveFreeTextAsync(page, info, dx, dy);
+            else await vm.BeginEditFreeTextAsync(page, info); // a click: open it for editing
+        };
+        box.KeyDown += async (_, e) =>
+        {
+            if (e.Key is not (Key.Delete or Key.Back)) return;
+            e.Handled = true;
+            if (_vm is { } vm && Page is { } page && box.Tag is FreeTextInfo info) await vm.DeleteFreeTextAsync(page, info);
+        };
+        return box;
     }
 }

@@ -126,6 +126,7 @@
   "Annotate.FreeText.Existing": "Drag to move, click to edit, Del to delete",
   "Annotate.Pending.Apply": "Apply (Enter)",
   "Annotate.Pending.Cancel": "Cancel (Esc)",
+  "Annotate.Pending.Delete": "Delete this text",
   "Annotate.Pending.Move": "Drag to move",
   "Annotate.Pending.Resize": "Drag to resize",
   "Annotate.Pending.FontSize": "Text size (pt)",

@@ -161,6 +161,10 @@ public class PdfAnnotationServiceTests
         Assert.False(info.Background);
         Assert.Contains("Hello", (await new PdfTextExtractor().ExtractTextAsync(withText)).Replace(" ", "")); // cells read back as spaced letters
 
+        // Redrawn with the same id (an edit or move): still one text, same identity.
+        var redrawn = await _sut.AddFreeTextAsync(await _sut.RemoveFreeTextAsync(withText, 0, info.Id), 0, rect, "Hello again", id: info.Id);
+        Assert.Equal(info.Id, Assert.Single(await _sut.ReadFreeTextsAsync(redrawn, 0)).Id);
+
         var removed = await _sut.RemoveFreeTextAsync(withText, 0, info.Id);
         Assert.True(IsValidPdf(removed));
         Assert.Empty(await _sut.ReadFreeTextsAsync(removed, 0));
