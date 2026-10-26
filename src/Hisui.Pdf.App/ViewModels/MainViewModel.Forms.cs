@@ -63,6 +63,7 @@ public partial class MainViewModel
     private void RaiseFormLayoutModeChanged()
     {
         OnPropertyChanged(nameof(IsFormLayoutMode));
+        OnPropertyChanged(nameof(IsFreeTextLayerVisible));
         OnPropertyChanged(nameof(IsCommentsPanel));
         OnPropertyChanged(nameof(IsBookmarksPanel));
         _ = RefreshCommentsAsync();
@@ -122,6 +123,7 @@ public partial class MainViewModel
             _fieldCache[key] = (bytes, widgets);
         }
         if (!widgets.SequenceEqual(item.Fields, FieldEquality.Instance)) item.Fields = widgets;
+        await LoadFreeTextsAsync(item, bytes);
         await LoadLinksAsync(item);
     }
 

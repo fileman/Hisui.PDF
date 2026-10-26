@@ -145,6 +145,42 @@ public class PdfAnnotationServiceTests
         Assert.InRange(Math.Abs(first.BoundingBox.Left - second.BoundingBox.Left), 0, 0.005); // same left edge (glyph bearings aside)
     }
 
+    [Fact]
+    public async Task AddFreeText_CanBeReadBackAndRemoved()
+    {
+        var pdf = PdfFixtureBuilder.Create(1);
+        var rect = new PdfRect(0.2, 0.3, 0.6, 0.35);
+        var withText = await _sut.AddFreeTextAsync(pdf, 0, rect, "Hello", "#FF0000", 14, charPitchPoints: 12, background: false);
+
+        var info = Assert.Single(await _sut.ReadFreeTextsAsync(withText, 0));
+        Assert.Equal("Hello", info.Text);
+        Assert.Equal(rect, info.Rect);
+        Assert.Equal(14, info.FontSizePoints);
+        Assert.Equal("#FF0000", info.ColorHex);
+        Assert.Equal(12, info.CharPitchPoints);
+        Assert.False(info.Background);
+        Assert.Contains("Hello", (await new PdfTextExtractor().ExtractTextAsync(withText)).Replace(" ", "")); // cells read back as spaced letters
+
+        var removed = await _sut.RemoveFreeTextAsync(withText, 0, info.Id);
+        Assert.True(IsValidPdf(removed));
+        Assert.Empty(await _sut.ReadFreeTextsAsync(removed, 0));
+        Assert.DoesNotContain("Hello", (await new PdfTextExtractor().ExtractTextAsync(removed)).Replace(" ", ""));
+    }
+
+    [Fact]
+    public async Task RemoveFreeText_LeavesOtherFreeTextsAndTheWatermark()
+    {
+        var pdf = await _sut.AddTextWatermarkAsync(PdfFixtureBuilder.Create(1), "DRAFT");
+        pdf = await _sut.AddFreeTextAsync(pdf, 0, new PdfRect(0.1, 0.1, 0.5, 0.15), "one");
+        pdf = await _sut.AddFreeTextAsync(pdf, 0, new PdfRect(0.1, 0.2, 0.5, 0.25), "two");
+        var texts = await _sut.ReadFreeTextsAsync(pdf, 0);
+        Assert.Equal(["one", "two"], texts.Select(t => t.Text));
+
+        var result = await _sut.RemoveFreeTextAsync(pdf, 0, texts[0].Id);
+        Assert.Equal("two", Assert.Single(await _sut.ReadFreeTextsAsync(result, 0)).Text);
+        Assert.NotNull(await _sut.ReadWatermarkAsync(result));
+    }
+
     // ── sticky note ──────────────────────────────────────────────────────────
 
     [Fact]

@@ -32,6 +32,12 @@ public interface IPdfAnnotationService
     Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12,
         double charPitchPoints = 0, bool background = true, CancellationToken ct = default);
 
+    /// <summary>The free texts drawn by <see cref="AddFreeTextAsync"/> on a page, so they can be edited, moved or removed.</summary>
+    Task<IReadOnlyList<FreeTextInfo>> ReadFreeTextsAsync(byte[] pdf, int pageIndex, CancellationToken ct = default);
+
+    /// <summary>Removes the free text with <paramref name="id"/> (from <see cref="ReadFreeTextsAsync"/>) from a page.</summary>
+    Task<byte[]> RemoveFreeTextAsync(byte[] pdf, int pageIndex, string id, CancellationToken ct = default);
+
     /// <summary>Draws a visual sticky-note box at a normalized position on a single page.</summary>
     Task<byte[]> AddStickyNoteAsync(byte[] pdf, int pageIndex, double normalizedX, double normalizedY, string noteText, CancellationToken ct = default);
 

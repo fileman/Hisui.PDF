@@ -67,6 +67,10 @@ public partial class PageItemViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<Hisui.Pdf.Core.Model.PdfFormWidget> _fields = [];
 
+    /// <summary>Free texts drawn on this page (editable and movable from the Annotate panel).</summary>
+    [ObservableProperty]
+    private IReadOnlyList<Hisui.Pdf.Core.Model.FreeTextInfo> _freeTexts = [];
+
     /// <summary>Link annotations on this page (clickable in normal viewing).</summary>
     [ObservableProperty]
     private IReadOnlyList<Hisui.Pdf.Core.Model.PdfLink> _links = [];

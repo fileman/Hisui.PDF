@@ -1324,6 +1324,7 @@
                                                 <views:LinkLayer Page="{Binding}" />
                                                 <views:FieldLayer Page="{Binding}" />
                                                 <views:CommentLayer Page="{Binding}" />
+                                                <views:FreeTextLayer Page="{Binding}" />
                                             </Panel>
                                         </Border>
                                     </LayoutTransformControl>
@@ -1416,6 +1417,15 @@
                                     <RotateTransform Angle="{Binding PreviewRotationAngle}" />
                                 </views:CommentLayer.RenderTransform>
                             </views:CommentLayer>
+                            <views:FreeTextLayer Page="{Binding SelectedPage}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Width="{Binding #PreviewImageControl.Bounds.Width}"
+                                    Height="{Binding #PreviewImageControl.Bounds.Height}"
+                                    RenderTransformOrigin="50%,50%">
+                                <views:FreeTextLayer.RenderTransform>
+                                    <RotateTransform Angle="{Binding PreviewRotationAngle}" />
+                                </views:FreeTextLayer.RenderTransform>
+                            </views:FreeTextLayer>
 
                             <Canvas x:Name="AnnotationCanvas"
                                     Background="Transparent"

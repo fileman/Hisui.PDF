@@ -28,20 +28,96 @@ public partial class MainViewModel
     // Last free-text settings, so the next box starts the way the previous one was typed (handy for forms).
     private AnnotationInputModel _lastFreeText = new() { Tool = AnnotationTool.FreeText, ColorHex = "#000000", Background = false };
 
-    /// <summary>Burns the pending annotation in with its final position and content; empty text is dropped.</summary>
+    // A free text already on the page being edited through the pending box: it is replaced on commit. While it is
+    // open the preview is shown without it, so the editor is not drawn over the burned-in text.
+    private string? _editingFreeTextId;
+    private bool _committingPending;
+
+    /// <summary>Burns the pending annotation in with its final position and content; empty text is dropped
+    /// (or, when an existing text was being edited, deletes it).</summary>
     public async Task CommitPendingAsync(AnnotationInputModel model)
     {
-        Pending = null;
+        var replace = _editingFreeTextId;
+        _committingPending = true;
+        try { Pending = null; }
+        finally { _committingPending = false; }
+
         if (model.Tool == AnnotationTool.FreeText)
         {
             _lastFreeText = model with { Text = string.Empty, Rect = default };
-            if (string.IsNullOrWhiteSpace(model.Text)) return;
+            if (string.IsNullOrWhiteSpace(model.Text) && replace is null) return;
         }
         if (model.Tool == AnnotationTool.StickyNote && string.IsNullOrWhiteSpace(model.Text)) return;
-        await ApplyAnnotationAsync(model);
+        await ApplyAnnotationAsync(model, replace);
     }
 
     public void CancelPending() => Pending = null;
+
+    partial void OnPendingChanged(AnnotationInputModel? value)
+    {
+        if (value is not null || _editingFreeTextId is null) return;
+        // The box of an existing text closed without committing (Esc, tool/page/zoom change): show the text again.
+        _editingFreeTextId = null;
+        if (!_committingPending) _ = UpdatePreviewAsync(SelectedPage);
+    }
+
+    /// <summary>Free texts on the page show as boxes to move, click to edit and delete while the Annotate panel is open
+    /// or the free-text tool is active.</summary>
+    public bool IsFreeTextLayerVisible => (IsToolPanelOpen && RibbonTab == RibbonTab.Annota) || ActiveTool == AnnotationTool.FreeText;
+
+    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, IReadOnlyList<FreeTextInfo> Texts)> _freeTextCache = [];
+
+    private async Task LoadFreeTextsAsync(PageItemViewModel item, byte[] bytes)
+    {
+        var key = (item.SourceDocumentId, item.SourcePageIndex);
+        IReadOnlyList<FreeTextInfo> texts;
+        if (_freeTextCache.TryGetValue(key, out var cached) && ReferenceEquals(cached.Bytes, bytes)) texts = cached.Texts;
+        else
+        {
+            try { texts = await _annotations.ReadFreeTextsAsync(bytes, item.SourcePageIndex); }
+            catch (Exception) { texts = []; }
+            _freeTextCache[key] = (bytes, texts);
+        }
+        if (!texts.SequenceEqual(item.FreeTexts)) item.FreeTexts = texts;
+    }
+
+    /// <summary>Opens an existing free text in the editing box: its text, settings and position can be changed,
+    /// Enter re-applies it (one undo step), Esc leaves it as it was.</summary>
+    public async Task BeginEditFreeTextAsync(PageItemViewModel page, FreeTextInfo info)
+    {
+        if (_session is null || IsBusy) return;
+        if (!ReferenceEquals(page, SelectedPage)) SelectedPage = page;
+        ActiveTool = AnnotationTool.FreeText; // the editing box lives on the tool canvas
+        await UpdatePreviewAsync(page);       // the cached preview first, so a late render can't overwrite the one below
+        try
+        {
+            var without = await _annotations.RemoveFreeTextAsync(_session.GetSource(page.SourceDocumentId), page.SourcePageIndex, info.Id);
+            var rendered = await _renderer.RenderPageAsync(without, page.SourcePageIndex, _settings.Settings.PreviewDpi);
+            PreviewImage = Imaging.BitmapConversions.ToFrozenBitmap(rendered);
+        }
+        catch (Exception) { /* the editor then sits over the burned-in text; still usable */ }
+        _editingFreeTextId = info.Id;
+        Pending = new AnnotationInputModel
+        {
+            Tool = AnnotationTool.FreeText, Rect = info.Rect, Text = info.Text, FontSizePoints = info.FontSizePoints,
+            ColorHex = info.ColorHex, CharPitchPoints = info.CharPitchPoints, Background = info.Background,
+        };
+    }
+
+    /// <summary>Moves an existing free text by a normalised offset (one undo step).</summary>
+    public Task MoveFreeTextAsync(PageItemViewModel page, FreeTextInfo info, double dx, double dy)
+    {
+        var r = info.Rect;
+        var left = Math.Clamp(r.Left + dx, 0, Math.Max(0, 1 - r.Width));
+        var top = Math.Clamp(r.Top + dy, 0, Math.Max(0, 1 - r.Height));
+        var moved = PdfRect.FromLTWH(left, top, r.Width, r.Height);
+        return EditSourceAsync(page.SourceDocumentId, page, async src =>
+            await _annotations.AddFreeTextAsync(await _annotations.RemoveFreeTextAsync(src, page.SourcePageIndex, info.Id),
+                page.SourcePageIndex, moved, info.Text, info.ColorHex, info.FontSizePoints, info.CharPitchPoints, info.Background));
+    }
+
+    public Task DeleteFreeTextAsync(PageItemViewModel page, FreeTextInfo info) =>
+        EditSourceAsync(page.SourceDocumentId, page, src => _annotations.RemoveFreeTextAsync(src, page.SourcePageIndex, info.Id));
 
     // ── Ribbon tab ────────────────────────────────────────────────────────────
 
@@ -306,6 +382,13 @@ public partial class MainViewModel
             // Typed straight on the page: no dialog, an editable box appears where the user clicked or dragged.
             if (tinyDrag)
             {
+                // A click on a text already there opens that one for editing.
+                var (px, py) = (_dragStart.X / w, _dragStart.Y / h);
+                if (SelectedPage.FreeTexts.LastOrDefault(f => px >= f.Rect.Left && px <= f.Rect.Right && py >= f.Rect.Top && py <= f.Rect.Bottom) is { } hit)
+                {
+                    await BeginEditFreeTextAsync(SelectedPage, hit);
+                    return;
+                }
                 var boxH = (_lastFreeText.FontSizePoints * 1.5 + 6) * PixelsPerPoint / h;
                 normRect = new PdfRect(C(_dragStart.X / w), C(_dragStart.Y / h), C(_dragStart.X / w + 0.35), C(_dragStart.Y / h + boxH));
             }
@@ -472,7 +555,8 @@ public partial class MainViewModel
 
     // ── Apply ─────────────────────────────────────────────────────────────────
 
-    private async Task ApplyAnnotationAsync(AnnotationInputModel model)
+    /// <param name="replaceFreeTextId">An existing free text to remove first, so the edit is one undo step.</param>
+    private async Task ApplyAnnotationAsync(AnnotationInputModel model, string? replaceFreeTextId = null)
     {
         if (_session is null || SelectedPage is null) return;
 
@@ -483,6 +567,8 @@ public partial class MainViewModel
         await RunBusyAsync(_loc["Status.ApplyingAnnotation"], async ct =>
         {
             var source = _session.GetSource(srcId);
+            if (replaceFreeTextId is not null)
+                source = await _annotations.RemoveFreeTextAsync(source, srcIdx, replaceFreeTextId, ct);
 
             var updated = model.Tool switch
             {
@@ -494,7 +580,7 @@ public partial class MainViewModel
                     await _annotations.AddRectangleAsync(source, srcIdx, model.Rect,
                         model.ColorHex, model.FillHex, model.LineWidth, ct),
 
-                AnnotationTool.FreeText =>
+                AnnotationTool.FreeText when !string.IsNullOrWhiteSpace(model.Text) =>
                     await _annotations.AddFreeTextAsync(source, srcIdx, model.Rect,
                         model.Text, model.ColorHex, model.FontSizePoints, model.CharPitchPoints, model.Background, ct),
 
@@ -533,7 +619,7 @@ public partial class MainViewModel
                 AnnotationTool.FormSignature =>
                     await _forms.AddFieldAsync(source, srcIdx, model.Rect, PdfFormFieldType.Signature, model.FieldName, null, ct),
 
-                _ => source, // Watermark is handled by AddWatermarkAsync (document-wide).
+                _ => source, // Watermark is handled by AddWatermarkAsync (document-wide); emptied free text = deleted.
             };
 
             _session.UpdateSource(srcId, updated);

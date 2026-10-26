@@ -78,8 +78,10 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
         return Task.Run(() => ModifyAllPages(pdf, (_, page) => RemoveWatermark(page)), ct);
     }
 
-    // Second-class key on the watermark's content stream, holding the text and settings it was drawn with.
+    // Second-class keys on the content streams this service appends, holding what they were drawn with so the
+    // watermark and each free text can be read back, edited or removed later.
     private const string WatermarkKey = "/HisuiWatermark";
+    private const string FreeTextKey = "/HisuiFreeText";
 
     private static PdfDictionary Describe(string text, WatermarkOptions options)
     {
@@ -92,24 +94,28 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
         return d;
     }
 
+    private static void RemoveWatermark(PdfPage page) => RemoveTagged(page, WatermarkKey, null);
+
     /// <summary>
-    /// Drops the tagged watermark stream(s) of a page. PDFsharp isolates each later addition by putting "q" in front of the
-    /// first stream and "Q" after the last one, so a watermark stream may carry such operators: they are kept (as the
-    /// stream's only content) to leave the graphics-state nesting balanced.
+    /// Drops the content stream(s) of a page tagged with <paramref name="key"/> (and, when given, that <paramref name="id"/>).
+    /// PDFsharp isolates each later addition by putting "q" in front of the first stream and "Q" after the last one, so
+    /// such a stream may carry those operators: they are kept (as the stream's only content) to leave the graphics-state
+    /// nesting balanced.
     /// </summary>
-    private static void RemoveWatermark(PdfPage page)
+    private static void RemoveTagged(PdfPage page, string key, string? id)
     {
         var items = page.Contents.Elements;
         for (var i = items.Count - 1; i >= 0; i--)
         {
-            if (Resolve(items[i]) is not PdfDictionary content || content.Elements[WatermarkKey] is null) continue;
+            if (Resolve(items[i]) is not PdfDictionary content || content.Elements.GetDictionary(key) is not { } tag) continue;
+            if (id is not null && tag.Elements.GetString("/Id") != id) continue;
             var balance = GraphicsStateBalance(content.Stream.UnfilteredValue);
             if (balance == 0)
             {
                 items.RemoveAt(i);
                 continue;
             }
-            content.Elements.Remove(WatermarkKey);
+            content.Elements.Remove(key);
             content.Elements.Remove("/Filter");
             content.Elements.Remove("/DecodeParms");
             content.Stream.Value = Encoding.ASCII.GetBytes(string.Join(' ', Enumerable.Repeat(balance > 0 ? "q" : "Q", Math.Abs(balance))));
@@ -162,6 +168,59 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
         return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
         {
+            var before = page.Contents.Elements.Count;
+            DrawFreeText(page, rect, text, colorHex, fontSizePoints, charPitchPoints, background);
+            // Tag the stream just appended with what it was drawn with, so the text can be edited or moved later.
+            if (page.Contents.Elements.Count > before && Resolve(page.Contents.Elements[^1]) is PdfDictionary added)
+            {
+                var d = new PdfDictionary();
+                d.Elements["/Id"] = new PdfString(Guid.NewGuid().ToString("N"));
+                d.Elements["/Text"] = new PdfString(text, PdfStringEncoding.Unicode);
+                d.Elements["/L"] = new PdfReal(rect.Left);
+                d.Elements["/T"] = new PdfReal(rect.Top);
+                d.Elements["/R"] = new PdfReal(rect.Right);
+                d.Elements["/B"] = new PdfReal(rect.Bottom);
+                d.Elements["/Size"] = new PdfReal(fontSizePoints);
+                d.Elements["/Color"] = new PdfString(colorHex);
+                d.Elements["/Pitch"] = new PdfReal(charPitchPoints);
+                d.Elements["/Background"] = new PdfBoolean(background);
+                added.Elements[FreeTextKey] = d;
+            }
+        }), ct);
+    }
+
+    public Task<IReadOnlyList<FreeTextInfo>> ReadFreeTextsAsync(byte[] pdf, int pageIndex, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<IReadOnlyList<FreeTextInfo>>(() =>
+        {
+            using var stream = new MemoryStream(pdf, writable: false);
+            using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+            if ((uint)pageIndex >= (uint)doc.PageCount)
+                throw new ArgumentOutOfRangeException(nameof(pageIndex), $"Page {pageIndex} does not exist (page count = {doc.PageCount}).");
+            var result = new List<FreeTextInfo>();
+            foreach (var item in doc.Pages[pageIndex].Contents.Elements)
+            {
+                if (Resolve(item) is not PdfDictionary content || content.Elements.GetDictionary(FreeTextKey) is not { } d) continue;
+                var e = d.Elements;
+                result.Add(new FreeTextInfo(e.GetString("/Id"),
+                    new PdfRect(e.GetReal("/L"), e.GetReal("/T"), e.GetReal("/R"), e.GetReal("/B")),
+                    e.GetString("/Text"), e.GetReal("/Size"), e.GetString("/Color"), e.GetReal("/Pitch"), e.GetBoolean("/Background")));
+            }
+            return result;
+        }, ct);
+    }
+
+    public Task<byte[]> RemoveFreeTextAsync(byte[] pdf, int pageIndex, string id, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) => RemoveTagged(page, FreeTextKey, id)), ct);
+    }
+
+    private static void DrawFreeText(PdfPage page, PdfRect rect, string text, string colorHex, double fontSizePoints, double charPitchPoints, bool background)
+    {
+        {
             using var gfx = PageGeometry.OpenGraphics(page);
             var xRect = ToXRect(rect, page);
             var font = new XFont("Arial", fontSizePoints);
@@ -197,7 +256,7 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
                     x += charPitchPoints;
                 }
             }
-        }), ct);
+        }
     }
 
     public Task<byte[]> AddStickyNoteAsync(byte[] pdf, int pageIndex, double normalizedX, double normalizedY, string noteText, CancellationToken ct = default)
