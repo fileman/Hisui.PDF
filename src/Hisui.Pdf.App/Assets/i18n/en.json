@@ -138,6 +138,7 @@
   "Annotate.Pending.Resize": "Drag to resize",
   "Annotate.Pending.FontSize": "Text size (pt)",
   "Annotate.Pending.Spacing": "Character spacing (pt): the width of each box, e.g. for an IBAN. 0 = normal text",
+  "Annotate.Pending.Cells": "Boxed text: one cell per character (set the cell width next to it)",
   "Annotate.Pending.Color": "Color (#RRGGBB)",
   "Annotate.Pending.Background": "Background",
   "Annotate.Pending.Background.Tooltip": "Draw a light box behind the text",

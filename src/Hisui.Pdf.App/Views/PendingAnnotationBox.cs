@@ -36,6 +36,9 @@ public sealed class PendingAnnotationBox : Border
     private readonly Border _toolbar;
     private TextBox? _editor;
     private NumericUpDown? _size, _pitch;
+    private ToggleButton? _cells;
+    // The pitch last used with cells on, so switching cells back on restores it instead of starting from 0.
+    private static double s_lastPitch = 12;
     private TextBox? _color;
     private CheckBox? _background;
     private ToggleButton? _bold, _italic;
@@ -139,7 +142,7 @@ public sealed class PendingAnnotationBox : Border
         {
             Text = _editor.Text ?? string.Empty,
             FontSizePoints = Number(_size, m.FontSizePoints),
-            CharPitchPoints = Number(_pitch, m.CharPitchPoints),
+            CharPitchPoints = CurrentPitch(m.CharPitchPoints),
             ColorHex = NormalizeHex(_color?.Text, m.ColorHex),
             Background = _background?.IsChecked == true,
             Bold = _bold?.IsChecked == true,
@@ -148,6 +151,9 @@ public sealed class PendingAnnotationBox : Border
     }
 
     private static double Number(NumericUpDown? box, double fallback) => box is { Value: { } d } ? (double)d : fallback;
+
+    /// <summary>Cell pitch in points, 0 when boxed text is switched off.</summary>
+    private double CurrentPitch(double fallback) => _cells is null ? fallback : _cells.IsChecked == true ? Number(_pitch, fallback) : 0;
 
     private static string NormalizeHex(string? value, string fallback)
     {
@@ -213,7 +219,7 @@ public sealed class PendingAnnotationBox : Border
     {
         if (_editor is null || _overlay is null) return;
         var fontPx = Math.Max(4, Number(_size, _model.FontSizePoints) * _scale);
-        var pitchPx = Number(_pitch, _model.CharPitchPoints) * _scale;
+        var pitchPx = CurrentPitch(_model.CharPitchPoints) * _scale;
         var pad = 3 * _scale;
         var weight = _bold?.IsChecked == true ? FontWeight.Bold : FontWeight.Normal;
         var style = _italic?.IsChecked == true ? FontStyle.Italic : FontStyle.Normal;
@@ -277,8 +283,20 @@ public sealed class PendingAnnotationBox : Border
         {
             _size = new NumericUpDown { Minimum = 4, Maximum = 200, Increment = 1, Value = (decimal)_model.FontSizePoints, FormatString = "0", Width = 54, Height = 30, ShowButtonSpinner = false };
             ToolTip.SetTip(_size, loc["Annotate.Pending.FontSize"]);
-            _pitch = new NumericUpDown { Minimum = 0, Maximum = 100, Increment = 0.5m, Value = (decimal)_model.CharPitchPoints, FormatString = "0.0", Width = 60, Height = 30, ShowButtonSpinner = false };
+            // Normal / boxed text is a switch; the pitch box only shows while boxed text is on.
+            var boxed = _model.CharPitchPoints > 0;
+            if (boxed) s_lastPitch = _model.CharPitchPoints;
+            _cells = new ToggleButton { Content = new TextBlock { Text = "A|A", FontSize = 11 }, IsChecked = boxed, Width = 34, Height = 30 };
+            _cells.Classes.Add("fw");
+            ToolTip.SetTip(_cells, loc["Annotate.Pending.Cells"]);
+            _pitch = new NumericUpDown { Minimum = 0.5m, Maximum = 100, Increment = 0.5m, Value = (decimal)(boxed ? _model.CharPitchPoints : s_lastPitch), FormatString = "0.0", Width = 60, Height = 30, ShowButtonSpinner = false, IsVisible = boxed };
             ToolTip.SetTip(_pitch, loc["Annotate.Pending.Spacing"]);
+            _cells.IsCheckedChanged += (_, _) =>
+            {
+                _pitch.IsVisible = _cells.IsChecked == true;
+                ApplyTextStyle();
+                PlaceToolbar();
+            };
             _bold = new ToggleButton { Content = new TextBlock { Text = "B", FontWeight = FontWeight.Bold }, IsChecked = _model.Bold, Width = 30, Height = 30 };
             _bold.Classes.Add("fw");
             ToolTip.SetTip(_bold, loc["Annotate.Pending.Bold"]);
@@ -291,7 +309,7 @@ public sealed class PendingAnnotationBox : Border
             ToolTip.SetTip(_background, loc["Annotate.Pending.Background.Tooltip"]);
 
             _size.ValueChanged += (_, _) => ApplyTextStyle();
-            _pitch.ValueChanged += (_, _) => ApplyTextStyle();
+            _pitch.ValueChanged += (_, _) => { if (_cells?.IsChecked == true) s_lastPitch = Number(_pitch, s_lastPitch); ApplyTextStyle(); };
             _color.TextChanged += (_, _) => ApplyTextStyle();
             _bold.IsCheckedChanged += (_, _) => ApplyTextStyle();
             _italic.IsCheckedChanged += (_, _) => ApplyTextStyle();
@@ -299,7 +317,8 @@ public sealed class PendingAnnotationBox : Border
             foreach (var c in new Control[] { _size, _pitch, _color })
                 c.AddHandler(KeyDownEvent, (_, e) => { if (e.Key is Key.Escape) HandleKey(e); }, RoutingStrategies.Tunnel);
             row.Children.Add(Labelled("A↕", _size));
-            row.Children.Add(Labelled("A|A", _pitch));
+            row.Children.Add(_cells);
+            row.Children.Add(_pitch);
             row.Children.Add(_bold);
             row.Children.Add(_italic);
             row.Children.Add(_color);
