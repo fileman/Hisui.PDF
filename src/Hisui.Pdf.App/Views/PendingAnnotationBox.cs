@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
@@ -37,6 +38,8 @@ public sealed class PendingAnnotationBox : Border
     private NumericUpDown? _size, _pitch;
     private TextBox? _color;
     private CheckBox? _background;
+    private ToggleButton? _bold, _italic;
+    private PitchOverlay? _overlay;
     private bool _done;
 
     public PendingAnnotationBox(MainViewModel vm, AnnotationInputModel model, Canvas canvas)
@@ -89,6 +92,9 @@ public sealed class PendingAnnotationBox : Border
         _canvas.Children.Add(this);
         _canvas.Children.Add(_toolbar);
         PlaceToolbar();
+        // Focusing the editor would scroll the page to bring the whole (often wide) box into view: the user placed it
+        // where they are looking, so leave the scroll position alone.
+        AddHandler(RequestBringIntoViewEvent, (_, e) => e.Handled = true);
         Dispatcher.UIThread.Post(() => { if (_editor is not null) _editor.Focus(); else Focus(); }, DispatcherPriority.Loaded);
     }
 
@@ -136,6 +142,8 @@ public sealed class PendingAnnotationBox : Border
             CharPitchPoints = Number(_pitch, m.CharPitchPoints),
             ColorHex = NormalizeHex(_color?.Text, m.ColorHex),
             Background = _background?.IsChecked == true,
+            Bold = _bold?.IsChecked == true,
+            Italic = _italic?.IsChecked == true,
         };
     }
 
@@ -177,7 +185,7 @@ public sealed class PendingAnnotationBox : Border
         _ => new Panel(),
     };
 
-    private TextBox BuildEditor(AnnotationInputModel m)
+    private Control BuildEditor(AnnotationInputModel m)
     {
         _editor = new TextBox
         {
@@ -194,43 +202,58 @@ public sealed class PendingAnnotationBox : Border
         };
         // Enter commits (Shift+Enter for a new line), Esc cancels — before the TextBox sees the key.
         _editor.AddHandler(KeyDownEvent, (_, e) => HandleKey(e), RoutingStrategies.Tunnel);
-        return _editor;
+        // The overlay paints the glyphs when a cell pitch is set; the TextBox underneath keeps caret and selection.
+        _overlay = new PitchOverlay { IsHitTestVisible = false, IsVisible = false };
+        _editor.TextChanged += (_, _) => { if (_overlay.IsVisible) _overlay.Text = _editor.Text ?? string.Empty; };
+        return new Panel { Children = { _editor, _overlay } };
     }
 
-    /// <summary>Keeps the editor looking like the burned-in text: same size, colour, background and cell pitch.</summary>
+    /// <summary>Keeps the editor looking like the burned-in text: same size, colour, background, weight and cell pitch.</summary>
     private void ApplyTextStyle()
     {
-        if (_editor is null) return;
+        if (_editor is null || _overlay is null) return;
         var fontPx = Math.Max(4, Number(_size, _model.FontSizePoints) * _scale);
         var pitchPx = Number(_pitch, _model.CharPitchPoints) * _scale;
         var pad = 3 * _scale;
+        var weight = _bold?.IsChecked == true ? FontWeight.Bold : FontWeight.Normal;
+        var style = _italic?.IsChecked == true ? FontStyle.Italic : FontStyle.Normal;
+        var color = Parse(NormalizeHex(_color?.Text, _model.ColorHex), Colors.Black);
+        var fg = new SolidColorBrush(color);
+        var cells = pitchPx > 0;
         _editor.FontSize = fontPx;
-        var fg = new SolidColorBrush(Parse(NormalizeHex(_color?.Text, _model.ColorHex), Colors.Black));
+        _editor.FontWeight = weight;
+        _editor.FontStyle = style;
         IBrush bg = _background?.IsChecked == true ? new SolidColorBrush(Color.FromArgb(220, 255, 255, 240)) : Brushes.Transparent;
-        _editor.Foreground = fg;
+        // With cells the TextBox text is invisible (the overlay draws it) but the caret keeps the real colour.
+        IBrush textBrush = cells ? Brushes.Transparent : fg;
+        _editor.Foreground = textBrush;
+        _editor.CaretBrush = fg;
         _editor.Background = bg;
         // The Fluent template swaps in its own (opaque, theme-coloured) brushes on hover and focus: pin them all.
         foreach (var key in new[] { "TextControlBackground", "TextControlBackgroundPointerOver", "TextControlBackgroundFocused" })
             _editor.Resources[key] = bg;
         foreach (var key in new[] { "TextControlForeground", "TextControlForegroundPointerOver", "TextControlForegroundFocused" })
-            _editor.Resources[key] = fg;
+            _editor.Resources[key] = textBrush;
         foreach (var key in new[] { "TextControlBorderBrush", "TextControlBorderBrushPointerOver", "TextControlBorderBrushFocused" })
             _editor.Resources[key] = Brushes.Transparent;
-        if (pitchPx > 0)
+        _editor.Padding = new Thickness(pad, pad, 0, 0);
+        if (cells)
         {
-            // ponytail: the PDF centres each Arial glyph in its cell; the preview approximates that with a monospace
-            // face spaced to the same pitch, so the cells line up even if the glyph shapes differ a little.
+            // Invisible layer: monospace face spaced to exactly one cell per character, so caret and selection land on
+            // the cell boundaries; the visible Arial glyphs are drawn centred in those cells by the overlay.
             _editor.FontFamily = CellFamily;
             var advance = new FormattedText("0", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                new Typeface(CellFamily), fontPx, Brushes.Black).WidthIncludingTrailingWhitespace;
+                new Typeface(CellFamily, style, weight), fontPx, Brushes.Black).WidthIncludingTrailingWhitespace;
             _editor.LetterSpacing = pitchPx - advance;
-            _editor.Padding = new Thickness(pad + Math.Max(0, (pitchPx - advance) / 2), pad, 0, 0);
+            _overlay.Configure(_editor.Text ?? string.Empty, fontPx, pitchPx, pad, weight, style, fg,
+                new SolidColorBrush(Color.FromArgb(77, 0x1E, 0x90, 0xFF)));
+            _overlay.IsVisible = true;
         }
         else
         {
             _editor.FontFamily = TextFamily;
             _editor.LetterSpacing = 0;
-            _editor.Padding = new Thickness(pad, pad, 0, 0);
+            _overlay.IsVisible = false;
         }
     }
 
@@ -256,6 +279,12 @@ public sealed class PendingAnnotationBox : Border
             ToolTip.SetTip(_size, loc["Annotate.Pending.FontSize"]);
             _pitch = new NumericUpDown { Minimum = 0, Maximum = 100, Increment = 0.5m, Value = (decimal)_model.CharPitchPoints, FormatString = "0.0", Width = 60, Height = 30, ShowButtonSpinner = false };
             ToolTip.SetTip(_pitch, loc["Annotate.Pending.Spacing"]);
+            _bold = new ToggleButton { Content = new TextBlock { Text = "B", FontWeight = FontWeight.Bold }, IsChecked = _model.Bold, Width = 30, Height = 30 };
+            _bold.Classes.Add("fw");
+            ToolTip.SetTip(_bold, loc["Annotate.Pending.Bold"]);
+            _italic = new ToggleButton { Content = new TextBlock { Text = "I", FontStyle = FontStyle.Italic }, IsChecked = _model.Italic, Width = 30, Height = 30 };
+            _italic.Classes.Add("fw");
+            ToolTip.SetTip(_italic, loc["Annotate.Pending.Italic"]);
             _color = new TextBox { Text = _model.ColorHex, Width = 84, Height = 30, PlaceholderText = "#RRGGBB" };
             ToolTip.SetTip(_color, loc["Annotate.Pending.Color"]);
             _background = new CheckBox { Content = loc["Annotate.Pending.Background"], IsChecked = _model.Background, VerticalAlignment = VerticalAlignment.Center };
@@ -264,11 +293,15 @@ public sealed class PendingAnnotationBox : Border
             _size.ValueChanged += (_, _) => ApplyTextStyle();
             _pitch.ValueChanged += (_, _) => ApplyTextStyle();
             _color.TextChanged += (_, _) => ApplyTextStyle();
+            _bold.IsCheckedChanged += (_, _) => ApplyTextStyle();
+            _italic.IsCheckedChanged += (_, _) => ApplyTextStyle();
             _background.IsCheckedChanged += (_, _) => ApplyTextStyle();
             foreach (var c in new Control[] { _size, _pitch, _color })
                 c.AddHandler(KeyDownEvent, (_, e) => { if (e.Key is Key.Escape) HandleKey(e); }, RoutingStrategies.Tunnel);
-            row.Children.Add(_size);
-            row.Children.Add(_pitch);
+            row.Children.Add(Labelled("A↕", _size));
+            row.Children.Add(Labelled("A|A", _pitch));
+            row.Children.Add(_bold);
+            row.Children.Add(_italic);
             row.Children.Add(_color);
             row.Children.Add(_background);
             ApplyTextStyle();
@@ -282,6 +315,13 @@ public sealed class PendingAnnotationBox : Border
         var bar = new Border { Padding = new Thickness(4), Child = row };
         bar.Classes.Add("floating");
         return bar;
+    }
+
+    /// <summary>A small muted caption in front of a field, so the bare numbers say what they are (tooltips stay).</summary>
+    private static StackPanel Labelled(string caption, Control field)
+    {
+        var label = new TextBlock { Text = caption, FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Foreground = Resource("RibbonCaptionBrush") ?? Brushes.Gray };
+        return new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { label, field } };
     }
 
     private static Button Glyph(string path, string tip, Action onClick, IBrush? stroke)
@@ -398,4 +438,54 @@ public sealed class PendingAnnotationBox : Border
 
     private static IBrush? Resource(string key) =>
         Application.Current is { } app && app.TryGetResource(key, app.ActualThemeVariant, out var value) ? value as IBrush : null;
+
+    /// <summary>
+    /// Draws free text the way the PDF does with a cell pitch (Arial, 3 pt padding, each glyph centred in its own cell)
+    /// plus a faint cell grid. Purely visual: the TextBox below handles the input.
+    /// </summary>
+    private sealed class PitchOverlay : Control
+    {
+        private string _text = string.Empty;
+        private double _fontPx, _pitchPx, _pad;
+        private FontWeight _weight;
+        private FontStyle _style;
+        private IBrush _fg = Brushes.Black, _grid = Brushes.Transparent;
+
+        static PitchOverlay() => AffectsRender<PitchOverlay>(BoundsProperty);
+
+        public string Text { get => _text; set { _text = value; InvalidateVisual(); } }
+
+        public void Configure(string text, double fontPx, double pitchPx, double pad, FontWeight weight, FontStyle style, IBrush fg, IBrush grid)
+        {
+            (_text, _fontPx, _pitchPx, _pad, _weight, _style, _fg, _grid) = (text, fontPx, pitchPx, pad, weight, style, fg, grid);
+            InvalidateVisual();
+        }
+
+        public override void Render(DrawingContext context)
+        {
+            if (_pitchPx <= 0) return;
+            using var clip = context.PushClip(new Rect(Bounds.Size));
+            var pen = new Pen(_grid, 1);
+            for (var x = _pad; x <= Bounds.Width; x += _pitchPx)
+                context.DrawLine(pen, new Point(x, 0), new Point(x, Bounds.Height));
+
+            var face = new Typeface(TextFamily, _style, _weight);
+            var y = _pad;
+            foreach (var line in _text.Replace("\r\n", "\n").Split('\n'))
+            {
+                var x = _pad;
+                // Every line advances by the font's line height (like the PDF's font.GetHeight()), empty ones too.
+                var lineHeight = new FormattedText("0", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, face, _fontPx, _fg).Height;
+                foreach (var rune in line.EnumerateRunes())
+                {
+                    var ft = new FormattedText(rune.ToString(), CultureInfo.InvariantCulture, FlowDirection.LeftToRight, face, _fontPx, _fg);
+                    context.DrawText(ft, new Point(x + (_pitchPx - ft.WidthIncludingTrailingWhitespace) / 2, y));
+                    x += _pitchPx;
+                    if (x > Bounds.Width) break;
+                }
+                y += lineHeight;
+                if (y > Bounds.Height) break;
+            }
+        }
+    }
 }

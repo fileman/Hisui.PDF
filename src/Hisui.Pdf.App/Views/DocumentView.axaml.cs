@@ -348,6 +348,21 @@ public partial class DocumentView : UserControl
 
     // ── Keyboard shortcuts (view-targeted) ────────────────────────────────────
 
+    /// <summary>Runs this view's shortcuts for a key that never bubbled through it: the <see cref="KeyBindings"/>
+    /// gestures first (same contract as Avalonia's own handling: a matching gesture is consumed even when the command
+    /// can't run), then the view-targeted keys. The window calls this when focus is null (an overlay box rebuilt after
+    /// an edit, a deleted item) or sits outside any document (a tab header). True when the key was consumed.</summary>
+    internal bool HandleShortcut(KeyEventArgs e)
+    {
+        foreach (var binding in KeyBindings)
+        {
+            binding.TryHandle(e);
+            if (e.Handled) return true;
+        }
+        OnWindowKeyDown(this, e);
+        return e.Handled;
+    }
+
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

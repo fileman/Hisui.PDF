@@ -90,7 +90,13 @@ public partial class MainWindow : Window
                 if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) _ = CloseAllTabsAsync();
                 else _ = CloseTabAsync(t);
                 e.Handled = true;
+                return;
             }
+            // With no focused element (an overlay box rebuilt after an edit, a deleted item) or focus outside the
+            // documents (a tab header) the key is raised on the window and never reaches a DocumentView, so hand it to
+            // the selected one. A view the key already bubbled through has declined it: don't offer it twice.
+            if (!e.Handled && (e.Source as Visual)?.FindAncestorOfType<DocumentView>(includeSelf: true) is null)
+                CurrentView?.HandleShortcut(e);
         };
         AddTab();
         Open.Add(this);

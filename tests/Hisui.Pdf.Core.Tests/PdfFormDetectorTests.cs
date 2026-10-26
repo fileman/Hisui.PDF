@@ -232,4 +232,46 @@ public class PdfFormDetectorTests
         Assert.Equal(["Riga1__Col2", "Riga2__Col1", "Riga2__Col3", "Riga3__Col2", "Riga4__Col1", "Riga4__Col3"],
             specs.Select(s => s.Name).Order());
     }
+
+    // ── character boxes ──────────────────────────────────────────────────────
+
+    private const double A4W = 595.275590551181, A4H = 841.889763779528;
+
+    /// <summary>IBAN row of 27 separate 14×18 boxes (2 pt apart) at y=100; the same row drawn as one divided rectangle at y=200; 2 boxes at y=300.</summary>
+    private static void CharacterBoxes(XGraphics g)
+    {
+        for (var i = 0; i < 27; i++) g.DrawRectangle(XPens.Black, new XRect(60 + i * 16, 100, 14, 18));
+        g.DrawRectangle(XPens.Black, new XRect(60, 200, 27 * 14, 18));
+        for (var i = 1; i < 27; i++) g.DrawLine(XPens.Black, 60 + i * 14, 200, 60 + i * 14, 218);
+        for (var i = 0; i < 2; i++) g.DrawRectangle(XPens.Black, new XRect(60 + i * 16, 300, 14, 18));
+    }
+
+    [Theory]
+    [InlineData(100.0, 16.0, 0)] [InlineData(200.0, 14.0, 0)] [InlineData(100.0, 16.0, 90)] [InlineData(200.0, 14.0, 270)]
+    public async Task CellRow_SeparateBoxesAndDividedRectangle_FoundFromAPointInBox5(double top, double pitch, int rotate)
+    {
+        var (px, py) = ((60 + 4 * pitch + 7) / A4W, (top + 9) / A4H);
+        var box5 = new PdfRect(px, py, px, py).RotateClockwise(rotate); // the point as the user sees it
+
+        var row = await _sut.FindCellRowAsync(Build(CharacterBoxes, rotate), 0, box5.Left, box5.Top);
+
+        Assert.NotNull(row);
+        Assert.Equal(27, row.CellCount);
+        Assert.Equal(pitch, row.CellWidthPoints, 0.5);
+        Assert.Equal(18, row.CellHeightPoints, 0.5);
+        var expected = new PdfRect(60 / A4W, top / A4H, (60 + 26 * pitch + 14) / A4W, (top + 18) / A4H).RotateClockwise(rotate);
+        Assert.Equal(expected.Left, row.Bounds.Left, 1 / A4W);
+        Assert.Equal(expected.Top, row.Bounds.Top, 1 / A4H);
+        Assert.Equal(expected.Right, row.Bounds.Right, 1 / A4W);
+        Assert.Equal(expected.Bottom, row.Bounds.Bottom, 1 / A4H);
+    }
+
+    [Theory]
+    [InlineData(300.0, 309.0)] // only two boxes
+    [InlineData(100.0, 150.0)] // between the rows
+    [InlineData(55.0, 109.0)]  // left of the first box
+    public async Task CellRow_NullOutsideARowOfAtLeastThreeBoxes(double x, double y)
+    {
+        Assert.Null(await _sut.FindCellRowAsync(Build(CharacterBoxes), 0, x / A4W, y / A4H));
+    }
 }

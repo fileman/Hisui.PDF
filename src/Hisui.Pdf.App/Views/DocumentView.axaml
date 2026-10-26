@@ -218,6 +218,12 @@
         <Style Selector="ToggleButton.rail:checked">
             <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
         </Style>
+        <!-- A long caption (e.g. "Segnalibri", "Commenti") shrinks to fit the rail instead of being clipped. -->
+        <Style Selector="Viewbox.rail-caption">
+            <Setter Property="MaxWidth" Value="40" />
+            <Setter Property="StretchDirection" Value="DownOnly" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
         <Style Selector="TextBlock.rail-caption">
             <Setter Property="FontSize" Value="10" />
             <Setter Property="Foreground" Value="{Binding $parent[ToggleButton].Foreground}" />
@@ -606,7 +612,7 @@
                                       ToolTip.Tip="{loc:Tr Rail.Pages}" AutomationProperties.Name="{loc:Tr Rail.Pages}">
                             <StackPanel Spacing="3" HorizontalAlignment="Center">
                                 <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconPages}" />
-                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Pages}" />
+                                <Viewbox Classes="rail-caption"><TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Pages}" /></Viewbox>
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
@@ -620,7 +626,7 @@
                             </ToggleButton.IsChecked>
                             <StackPanel Spacing="3" HorizontalAlignment="Center">
                                 <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconTools}" />
-                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Tools}" />
+                                <Viewbox Classes="rail-caption"><TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Tools}" /></Viewbox>
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
@@ -634,7 +640,7 @@
                             </ToggleButton.IsChecked>
                             <StackPanel Spacing="3" HorizontalAlignment="Center">
                                 <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconHighlight}" />
-                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Annotate}" />
+                                <Viewbox Classes="rail-caption"><TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Annotate}" /></Viewbox>
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
@@ -648,7 +654,7 @@
                             </ToggleButton.IsChecked>
                             <StackPanel Spacing="3" HorizontalAlignment="Center">
                                 <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconFormText}" />
-                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Forms}" />
+                                <Viewbox Classes="rail-caption"><TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Forms}" /></Viewbox>
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
@@ -662,7 +668,7 @@
                             </ToggleButton.IsChecked>
                             <StackPanel Spacing="3" HorizontalAlignment="Center">
                                 <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconSignature}" />
-                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Sign}" />
+                                <Viewbox Classes="rail-caption"><TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Sign}" /></Viewbox>
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
@@ -676,7 +682,7 @@
                             </ToggleButton.IsChecked>
                             <StackPanel Spacing="3" HorizontalAlignment="Center">
                                 <Path Classes="glyph" Width="18" Height="18" Data="{StaticResource IconStickyNote}" />
-                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Comments}" />
+                                <Viewbox Classes="rail-caption"><TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Comments}" /></Viewbox>
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Classes="rail" Command="{Binding ToggleToolPanelCommand}"
@@ -690,7 +696,7 @@
                             </ToggleButton.IsChecked>
                             <StackPanel Spacing="3" HorizontalAlignment="Center">
                                 <Path Classes="glyph" Width="18" Height="18" Data="M4.5 2h7v12l-3.5-3-3.5 3z" />
-                                <TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Bookmarks}" />
+                                <Viewbox Classes="rail-caption"><TextBlock Classes="rail-caption" Text="{loc:Tr Rail.Bookmarks}" /></Viewbox>
                             </StackPanel>
                         </ToggleButton>
                     </StackPanel>
@@ -949,6 +955,43 @@
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <Path Classes="glyph" Width="13" Height="13" Data="M1 1l9 9M10 1l-9 9" />
                                         <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Tool.Clear}" />
+                                    </StackPanel>
+                                </Button>
+
+                                <!-- Annotations placed on the selected page: pick one here or on the page -->
+                                <TextBlock Classes="panel-caption" Text="{loc:Tr Annotate.List.Caption}" />
+                                <TextBlock Classes="dialog-hint" Text="{loc:Tr Annotate.List.Empty}" TextWrapping="Wrap" FontSize="11" Margin="8,4"
+                                           IsVisible="{Binding !PlacedList.Count}" />
+                                <ListBox ItemsSource="{Binding PlacedList}" SelectedItem="{Binding SelectedPlaced, Mode=TwoWay}"
+                                         MaxHeight="220" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         views:DoubleTap.Command="{Binding EditSelectedPlacedCommand}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:PlacedItem">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <Panel Width="15" Height="15" VerticalAlignment="Center">
+                                                    <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconFreeText}" IsVisible="{Binding IsFreeText}" />
+                                                    <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconHighlight}" IsVisible="{Binding IsHighlight}" />
+                                                    <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconRectangle}" IsVisible="{Binding IsRectangle}" />
+                                                    <Path Classes="glyph-tool" Width="15" Height="15" Data="{StaticResource IconImage}" IsVisible="{Binding IsImage}" />
+                                                </Panel>
+                                                <StackPanel VerticalAlignment="Center" Spacing="1">
+                                                    <TextBlock Text="{Binding Kind}" FontSize="10.5" Foreground="{DynamicResource RibbonSubtleTextBrush}" />
+                                                    <TextBlock Text="{Binding Summary}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <Button Classes="ribbon-small" Command="{Binding EditSelectedPlacedCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconTextEdit}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Annotate.List.Edit}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="ribbon-small" Command="{Binding DeleteSelectedPlacedCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Path Classes="glyph" Width="15" Height="15" Data="{StaticResource IconDelete}" />
+                                        <TextBlock Classes="ribbon-label-sm" Text="{loc:Tr Annotate.List.Delete}" />
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -1324,7 +1367,7 @@
                                                 <views:LinkLayer Page="{Binding}" />
                                                 <views:FieldLayer Page="{Binding}" />
                                                 <views:CommentLayer Page="{Binding}" />
-                                                <views:FreeTextLayer Page="{Binding}" />
+                                                <views:AnnotationLayer Page="{Binding}" />
                                             </Panel>
                                         </Border>
                                     </LayoutTransformControl>
@@ -1417,15 +1460,15 @@
                                     <RotateTransform Angle="{Binding PreviewRotationAngle}" />
                                 </views:CommentLayer.RenderTransform>
                             </views:CommentLayer>
-                            <views:FreeTextLayer Page="{Binding SelectedPage}"
+                            <views:AnnotationLayer Page="{Binding SelectedPage}"
                                     HorizontalAlignment="Left" VerticalAlignment="Top"
                                     Width="{Binding #PreviewImageControl.Bounds.Width}"
                                     Height="{Binding #PreviewImageControl.Bounds.Height}"
                                     RenderTransformOrigin="50%,50%">
-                                <views:FreeTextLayer.RenderTransform>
+                                <views:AnnotationLayer.RenderTransform>
                                     <RotateTransform Angle="{Binding PreviewRotationAngle}" />
-                                </views:FreeTextLayer.RenderTransform>
-                            </views:FreeTextLayer>
+                                </views:AnnotationLayer.RenderTransform>
+                            </views:AnnotationLayer>
 
                             <Canvas x:Name="AnnotationCanvas"
                                     Background="Transparent"

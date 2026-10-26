@@ -15,6 +15,8 @@ public sealed record AnnotationInputModel
     public double CharPitchPoints { get; init; }
     /// <summary>FreeText: draw a light box behind the text; off when typing straight onto a form.</summary>
     public bool Background { get; init; } = true;
+    public bool Bold { get; init; }
+    public bool Italic { get; init; }
     /// <summary>Form tools: field name (blank = generated). Combo options come one per line in <see cref="Text"/>.</summary>
     public string? FieldName { get; init; }
     public byte[]? ImageBytes { get; init; }

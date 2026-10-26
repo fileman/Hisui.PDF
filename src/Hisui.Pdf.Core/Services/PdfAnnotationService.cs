@@ -79,9 +79,14 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
     }
 
     // Second-class keys on the content streams this service appends, holding what they were drawn with so the
-    // watermark and each free text can be read back, edited or removed later.
+    // watermark and each placed annotation can be read back, edited or removed later.
+    // /HisuiAnnot: /Id, /Tool (AnnotationTool name), /L /T /R /B (normalised visual rect) and the tool's settings:
+    //   FreeText → /Text /Size /Color /Pitch /Background /Bold /Italic; Highlight → /Color /Opacity;
+    //   Rectangle → /Color /Fill (absent when unfilled) /Width; ImageOverlay → /Image (stream of the original bytes).
+    // /HisuiFreeText is the key free texts were tagged with before /HisuiAnnot existed; still read, never written.
     private const string WatermarkKey = "/HisuiWatermark";
-    private const string FreeTextKey = "/HisuiFreeText";
+    private const string AnnotKey = "/HisuiAnnot";
+    private const string LegacyFreeTextKey = "/HisuiFreeText";
 
     private static PdfDictionary Describe(string text, WatermarkOptions options)
     {
@@ -131,23 +136,27 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
 
     private static PdfItem? Resolve(PdfItem? item) => item is PdfSharp.Pdf.Advanced.PdfReference r ? r.Value : item;
 
-    public Task<byte[]> AddHighlightAsync(byte[] pdf, int pageIndex, PdfRect rect, string colorHex = "#FFFF00", double opacity = 0.4, CancellationToken ct = default)
+    public Task<byte[]> AddHighlightAsync(byte[] pdf, int pageIndex, PdfRect rect, string colorHex = "#FFFF00", double opacity = 0.4, string? id = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
 
-        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
+        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) => Tagged(page, AnnotationTool.Highlight, id, rect, () =>
         {
             using var gfx = PageGeometry.OpenGraphics(page);
             var brush = new XSolidBrush(ColorWithAlpha(colorHex, opacity));
             gfx.DrawRectangle(brush, ToXRect(rect, page));
-        }), ct);
+        }, d =>
+        {
+            d.Elements["/Color"] = new PdfString(colorHex);
+            d.Elements["/Opacity"] = new PdfReal(opacity);
+        })), ct);
     }
 
-    public Task<byte[]> AddRectangleAsync(byte[] pdf, int pageIndex, PdfRect rect, string strokeHex = "#FF0000", string? fillHex = null, double lineWidthPoints = 2.0, CancellationToken ct = default)
+    public Task<byte[]> AddRectangleAsync(byte[] pdf, int pageIndex, PdfRect rect, string strokeHex = "#FF0000", string? fillHex = null, double lineWidthPoints = 2.0, string? id = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
 
-        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
+        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) => Tagged(page, AnnotationTool.Rectangle, id, rect, () =>
         {
             using var gfx = PageGeometry.OpenGraphics(page);
             var pen = new XPen(ParseColor(strokeHex), lineWidthPoints);
@@ -157,73 +166,125 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
                 gfx.DrawRectangle(pen, new XSolidBrush(ParseColor(fillHex)), xRect);
             else
                 gfx.DrawRectangle(pen, xRect);
-        }), ct);
+        }, d =>
+        {
+            d.Elements["/Color"] = new PdfString(strokeHex);
+            if (fillHex is not null) d.Elements["/Fill"] = new PdfString(fillHex);
+            d.Elements["/Width"] = new PdfReal(lineWidthPoints);
+        })), ct);
     }
 
     public Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12,
-        double charPitchPoints = 0, bool background = true, string? id = null, CancellationToken ct = default)
+        double charPitchPoints = 0, bool background = true, bool bold = false, bool italic = false, string? id = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
 
-        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
-        {
-            var before = page.Contents.Elements.Count;
-            DrawFreeText(page, rect, text, colorHex, fontSizePoints, charPitchPoints, background);
-            // Tag the stream just appended with what it was drawn with, so the text can be edited or moved later.
-            if (page.Contents.Elements.Count > before && Resolve(page.Contents.Elements[^1]) is PdfDictionary added)
+        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) => Tagged(page, AnnotationTool.FreeText, id, rect,
+            () => DrawFreeText(page, rect, text, colorHex, fontSizePoints, charPitchPoints, background, bold, italic),
+            d =>
             {
-                var d = new PdfDictionary();
-                d.Elements["/Id"] = new PdfString(string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id);
                 d.Elements["/Text"] = new PdfString(text, PdfStringEncoding.Unicode);
-                d.Elements["/L"] = new PdfReal(rect.Left);
-                d.Elements["/T"] = new PdfReal(rect.Top);
-                d.Elements["/R"] = new PdfReal(rect.Right);
-                d.Elements["/B"] = new PdfReal(rect.Bottom);
                 d.Elements["/Size"] = new PdfReal(fontSizePoints);
                 d.Elements["/Color"] = new PdfString(colorHex);
                 d.Elements["/Pitch"] = new PdfReal(charPitchPoints);
                 d.Elements["/Background"] = new PdfBoolean(background);
-                added.Elements[FreeTextKey] = d;
-            }
-        }), ct);
+                d.Elements["/Bold"] = new PdfBoolean(bold);
+                d.Elements["/Italic"] = new PdfBoolean(italic);
+            })), ct);
     }
 
-    public Task<IReadOnlyList<FreeTextInfo>> ReadFreeTextsAsync(byte[] pdf, int pageIndex, CancellationToken ct = default)
+    public Task<IReadOnlyList<PlacedAnnotation>> ReadPlacedAsync(byte[] pdf, int pageIndex, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
-        return Task.Run<IReadOnlyList<FreeTextInfo>>(() =>
+        return Task.Run<IReadOnlyList<PlacedAnnotation>>(() =>
         {
             using var stream = new MemoryStream(pdf, writable: false);
             using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
             if ((uint)pageIndex >= (uint)doc.PageCount)
                 throw new ArgumentOutOfRangeException(nameof(pageIndex), $"Page {pageIndex} does not exist (page count = {doc.PageCount}).");
-            var result = new List<FreeTextInfo>();
+            var result = new List<PlacedAnnotation>();
             foreach (var item in doc.Pages[pageIndex].Contents.Elements)
             {
-                if (Resolve(item) is not PdfDictionary content || content.Elements.GetDictionary(FreeTextKey) is not { } d) continue;
-                var e = d.Elements;
-                result.Add(new FreeTextInfo(e.GetString("/Id"),
-                    new PdfRect(e.GetReal("/L"), e.GetReal("/T"), e.GetReal("/R"), e.GetReal("/B")),
-                    e.GetString("/Text"), e.GetReal("/Size"), e.GetString("/Color"), e.GetReal("/Pitch"), e.GetBoolean("/Background")));
+                if (Resolve(item) is not PdfDictionary content) continue;
+                if (content.Elements.GetDictionary(AnnotKey) is { } d && ReadTag(d) is { } placed) result.Add(placed);
+                else if (content.Elements.GetDictionary(LegacyFreeTextKey) is { } legacy) result.Add(ReadTag(legacy, AnnotationTool.FreeText));
             }
             return result;
         }, ct);
     }
 
-    public Task<byte[]> RemoveFreeTextAsync(byte[] pdf, int pageIndex, string id, CancellationToken ct = default)
+    public Task<byte[]> RemovePlacedAsync(byte[] pdf, int pageIndex, string id, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
-        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) => RemoveTagged(page, FreeTextKey, id)), ct);
+        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
+        {
+            RemoveTagged(page, AnnotKey, id);
+            RemoveTagged(page, LegacyFreeTextKey, id);
+        }), ct);
     }
 
-    private static void DrawFreeText(PdfPage page, PdfRect rect, string text, string colorHex, double fontSizePoints, double charPitchPoints, bool background)
+    /// <summary>
+    /// Runs <paramref name="draw"/> and tags the content stream it appended with /HisuiAnnot (id, tool, rect, plus whatever
+    /// <paramref name="describe"/> adds), so the annotation can be read back, moved or removed later.
+    /// </summary>
+    private static void Tagged(PdfPage page, AnnotationTool tool, string? id, PdfRect rect, Action draw, Action<PdfDictionary> describe)
+    {
+        var before = page.Contents.Elements.Count;
+        draw();
+        if (page.Contents.Elements.Count <= before || Resolve(page.Contents.Elements[^1]) is not PdfDictionary added) return;
+        var d = new PdfDictionary();
+        d.Elements["/Id"] = new PdfString(string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id);
+        d.Elements["/Tool"] = new PdfName("/" + tool);
+        d.Elements["/L"] = new PdfReal(rect.Left);
+        d.Elements["/T"] = new PdfReal(rect.Top);
+        d.Elements["/R"] = new PdfReal(rect.Right);
+        d.Elements["/B"] = new PdfReal(rect.Bottom);
+        describe(d);
+        added.Elements[AnnotKey] = d;
+    }
+
+    /// <summary>Null when the tag names a tool this build does not know (a newer build wrote it).</summary>
+    private static PlacedAnnotation? ReadTag(PdfDictionary d) =>
+        Enum.TryParse<AnnotationTool>(d.Elements.GetName("/Tool").TrimStart('/'), out var tool) ? ReadTag(d, tool) : null;
+
+    private static PlacedAnnotation ReadTag(PdfDictionary d, AnnotationTool tool)
+    {
+        var e = d.Elements;
+        return new PlacedAnnotation
+        {
+            Id = e.GetString("/Id"),
+            Tool = tool,
+            Rect = new PdfRect(e.GetReal("/L"), e.GetReal("/T"), e.GetReal("/R"), e.GetReal("/B")),
+            Text = e.GetString("/Text"),
+            FontSizePoints = e.ContainsKey("/Size") ? e.GetReal("/Size") : 12,
+            ColorHex = e.ContainsKey("/Color") ? e.GetString("/Color") : "#000000",
+            FillHex = e.ContainsKey("/Fill") ? e.GetString("/Fill") : null,
+            Opacity = e.ContainsKey("/Opacity") ? e.GetReal("/Opacity") : 1,
+            LineWidth = e.ContainsKey("/Width") ? e.GetReal("/Width") : 2,
+            CharPitchPoints = e.GetReal("/Pitch"),
+            Background = !e.ContainsKey("/Background") || e.GetBoolean("/Background"),
+            Bold = e.GetBoolean("/Bold"),
+            Italic = e.GetBoolean("/Italic"),
+            ImageBytes = e.GetDictionary("/Image")?.Stream?.Value,
+        };
+    }
+
+    private static void DrawFreeText(PdfPage page, PdfRect rect, string text, string colorHex, double fontSizePoints, double charPitchPoints, bool background, bool bold, bool italic)
     {
         {
             using var gfx = PageGeometry.OpenGraphics(page);
             var xRect = ToXRect(rect, page);
-            var font = new XFont("Arial", fontSizePoints);
+            // BundledFontResolver maps these styles to Liberation Sans Bold/Italic/BoldItalic.
+            var style = (bold, italic) switch
+            {
+                (true, true) => XFontStyleEx.BoldItalic,
+                (true, false) => XFontStyleEx.Bold,
+                (false, true) => XFontStyleEx.Italic,
+                _ => XFontStyleEx.Regular,
+            };
+            var font = new XFont("Arial", fontSizePoints, style);
             var brush = new XSolidBrush(ParseColor(colorHex));
 
             // Light background box so text is readable over page content (off when filling a printed form).
@@ -286,25 +347,27 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
         }), ct);
     }
 
-    public Task<byte[]> AddImageOverlayAsync(byte[] pdf, int pageIndex, byte[] imageBytes, PdfRect rect, CancellationToken ct = default)
+    public Task<byte[]> AddImageOverlayAsync(byte[] pdf, int pageIndex, byte[] imageBytes, PdfRect rect, string? id = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
         ArgumentNullException.ThrowIfNull(imageBytes);
 
-        return Task.Run(() => ModifyPage(pdf, pageIndex, (_, page) =>
+        return Task.Run(() => ModifyPage(pdf, pageIndex, (doc, page) => Tagged(page, AnnotationTool.ImageOverlay, id, rect, () =>
         {
             using var gfx = PageGeometry.OpenGraphics(page);
             using var imgStream = new MemoryStream(imageBytes);
-            var xImg = XImage.FromStream(imgStream);
-            try
-            {
-                gfx.DrawImage(xImg, ToXRect(rect, page));
-            }
-            finally
-            {
-                xImg.Dispose();
-            }
-        }), ct);
+            using var xImg = XImage.FromStream(imgStream);
+            gfx.DrawImage(xImg, ToXRect(rect, page));
+        }, d =>
+        {
+            // The original file bytes, so the image can be redrawn after a move. PNG/JPEG are already compressed: no filter.
+            // A stream must be an indirect object, hence the reference. Removing the annotation drops only the content
+            // stream: the XObject the draw above put in the page resources stays behind as an orphan (acceptable, a few KB).
+            var image = new PdfDictionary(doc);
+            image.CreateStream(imageBytes);
+            doc.Internals.AddObject(image);
+            d.Elements["/Image"] = image.Reference;
+        })), ct);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
