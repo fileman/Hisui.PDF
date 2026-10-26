@@ -1,7 +1,7 @@
 namespace Hisui.Pdf.App.Services;
 
 /// <summary>A published release that is newer than the running build.</summary>
-public sealed record UpdateInfo(Version Version, string Tag, string Url, string? Notes, string? MsiUrl = null);
+public sealed record UpdateInfo(Version Version, string Tag, string Url, string? Notes, string? MsiUrl = null, string? MsiSha256 = null);
 
 public interface IUpdateService
 {

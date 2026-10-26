@@ -24,8 +24,13 @@ public interface IPdfAnnotationService
     /// <summary>Draws a rectangle outline (optionally filled) on a single page.</summary>
     Task<byte[]> AddRectangleAsync(byte[] pdf, int pageIndex, PdfRect rect, string strokeHex = "#FF0000", string? fillHex = null, double lineWidthPoints = 2.0, CancellationToken ct = default);
 
-    /// <summary>Draws a free-text annotation box on a single page.</summary>
-    Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12, CancellationToken ct = default);
+    /// <summary>
+    /// Draws free text on a single page, one line per newline. With <paramref name="charPitchPoints"/> &gt; 0 each
+    /// character is centred in its own cell of that width (for boxed forms such as IBAN fields); with
+    /// <paramref name="background"/> false the text goes straight onto the page with no box behind it.
+    /// </summary>
+    Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12,
+        double charPitchPoints = 0, bool background = true, CancellationToken ct = default);
 
     /// <summary>Draws a visual sticky-note box at a normalized position on a single page.</summary>
     Task<byte[]> AddStickyNoteAsync(byte[] pdf, int pageIndex, double normalizedX, double normalizedY, string noteText, CancellationToken ct = default);

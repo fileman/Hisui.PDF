@@ -365,7 +365,10 @@ internal sealed partial class PdfFormService
     private static Dictionary<string, string> FromXfdf(byte[] data)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
-        var xdoc = XDocument.Load(new MemoryStream(data));
+        // The file comes from the user's disk: no DTD, no external entities (XXE), whatever the reader defaults are.
+        using var reader = System.Xml.XmlReader.Create(new MemoryStream(data),
+            new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit, XmlResolver = null });
+        var xdoc = XDocument.Load(reader);
         void Walk(XElement element, string prefix)
         {
             foreach (var f in element.Elements().Where(e => e.Name.LocalName == "field"))

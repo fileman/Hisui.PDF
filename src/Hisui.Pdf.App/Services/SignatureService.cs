@@ -55,7 +55,7 @@ internal sealed class SignatureService : ISignatureService
         _signatures.Remove(entry);
         try
         {
-            var path = Path.Combine(AppDataPaths.SignaturesDir, entry.FileName);
+            var path = Path.Combine(AppDataPaths.SignaturesDir, Path.GetFileName(entry.FileName));
             if (File.Exists(path)) File.Delete(path);
         }
         catch { /* best-effort: the manifest entry is gone regardless */ }
@@ -66,7 +66,8 @@ internal sealed class SignatureService : ISignatureService
     {
         try
         {
-            var path = Path.Combine(AppDataPaths.SignaturesDir, signature.FileName);
+            // The manifest is user-writable: keep the name to a file inside the signatures folder.
+            var path = Path.Combine(AppDataPaths.SignaturesDir, Path.GetFileName(signature.FileName));
             return File.Exists(path) ? File.ReadAllBytes(path) : null;
         }
         catch { return null; }

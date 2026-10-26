@@ -11,6 +11,10 @@ public sealed record AnnotationInputModel
     public double Opacity { get; init; } = 0.4;
     public double LineWidth { get; init; } = 2.0;
     public double FontSizePoints { get; init; } = 12;
+    /// <summary>FreeText: cell width in points when every character gets its own cell (boxed forms, e.g. IBAN); 0 = normal text.</summary>
+    public double CharPitchPoints { get; init; }
+    /// <summary>FreeText: draw a light box behind the text; off when typing straight onto a form.</summary>
+    public bool Background { get; init; } = true;
     /// <summary>Form tools: field name (blank = generated). Combo options come one per line in <see cref="Text"/>.</summary>
     public string? FieldName { get; init; }
     public byte[]? ImageBytes { get; init; }

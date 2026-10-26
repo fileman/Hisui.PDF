@@ -110,6 +110,41 @@ public class PdfAnnotationServiceTests
         Assert.True(IsValidPdf(result));
     }
 
+    [Fact]
+    public async Task AddFreeText_WithCharPitch_PlacesEachCharacterInItsOwnCell()
+    {
+        // Boxed-form mode (e.g. IBAN): 10 cells of 20pt starting 3pt inside the rect; the glyphs must be read back
+        // in order, each inside its cell on an A4 page (595pt wide).
+        var pdf = PdfFixtureBuilder.Create(1);
+        var rect = new PdfRect(0.1, 0.5, 0.9, 0.55);
+        var result = await _sut.AddFreeTextAsync(pdf, 0, rect, "IT60X05428", charPitchPoints: 20, background: false);
+        Assert.True(IsValidPdf(result));
+
+        var letters = (await new PdfTextExtractor().ExtractWordsAsync(result, 0))
+            .Where(w => w.BoundingBox.Top >= 0.49)
+            .OrderBy(w => w.BoundingBox.Left).ToList();
+        Assert.Equal("IT60X05428", string.Concat(letters.Select(w => w.Text)));
+        var cellStart = (0.1 * 595 + 3) / 595;
+        var cellW = 20.0 / 595;
+        for (var i = 0; i < letters.Count; i++)
+        {
+            Assert.InRange(letters[i].BoundingBox.Left, cellStart + i * cellW, cellStart + (i + 1) * cellW);
+            Assert.InRange(letters[i].BoundingBox.Right, cellStart + i * cellW, cellStart + (i + 1) * cellW);
+        }
+    }
+
+    [Fact]
+    public async Task AddFreeText_MultiLine_DrawsOneLinePerNewline()
+    {
+        var pdf = PdfFixtureBuilder.Create(1);
+        var result = await _sut.AddFreeTextAsync(pdf, 0, new PdfRect(0.1, 0.5, 0.9, 0.7), "first\nsecond", background: false);
+        var words = (await new PdfTextExtractor().ExtractWordsAsync(result, 0)).Where(w => w.BoundingBox.Top >= 0.49).ToList();
+        var first = Assert.Single(words, w => w.Text == "first");
+        var second = Assert.Single(words, w => w.Text == "second");
+        Assert.True(second.BoundingBox.Top > first.BoundingBox.Bottom - 0.001, "second line must sit below the first");
+        Assert.InRange(Math.Abs(first.BoundingBox.Left - second.BoundingBox.Left), 0, 0.005); // same left edge (glyph bearings aside)
+    }
+
     // ── sticky note ──────────────────────────────────────────────────────────
 
     [Fact]

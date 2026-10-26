@@ -20,6 +20,29 @@ public partial class MainViewModel
 
     private Point _dragStart;
 
+    // ── Pending annotation: placed on the page but not burned in yet, so it can still be moved, resized and
+    //    (for free text) typed into; the view shows it as an overlay box. Committing burns it in.
+
+    [ObservableProperty] private AnnotationInputModel? _pending;
+
+    // Last free-text settings, so the next box starts the way the previous one was typed (handy for forms).
+    private AnnotationInputModel _lastFreeText = new() { Tool = AnnotationTool.FreeText, ColorHex = "#000000", Background = false };
+
+    /// <summary>Burns the pending annotation in with its final position and content; empty text is dropped.</summary>
+    public async Task CommitPendingAsync(AnnotationInputModel model)
+    {
+        Pending = null;
+        if (model.Tool == AnnotationTool.FreeText)
+        {
+            _lastFreeText = model with { Text = string.Empty, Rect = default };
+            if (string.IsNullOrWhiteSpace(model.Text)) return;
+        }
+        if (model.Tool == AnnotationTool.StickyNote && string.IsNullOrWhiteSpace(model.Text)) return;
+        await ApplyAnnotationAsync(model);
+    }
+
+    public void CancelPending() => Pending = null;
+
     // ── Ribbon tab ────────────────────────────────────────────────────────────
 
     [ObservableProperty] private RibbonTab _ribbonTab = RibbonTab.Home;
@@ -156,14 +179,18 @@ public partial class MainViewModel
     public Avalonia.Input.Cursor CanvasCursor { get; } = new(Avalonia.Input.StandardCursorType.Cross);
 
     /// <summary>Tooltip following the pointer over the page while a tool is active: what a drag does, and the shortcuts.</summary>
-    public string CanvasTooltip => ActiveTool == AnnotationTool.CaptureArea
-        ? _loc["Annotate.CaptureTooltip"]
-        : _loc["Annotate.CanvasTooltip"];
+    public string CanvasTooltip => ActiveTool switch
+    {
+        AnnotationTool.CaptureArea => _loc["Annotate.CaptureTooltip"],
+        AnnotationTool.FreeText => _loc["Annotate.FreeTextTooltip"],
+        _ => _loc["Annotate.CanvasTooltip"],
+    };
 
     partial void OnActiveToolChanged(AnnotationTool value)
     {
         IsDragging = false;
         DragRect = default;
+        Pending = null;
         OnPropertyChanged(nameof(IsAnnotationActive));
         OnPropertyChanged(nameof(CanAnnotate));
         OnPropertyChanged(nameof(CanvasTooltip));
@@ -216,9 +243,10 @@ public partial class MainViewModel
         if (canvasSize.Width <= 0 || canvasSize.Height <= 0) return;
 
         // Area tools need a real drag; ignore an accidental click / near-zero drag so we don't
-        // produce a degenerate (invisible) annotation. StickyNote is a click gesture, so it's exempt.
-        if (ActiveTool is not (AnnotationTool.StickyNote or AnnotationTool.Comment) &&
-            (Math.Abs(pos.X - _dragStart.X) < 5 || Math.Abs(pos.Y - _dragStart.Y) < 5))
+        // produce a degenerate (invisible) annotation. StickyNote is a click gesture, so it's exempt,
+        // and a FreeText click opens a default-sized box to type into.
+        var tinyDrag = Math.Abs(pos.X - _dragStart.X) < 5 || Math.Abs(pos.Y - _dragStart.Y) < 5;
+        if (tinyDrag && ActiveTool is not (AnnotationTool.StickyNote or AnnotationTool.Comment or AnnotationTool.FreeText))
             return;
 
         // Normalize against the canvas (which now exactly overlays the page image) and clamp to the
@@ -273,8 +301,30 @@ public partial class MainViewModel
             return;
         }
 
+        if (ActiveTool == AnnotationTool.FreeText)
+        {
+            // Typed straight on the page: no dialog, an editable box appears where the user clicked or dragged.
+            if (tinyDrag)
+            {
+                var boxH = (_lastFreeText.FontSizePoints * 1.5 + 6) * PixelsPerPoint / h;
+                normRect = new PdfRect(C(_dragStart.X / w), C(_dragStart.Y / h), C(_dragStart.X / w + 0.35), C(_dragStart.Y / h + boxH));
+            }
+            Pending = _lastFreeText with { Rect = normRect, Text = string.Empty };
+            return;
+        }
+
         var model = await getInput(ActiveTool);
         if (model is null) return;
+
+        // These are placed as a movable box first and burned in on confirmation; the rest apply at once.
+        if (model.Tool is AnnotationTool.Highlight or AnnotationTool.Rectangle or AnnotationTool.StickyNote
+            or AnnotationTool.ImageOverlay or AnnotationTool.Signature)
+        {
+            if (model.Tool == AnnotationTool.StickyNote) // the note's own size, centred on the click
+                normRect = PdfRect.FromLTWH(C(normRect.Left - 0.09), C(normRect.Top - 0.05), 0.18, 0.10);
+            Pending = model with { Rect = normRect };
+            return;
+        }
 
         await ApplyAnnotationAsync(model with { Rect = normRect });
     }
@@ -446,11 +496,12 @@ public partial class MainViewModel
 
                 AnnotationTool.FreeText =>
                     await _annotations.AddFreeTextAsync(source, srcIdx, model.Rect,
-                        model.Text, model.ColorHex, model.FontSizePoints, ct),
+                        model.Text, model.ColorHex, model.FontSizePoints, model.CharPitchPoints, model.Background, ct),
 
+                // The note is drawn centred on a point: the centre of the placed box.
                 AnnotationTool.StickyNote =>
                     await _annotations.AddStickyNoteAsync(source, srcIdx,
-                        model.Rect.Left, model.Rect.Top, model.Text, ct),
+                        (model.Rect.Left + model.Rect.Right) / 2, (model.Rect.Top + model.Rect.Bottom) / 2, model.Text, ct),
 
                 AnnotationTool.ImageOverlay when model.ImageBytes is not null =>
                     await _annotations.AddImageOverlayAsync(source, srcIdx,

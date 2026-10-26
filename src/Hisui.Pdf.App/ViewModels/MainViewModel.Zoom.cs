@@ -24,11 +24,15 @@ public partial class MainViewModel
     public double PreviewDisplayHeight => NativeH * ZoomLevel;
     public string ZoomLabel => $"{ZoomLevel * 100:0}%";
 
+    /// <summary>Preview pixels per PDF point at the current zoom (the preview is rendered at the settings' DPI).</summary>
+    public double PixelsPerPoint => ZoomLevel * _settings.Settings.PreviewDpi / 72.0;
+
     private double NativeW => PreviewImage?.Size.Width ?? 0;
     private double NativeH => PreviewImage?.Size.Height ?? 0;
 
     partial void OnZoomLevelChanged(double value)
     {
+        Pending = null; // the pending box is laid out in preview pixels of the previous zoom
         foreach (var page in Pages) page.SetZoom(value);
     }
 

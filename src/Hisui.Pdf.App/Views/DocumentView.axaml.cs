@@ -23,6 +23,7 @@ namespace Hisui.Pdf.App.Views;
 public partial class DocumentView : UserControl
 {
     private Canvas? _annotCanvas;
+    private PendingAnnotationBox? _pendingBox;
     private readonly ISignatureService _signatures;
     private readonly IPrintService _print;
     private readonly IPdfRenderer _renderer;
@@ -178,6 +179,20 @@ public partial class DocumentView : UserControl
         _annotCanvas.AddHandler(PointerPressedEvent,  OnAnnotationPressed,  RoutingStrategies.Tunnel);
         _annotCanvas.AddHandler(PointerMovedEvent,    OnAnnotationMoved,    RoutingStrategies.Tunnel);
         _annotCanvas.AddHandler(PointerReleasedEvent, OnAnnotationReleased, RoutingStrategies.Tunnel);
+
+        // A placed-but-not-yet-applied annotation shows as a movable box over the page.
+        if (DataContext is not MainViewModel viewModel) return;
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(MainViewModel.Pending)) return;
+            _pendingBox?.Detach();
+            _pendingBox = null;
+            if (viewModel.Pending is { } pending && _annotCanvas is not null)
+            {
+                _pendingBox = new PendingAnnotationBox(viewModel, pending, _annotCanvas);
+                _pendingBox.Attach();
+            }
+        };
     }
 
     // ── File backstage menu ───────────────────────────────────────────────────
@@ -361,6 +376,10 @@ public partial class DocumentView : UserControl
                 if (this.FindControl<TextBox>("PageNumberBox") is { } pageBox) { pageBox.Focus(); pageBox.SelectAll(); }
                 e.Handled = true;
                 break;
+            case Key.Escape when vm.Pending is not null:
+                vm.CancelPending();
+                e.Handled = true;
+                break;
             case Key.Escape when vm.IsAnnotationActive:
                 vm.ActiveTool = AnnotationTool.None;
                 e.Handled = true;
@@ -538,6 +557,14 @@ public partial class DocumentView : UserControl
     {
         if (DataContext is not MainViewModel vm) return;
         if (!vm.IsAnnotationActive) return;
+        if (_pendingBox is { } box)
+        {
+            // Inside the box (or its toolbar): the box handles it. Anywhere else on the page: that confirms the box.
+            if (box.Owns(e.Source)) return;
+            e.Handled = true;
+            _ = box.CommitAsync();
+            return;
+        }
         e.Pointer.Capture(_annotCanvas);
         vm.OnPointerPressed(e.GetPosition(_annotCanvas));
         e.Handled = true;
@@ -554,7 +581,7 @@ public partial class DocumentView : UserControl
     private async void OnAnnotationReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (DataContext is not MainViewModel vm || _annotCanvas is null) return;
-        if (!vm.IsAnnotationActive) return;
+        if (!vm.IsAnnotationActive || !vm.IsDragging) return; // no drag of ours in progress (e.g. the pending box's own)
 
         e.Pointer.Capture(null);
         var pos = e.GetPosition(_annotCanvas);
@@ -693,7 +720,7 @@ public partial class DocumentView : UserControl
                     {
                         // Elevate up front: AppLocker's default MSI rules allow unsigned packages only for Administrators,
                         // and the per-machine install needs elevation anyway. UAC cancel throws, so we stay open.
-                        Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{msi}\"") { UseShellExecute = true, Verb = "runas" });
+                        Process.Start(new ProcessStartInfo("msiexec.exe") { ArgumentList = { "/i", msi }, UseShellExecute = true, Verb = "runas" });
                         Owner.Close();
                     }
                     else

@@ -155,6 +155,7 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSelectedPageChanged(PageItemViewModel? value)
     {
+        Pending = null; // a box placed on the previous page must not land on this one
         RaisePageInfoChanged();
         _ = UpdatePreviewAsync(value);
         RecomputeHighlights(); // refreshed again by the preview-size push once the new page lays out

@@ -154,7 +154,8 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
         }), ct);
     }
 
-    public Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12, CancellationToken ct = default)
+    public Task<byte[]> AddFreeTextAsync(byte[] pdf, int pageIndex, PdfRect rect, string text, string colorHex = "#000000", double fontSizePoints = 12,
+        double charPitchPoints = 0, bool background = true, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pdf);
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
@@ -166,18 +167,36 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
             var font = new XFont("Arial", fontSizePoints);
             var brush = new XSolidBrush(ParseColor(colorHex));
 
-            // Light background box so text is readable over page content.
-            gfx.DrawRectangle(
-                new XPen(XColors.DarkGray, 0.5),
-                new XSolidBrush(XColor.FromArgb(220, 255, 255, 240)),
-                xRect);
-            gfx.DrawString(
-                text, font, brush,
-                // Clamp: a tiny box (or a near-zero drag) would make the padded inner rect negative,
-                // which XRect rejects with WidthAndHeightCannotBeNegative.
-                new XRect(xRect.Left + 3, xRect.Top + 3,
-                          Math.Max(0, xRect.Width - 6), Math.Max(0, xRect.Height - 6)),
-                XStringFormats.TopLeft);
+            // Light background box so text is readable over page content (off when filling a printed form).
+            if (background)
+                gfx.DrawRectangle(
+                    new XPen(XColors.DarkGray, 0.5),
+                    new XSolidBrush(XColor.FromArgb(220, 255, 255, 240)),
+                    xRect);
+
+            // Clamp: a tiny box (or a near-zero drag) would make the padded inner rect negative,
+            // which XRect rejects with WidthAndHeightCannotBeNegative.
+            var inner = new XRect(xRect.Left + 3, xRect.Top + 3, Math.Max(0, xRect.Width - 6), Math.Max(0, xRect.Height - 6));
+            var lineHeight = font.GetHeight();
+            var lines = text.Replace("\r\n", "\n").Split('\n');
+            for (var li = 0; li < lines.Length; li++)
+            {
+                var y = inner.Top + li * lineHeight;
+                if (charPitchPoints <= 0)
+                {
+                    gfx.DrawString(lines[li], font, brush, new XPoint(inner.Left, y), XStringFormats.TopLeft);
+                    continue;
+                }
+                // Boxed form: one cell per character, each glyph centred in its cell.
+                var x = inner.Left;
+                foreach (var rune in lines[li].EnumerateRunes())
+                {
+                    var glyph = rune.ToString();
+                    var w = gfx.MeasureString(glyph, font).Width;
+                    gfx.DrawString(glyph, font, brush, new XPoint(x + (charPitchPoints - w) / 2, y), XStringFormats.TopLeft);
+                    x += charPitchPoints;
+                }
+            }
         }), ct);
     }
 
