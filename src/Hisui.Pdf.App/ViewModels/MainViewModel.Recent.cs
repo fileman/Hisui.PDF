@@ -109,6 +109,6 @@ public partial class MainViewModel
             StatusMessage = _loc["Status.FileNotFound"];
             return;
         }
-        await OpenPathAsync(path);
+        if (!_windows.ActivateExisting(path)) await OpenPathAsync(path);
     }
 }

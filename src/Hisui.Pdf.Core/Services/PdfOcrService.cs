@@ -16,10 +16,6 @@ namespace Hisui.Pdf.Core.Services;
 /// </summary>
 internal sealed class PdfOcrService : IPdfOcrService
 {
-    // A page with fewer than this many non-whitespace characters of embedded text is treated as
-    // having no real text layer (tolerates a stray header/footer artifact on an otherwise scanned page).
-    private const int ScannedTextThreshold = 8;
-
     private readonly IPdfRenderer _renderer;
     private readonly IOcrEngine _engine;
 
@@ -42,10 +38,7 @@ internal sealed class PdfOcrService : IPdfOcrService
             {
                 ct.ThrowIfCancellationRequested();
 
-                var textLength = page.Text?.Count(c => !char.IsWhiteSpace(c)) ?? 0;
-                if (textLength >= ScannedTextThreshold) continue;
-
-                if (HasRasterImage(page))
+                if (ScanHeuristics.IsScannedPage(page))
                     scanned.Add(page.Number - 1); // PdfPig is 1-based
             }
 
@@ -165,19 +158,6 @@ internal sealed class PdfOcrService : IPdfOcrService
         // Raw pixels straight into the engine: no PNG encode/decode round trip at 300 DPI.
         var page = await _renderer.RenderPageAsync(pdf, pageIndex, options.Dpi, ct).ConfigureAwait(false);
         return await _engine.RecognizeRenderedAsync(page, pageIndex, options, ct).ConfigureAwait(false);
-    }
-
-    private static bool HasRasterImage(UglyToad.PdfPig.Content.Page page)
-    {
-        try
-        {
-            return page.GetImages().Any();
-        }
-        catch
-        {
-            // A malformed image XObject must not abort detection of the rest of the document.
-            return false;
-        }
     }
 
     /// <summary>

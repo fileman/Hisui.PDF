@@ -90,6 +90,89 @@ public static class PdfFixtureBuilder
     }
 
     /// <summary>
+    /// A scanned letter as office scanners make them: an A4 page covered by horizontal image strips (white paper
+    /// with one solid "logo" block at the top left) and a real, rotated protocol stamp in the left margin, so
+    /// the page has a text layer but no horizontal text.
+    /// </summary>
+    public const string ScannedLetterStamp = "Protocollo N. 96548/2026 del 30-10-2026";
+
+    public static byte[] CreateScannedLetterWithStamp()
+    {
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+        double w = page.Width.Point, h = page.Height.Point;
+
+        using (var gfx = XGraphics.FromPdfPage(page))
+        {
+            const int strips = 3;
+            for (var s = 0; s < strips; s++)
+            {
+                // 100 DPI strips: 827 px wide, a third of the page tall each.
+                using var bmp = new SKBitmap(827, 390);
+                using (var canvas = new SKCanvas(bmp))
+                {
+                    canvas.Clear(SKColors.White);
+                    if (s == 0)
+                        using (var paint = new SKPaint { Color = SKColors.Black })
+                            canvas.DrawRect(80, 40, 120, 120, paint); // the logo: ≈ 1.2" square
+                }
+                using var png = SKImage.FromBitmap(bmp).Encode(SKEncodedImageFormat.Png, 100);
+                using var stream = new MemoryStream(png.ToArray());
+                gfx.DrawImage(XImage.FromStream(stream), 0, s * h / strips, w, h / strips);
+            }
+
+            var font = new XFont("Arial", 8);
+            var origin = new XPoint(20, h - 300);
+            gfx.RotateAtTransform(-90, origin);
+            gfx.DrawString(ScannedLetterStamp, font, XBrushes.Gray, origin);
+        }
+
+        using var ms = new MemoryStream();
+        document.Save(ms);
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// A digital A4 page: a left-aligned paragraph, a right-aligned date line, an e-mail address, a numbered list
+    /// on consecutive lines, and one picture embedded as three stacked PNG strips (x 100–300 pt, y 400–550 pt).
+    /// </summary>
+    public static byte[] CreateDigitalLetterWithStrips()
+    {
+        GlobalFontSettings.FontResolver ??= new BundledFontResolver();
+        using var document = new PdfDocument();
+        var page = document.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+        var right = page.Width.Point - 72;
+
+        using (var gfx = XGraphics.FromPdfPage(page))
+        {
+            var font = new XFont("Arial", 11);
+            gfx.DrawString("Opening line of the letter, flush with the left margin and long enough.", font, XBrushes.Black, new XPoint(72, 100));
+            var date = "Macerata, 30.10.2026";
+            gfx.DrawString(date, font, XBrushes.Black, new XPoint(right - gfx.MeasureString(date, font).Width, 140));
+            gfx.DrawString("Write to office@example.org for details.", font, XBrushes.Black, new XPoint(72, 200));
+            gfx.DrawString("1. First item", font, XBrushes.Black, new XPoint(90, 240));
+            gfx.DrawString("2. Second item", font, XBrushes.Black, new XPoint(90, 254));
+            gfx.DrawString("Last line of the page, also flush with the left margin, to fix the right edge.", font, XBrushes.Black, new XPoint(72, 700));
+
+            for (var s = 0; s < 3; s++)
+            {
+                using var bmp = new SKBitmap(200, 50);
+                using (var canvas = new SKCanvas(bmp)) canvas.Clear(s == 1 ? SKColors.SteelBlue : SKColors.Orange);
+                using var png = SKImage.FromBitmap(bmp).Encode(SKEncodedImageFormat.Png, 100);
+                using var stream = new MemoryStream(png.ToArray());
+                gfx.DrawImage(XImage.FromStream(stream), 100, 400 + s * 50, 200, 50);
+            }
+        }
+
+        using var ms = new MemoryStream();
+        document.Save(ms);
+        return ms.ToArray();
+    }
+
+    /// <summary>
     /// Creates a single-page A4 PDF that embeds a sizeable baseline-JPEG image, so the optimizer's
     /// <c>/DCTDecode</c> recompression path has something real to shrink.
     /// </summary>

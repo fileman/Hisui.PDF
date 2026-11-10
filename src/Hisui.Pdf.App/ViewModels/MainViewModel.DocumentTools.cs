@@ -70,7 +70,13 @@ public partial class MainViewModel
             switch (format)
             {
                 case "docx":
-                    await File.WriteAllBytesAsync(target, await _wordExporter.ExportAsync(current, ct), ct);
+                    var word = await _wordExporter.ExportAsync(current, new WordExportOptions { Ocr = CurrentOcrOptions() }, ct);
+                    await File.WriteAllBytesAsync(target, word.Docx, ct);
+                    if (word.OcrUnavailableReason is { } reason)
+                    {
+                        StatusMessage = _loc.Format("Status.OcrUnavailable", reason);
+                        return;
+                    }
                     break;
                 case "xlsx":
                     await File.WriteAllBytesAsync(target, await _office.ExportXlsxAsync(current, ct), ct);

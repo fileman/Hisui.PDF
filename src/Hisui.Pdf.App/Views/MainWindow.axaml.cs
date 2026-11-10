@@ -144,6 +144,9 @@ public partial class MainWindow : Window
     /// optionally exports it to <paramref name="convert"/>. With no path, adds an empty tab.</summary>
     public void OpenInTab(string? path = null, string? convert = null)
     {
+        // A file that is already open (or loading) is brought forward instead of loaded into a second tab. A --convert
+        // request still loads its own copy: the export must not pick up the open tab's unsaved edits.
+        if (path is not null && convert is null && ActivateExisting(path)) return;
         // Reuse an empty tab (the current one first) rather than leaving it in front of the documents. Loading is async,
         // so IsDocumentLoaded alone can't tell that a tab was just claimed by a previous file or is opening one itself.
         var empty = path is null
@@ -438,6 +441,21 @@ public partial class MainWindow : Window
 
     private void UpdateWindowTitle() =>
         Title = (CurrentView?.DataContext as MainViewModel)?.Title ?? "Hisui PDF";
+
+    /// <summary>Selects the tab (in any window) that holds or is loading <paramref name="path"/> and brings its window
+    /// to the front. False when no tab has it.</summary>
+    public static bool ActivateExisting(string path)
+    {
+        foreach (var w in Open)
+            foreach (var t in w.Tabs.Items.OfType<TabItem>())
+                if (ViewOf(t)?.DataContext is MainViewModel vm && vm.IsShowingFile(path))
+                {
+                    w.Tabs.SelectedItem = t;
+                    w.Bring();
+                    return true;
+                }
+        return false;
+    }
 
     /// <summary>Brings the window to the front (second launch / forwarded files).</summary>
     public void Bring()

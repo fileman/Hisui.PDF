@@ -6,9 +6,13 @@ namespace Hisui.Pdf.App;
 
 internal sealed class Program
 {
+    /// <summary>Started at process entry; startup milestones are logged against it.</summary>
+    internal static readonly System.Diagnostics.Stopwatch Startup = System.Diagnostics.Stopwatch.StartNew();
+
     [STAThread]
     public static void Main(string[] args)
     {
+        Startup.Restart(); // the static is initialized lazily; start timing at entry
         if (!SingleInstance.TryBecomePrimary(args)) return;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

@@ -126,7 +126,8 @@ public partial class MainViewModel : ObservableObject
         };
 
         Pages.CollectionChanged += (_, _) => { RaisePageInfoChanged(); InvalidateSearch(); };
-        RefreshRecentFiles();
+        // The recent list is filled by DocumentView when the tab comes into view (AttachedToVisualTree); building it
+        // here too did the file checks and thumbnail rendering twice on every startup and new tab.
     }
 
     public ObservableCollection<PageItemViewModel> Pages { get; } = [];
@@ -168,7 +169,7 @@ public partial class MainViewModel : ObservableObject
     {
         var paths = await _dialogs.OpenPdfsAsync();
         if (paths.Count == 0) return;
-        await OpenPathAsync(paths[0]);
+        if (!_windows.ActivateExisting(paths[0])) await OpenPathAsync(paths[0]);
         foreach (var extra in paths.Skip(1)) _windows.OpenWindow(extra); // one window per additional file
     }
 
@@ -186,6 +187,29 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Opens a specific file. Used by the Open command, command-line args and drag-drop.</summary>
     public async Task OpenPathAsync(string path)
+    {
+        if (IsBusy) return; // RunBusyAsync would skip it anyway; don't advertise a path that is not loading
+        OpeningPath = path;
+        try { await OpenPathCoreAsync(path); }
+        finally { OpeningPath = null; }
+    }
+
+    /// <summary>File being loaded into this tab right now (null when idle). With <see cref="CurrentPath"/> it lets a
+    /// second open of the same file select this tab instead of loading another copy.</summary>
+    public string? OpeningPath { get; private set; }
+
+    /// <summary>True when this tab holds, or is loading, <paramref name="path"/>.</summary>
+    public bool IsShowingFile(string path) =>
+        SamePath(_currentPath, path) || SamePath(OpeningPath, path);
+
+    private static bool SamePath(string? a, string b)
+    {
+        if (a is null) return false;
+        try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return false; }
+    }
+
+    private async Task OpenPathCoreAsync(string path)
     {
         await RunBusyAsync(_loc["Status.Opening"], async ct =>
         {
@@ -219,6 +243,7 @@ public partial class MainViewModel : ObservableObject
 
         if (_session is null)
         {
+            if (paths.Count == 1 && _windows.ActivateExisting(paths[0])) return;
             await OpenPathAsync(paths[0]);
             for (var i = 1; i < paths.Count; i++)
                 await AddExistingPathAsync(paths[i]);

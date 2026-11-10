@@ -15,4 +15,6 @@ internal sealed class WindowService : IWindowService
 
     public void OpenWindow(string? filePath = null) =>
         (MainWindow.Active ?? _services.GetRequiredService<MainWindow>()).OpenInTab(filePath is not null && File.Exists(filePath) ? filePath : null);
+
+    public bool ActivateExisting(string filePath) => MainWindow.ActivateExisting(filePath);
 }
