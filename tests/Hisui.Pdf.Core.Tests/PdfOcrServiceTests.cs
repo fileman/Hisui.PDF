@@ -25,6 +25,18 @@ public class PdfOcrServiceTests
     }
 
     [Fact]
+    public async Task DetectScannedPages_IgnoresARotatedStampInTheMargin()
+    {
+        // A protocol stamp is a real text layer, but rotated: it must not hide the scan from OCR.
+        var pdf = PdfFixtureBuilder.CreateScannedLetterWithStamp();
+        var sut = new PdfOcrService(_renderer, new FakeOcrEngine());
+
+        var scanned = await sut.DetectScannedPagesAsync(pdf);
+
+        Assert.Equal([0], scanned);
+    }
+
+    [Fact]
     public async Task DetectScannedPages_OnTextPdf_ReturnsEmpty()
     {
         var pdf = PdfFixtureBuilder.CreateWithText("This is a real digital text layer for the page", 1);

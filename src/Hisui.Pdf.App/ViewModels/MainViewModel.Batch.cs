@@ -99,7 +99,8 @@ public partial class MainViewModel
                 var (pdfa, report) = await _conformance.ConvertAsync(pdf, PdfProfile.PdfA2b, new ConversionOptions(), ct);
                 return (pdfa, "-PDFA2b.pdf", report.Passes ? null : _loc.Format("Batch.PdfAIssues", report.Issues.Count(x => x.Severity == IssueSeverity.Error)));
             case BatchAction.Word:
-                return (await _wordExporter.ExportAsync(pdf, ct), ".docx", null);
+                var word = await _wordExporter.ExportAsync(pdf, new WordExportOptions { Ocr = CurrentOcrOptions() }, ct);
+                return (word.Docx, ".docx", word.OcrUnavailableReason is { } reason ? _loc.Format("Status.OcrUnavailable", reason) : null);
             case BatchAction.Excel:
                 return (await _office.ExportXlsxAsync(pdf, ct), ".xlsx", null);
             case BatchAction.PowerPoint:
