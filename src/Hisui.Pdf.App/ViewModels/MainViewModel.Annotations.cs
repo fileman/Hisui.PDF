@@ -1,6 +1,7 @@
 using System.IO;
 using Avalonia;
 using Avalonia.Input.Platform;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Hisui.Pdf.App.Views;
@@ -356,7 +357,7 @@ public partial class MainViewModel
                 var path = await _dialogs.SaveFileAsync($"{baseName}-p{pageIndex + 1}.png", ".png", _loc["Picker.PngType"]);
                 if (path is null) return;
                 await using var stream = File.Create(path);
-                bitmap.Save(stream);
+                bitmap.Save(stream, new PngBitmapEncoderOptions());
                 StatusMessage = _loc.Format("Status.AreaCaptured", Path.GetFileName(path), w, h);
             }
         }
