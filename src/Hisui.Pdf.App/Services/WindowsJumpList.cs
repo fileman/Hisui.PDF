@@ -6,12 +6,51 @@ namespace Hisui.Pdf.App.Services;
 /// Publishes the recent-files list to the Windows taskbar Jump List (right-click the taskbar icon).
 /// Each entry relaunches this executable with the file path as its argument, which App already opens.
 /// Best-effort: any COM failure is swallowed; no-op on other platforms.
+/// The shell calls (and the per-file existence checks) run on a background STA thread, never on the UI thread, and
+/// an update identical to the last one published is skipped: every new tab refreshes the recent list.
 /// </summary>
 internal static class WindowsJumpList
 {
+    private static readonly object Gate = new();
+    private static string? _published;     // signature of the list last handed to the shell
+    private static (string[] Paths, string Title)? _pending;
+    private static bool _running;
+
     public static void Update(IEnumerable<string> paths, string categoryTitle)
     {
         if (!OperatingSystem.IsWindows()) return;
+        var list = paths.ToArray();
+        var signature = categoryTitle + "\n" + string.Join("\n", list);
+        lock (Gate)
+        {
+            if (signature == _published) return;
+            _published = signature;
+            _pending = (list, categoryTitle); // a newer update replaces one not started yet
+            if (_running) return;
+            _running = true;
+        }
+        var worker = new Thread(Drain) { IsBackground = true, Name = "JumpList" };
+        worker.SetApartmentState(ApartmentState.STA);
+        worker.Start();
+    }
+
+    private static void Drain()
+    {
+        while (true)
+        {
+            (string[] Paths, string Title) next;
+            lock (Gate)
+            {
+                if (_pending is not { } p) { _running = false; return; }
+                next = p;
+                _pending = null;
+            }
+            Publish(next.Paths, next.Title);
+        }
+    }
+
+    private static void Publish(IReadOnlyList<string> paths, string categoryTitle)
+    {
         try
         {
             var exe = Environment.ProcessPath;

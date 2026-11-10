@@ -24,7 +24,10 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var builder = Host.CreateApplicationBuilder();
+            var tFramework = Program.Startup.ElapsedMilliseconds;
+            // Empty builder: the default one wires appsettings/env/command-line configuration, console lifetime and
+            // logging providers the app doesn't use (logging is configured explicitly below), costing startup time.
+            var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
 
             builder.Services.AddPdfCore();
             builder.Services.AddSingleton<IFileDialogService, FileDialogService>();
@@ -48,6 +51,7 @@ public partial class App : Application
 
             _host = builder.Build();
             await _host.StartAsync();
+            var tHost = Program.Startup.ElapsedMilliseconds;
 
             // Make crashes and fire-and-forget failures visible in the log viewer.
             var crashLog = _host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Unhandled");
@@ -61,7 +65,13 @@ public partial class App : Application
             // Apply the saved theme (Light / Dark / System) before the first window is shown.
             Theming.ThemeManager.Apply(settings.Settings.Theme);
 
+            var tSettings = Program.Startup.ElapsedMilliseconds;
             var window = _host.Services.GetRequiredService<MainWindow>();
+            var tWindow = Program.Startup.ElapsedMilliseconds;
+            var startupLog = _host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+            window.Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                startupLog.LogInformation("Startup: framework {Framework} ms, host {Host} ms, settings {Settings} ms, window {Window} ms, first frame {Shown} ms",
+                    tFramework, tHost, tSettings, tWindow, Program.Startup.ElapsedMilliseconds), Avalonia.Threading.DispatcherPriority.Background);
             desktop.MainWindow = window;
             desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnLastWindowClose; // windows are peers; exit with the last one
 
