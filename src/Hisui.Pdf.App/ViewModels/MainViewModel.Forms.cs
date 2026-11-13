@@ -107,21 +107,15 @@ public partial class MainViewModel
 
     /// <summary>Loads <paramref name="item"/>'s widgets, keeping the current list (and live editors) when unchanged.</summary>
     // Widgets per source page, valid while the source bytes are the same array (continuous view asks on every scroll).
-    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, IReadOnlyList<PdfFormWidget> Widgets)> _fieldCache = [];
+    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, Task<IReadOnlyList<PdfFormWidget>> Widgets)> _fieldCache = [];
 
     private async Task LoadFieldsAsync(PageItemViewModel item)
     {
         if (_session is null) return;
         var key = (item.SourceDocumentId, item.SourcePageIndex);
         var bytes = _session.GetSource(item.SourceDocumentId);
-        IReadOnlyList<PdfFormWidget> widgets;
-        if (_fieldCache.TryGetValue(key, out var cached) && ReferenceEquals(cached.Bytes, bytes)) widgets = cached.Widgets;
-        else
-        {
-            try { widgets = await _forms.ReadWidgetsAsync(bytes, item.SourcePageIndex); }
-            catch (Exception) { widgets = []; } // unreadable form structure: the page stays view-only
-            _fieldCache[key] = (bytes, widgets);
-        }
+        // Unreadable form structure: the page stays view-only.
+        var widgets = await CachedReadAsync(_fieldCache, key, bytes, () => _forms.ReadWidgetsAsync(bytes, item.SourcePageIndex));
         if (!widgets.SequenceEqual(item.Fields, FieldEquality.Instance)) item.Fields = widgets;
         await LoadPlacedAsync(item, bytes);
         await LoadLinksAsync(item);
@@ -187,7 +181,7 @@ public partial class MainViewModel
             InvalidatePageCache(id, page.SourcePageIndex);
 
             var widgets = await _forms.ReadWidgetsAsync(updated, page.SourcePageIndex);
-            _fieldCache[(id, page.SourcePageIndex)] = (updated, widgets);
+            _fieldCache[(id, page.SourcePageIndex)] = (updated, Task.FromResult(widgets));
             if (rebuild) page.Fields = widgets;
             else page.SetFieldsSilently(widgets);
             await RenderThumbnailsAsync();

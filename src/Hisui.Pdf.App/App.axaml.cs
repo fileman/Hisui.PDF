@@ -57,6 +57,13 @@ public partial class App : Application
             var crashLog = _host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Unhandled");
             AppDomain.CurrentDomain.UnhandledException += (_, e) => crashLog.LogCritical(e.ExceptionObject as Exception, "Unhandled exception");
             TaskScheduler.UnobservedTaskException += (_, e) => crashLog.LogError(e.Exception, "Unobserved task exception");
+            // An exception escaping a UI event handler (async void included) would close the app and lose unsaved work;
+            // log it and keep running instead. Out-of-memory still ends the process: its state can't be trusted.
+            Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+            {
+                crashLog.LogError(e.Exception, "Unhandled exception on the UI thread");
+                if (e.Exception is not OutOfMemoryException) e.Handled = true;
+            };
 
             // Apply the saved language before any view is built so the first render is localized.
             var settings = _host.Services.GetRequiredService<ISettingsService>();

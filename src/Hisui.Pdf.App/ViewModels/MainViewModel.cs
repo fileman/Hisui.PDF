@@ -224,6 +224,7 @@ public partial class MainViewModel : ObservableObject
             _savedVersion = _session.Version;
             _thumbCache.Clear();
             _previewCache.Clear();
+            ClearPageDataCaches();
 
             SyncPagesFromSession();
             SetOpenedFromEncrypted(wasEncrypted); // enables "remove password" only for once-encrypted files
@@ -725,16 +726,25 @@ public partial class MainViewModel : ObservableObject
     {
         if (_session is null) return;
         var key = (item.SourceDocumentId, item.SourcePageIndex);
-        _ = LoadFieldsAsync(item);
+        // Called for every nearby page on each scroll/resize tick: load the page's overlays once per source version.
+        var source = _session.GetSource(item.SourceDocumentId);
+        if (!ReferenceEquals(item.OverlaySource, source))
+        {
+            item.OverlaySource = source;
+            _ = LoadFieldsAsync(item);
+        }
         if (_previewCache.TryGetValue(key, out var cached))
         {
             if (!ReferenceEquals(item.Preview, cached)) { item.Preview = cached; item.SetBaseSize(cached.Size); }
             return;
         }
         if (!_renderingPreviews.Add(key)) return;
+        var stale = false;
         try
         {
-            var page = await _renderer.RenderPageAsync(_session.GetSource(item.SourceDocumentId), item.SourcePageIndex, _settings.Settings.PreviewDpi);
+            var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, _settings.Settings.PreviewDpi);
+            // Edited (or closed) while rendering: this render is out of date, so it is redone below instead of cached.
+            if (_session is null || !ReferenceEquals(_session.GetSource(item.SourceDocumentId), source)) { stale = true; return; }
             var preview = BitmapConversions.ToFrozenBitmap(page);
             _previewCache[key] = preview;
             item.Preview = preview;
@@ -744,7 +754,35 @@ public partial class MainViewModel : ObservableObject
         {
             StatusMessage = _loc.Format("Status.RenderError", ex.Message);
         }
-        finally { _renderingPreviews.Remove(key); }
+        finally
+        {
+            _renderingPreviews.Remove(key);
+            if (stale && _session is not null && Pages.Contains(item)) EnsurePagePreview(item);
+        }
+    }
+
+    /// <summary>Full-size previews kept in memory in continuous view (about 9 MB each for an A4 page at 150 DPI).</summary>
+    private const int MaxContinuousPreviews = 24;
+
+    /// <summary>
+    /// Drops the full-size previews of pages away from the viewport once more than <see cref="MaxContinuousPreviews"/>
+    /// are held, so scrolling through a long document (or two, in split view) doesn't keep every page rendered. The
+    /// pages keep their size, and a dropped preview is rendered again when its page comes back near the viewport.
+    /// </summary>
+    public void TrimPagePreviews(IReadOnlyCollection<PageItemViewModel> keep)
+    {
+        if (_previewCache.Count <= MaxContinuousPreviews) return;
+        var kept = new HashSet<(int, int)>(keep.Select(p => (p.SourceDocumentId, p.SourcePageIndex)));
+        if (SelectedPage is { } selected) kept.Add((selected.SourceDocumentId, selected.SourcePageIndex));
+        foreach (var page in Pages)
+        {
+            if (page.Preview is null || kept.Contains((page.SourceDocumentId, page.SourcePageIndex))) continue;
+            page.Preview = null;
+            _previewCache.Remove((page.SourceDocumentId, page.SourcePageIndex));
+        }
+        // Previews of pages no longer in the list (deleted, reordered away) are only reachable from the cache.
+        foreach (var key in _previewCache.Keys.Where(k => !kept.Contains(k)).ToList())
+            if (!ReferenceEquals(_previewCache[key], PreviewImage)) _previewCache.Remove(key);
     }
 
     private async Task UpdatePreviewAsync(PageItemViewModel? item)
