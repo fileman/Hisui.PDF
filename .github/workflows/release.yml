@@ -185,9 +185,30 @@ jobs:
       - name: wingetcreate update
         shell: pwsh
         env:
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          # wingetcreate reads the token from this variable (keeps it off the command line and out of the log).
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
           BUILD_VERSION: ${{ needs.version.outputs.ver }}
         run: |
+          $ErrorActionPreference = 'Stop'
+          $id = 'Fileman.HisuiPDF'
+          $ver = $env:BUILD_VERSION
+          # `update` needs as many installer URLs as the published manifest has (e.g. MSI + Setup.exe), so take the
+          # URLs of the latest published version and swap in the new version number.
+          $api = 'https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/f/Fileman/HisuiPDF'
+          $headers = @{ Authorization = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN"; 'User-Agent' = 'hisui-release' }
+          $prev = Invoke-RestMethod $api -Headers $headers |
+            Where-Object { $_.type -eq 'dir' -and $_.name -match '^\d+(\.\d+){1,3}$' } |
+            Sort-Object { [version]$_.name } | Select-Object -Last 1 -ExpandProperty name
+          if (-not $prev) { throw "No published version of $id found in winget-pkgs" }
+          $file = Invoke-RestMethod "$api/$prev/$id.installer.yaml" -Headers $headers
+          $yaml = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($file.content))
+          $urls = [regex]::Matches($yaml, '(?m)^\s*-?\s*InstallerUrl:\s*(\S+)') |
+            ForEach-Object { $_.Groups[1].Value.Trim("'`"").Replace($prev, $ver) } | Select-Object -Unique
+          if (-not $urls) { throw "No InstallerUrl in the $prev manifest" }
+          Write-Host "Previous version $prev; installers for $($ver):"
+          $urls | ForEach-Object { Write-Host "  $_" }
+          foreach ($u in $urls) { Invoke-WebRequest $u -Method Head -UseBasicParsing | Out-Null } # every asset must exist
+
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$env:BUILD_VERSION/HisuiPDF-$env:BUILD_VERSION-win-x64.msi"
-          ./wingetcreate.exe update Fileman.HisuiPDF --version $env:BUILD_VERSION --urls $url --submit --token $env:WINGET_TOKEN
+          ./wingetcreate.exe update $id --version $ver --urls @($urls) --submit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
