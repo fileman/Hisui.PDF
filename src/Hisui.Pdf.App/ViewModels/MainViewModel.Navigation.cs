@@ -216,36 +216,56 @@ public partial class MainViewModel
 
     // ── Links ─────────────────────────────────────────────────────────────────
 
-    private readonly Dictionary<int, (byte[] Bytes, IReadOnlyList<PdfLink> Links)> _linkCache = [];
+    private readonly Dictionary<int, (byte[] Bytes, Task<IReadOnlyList<PdfLink>> Links)> _linkCache = [];
 
     private async Task LoadLinksAsync(PageItemViewModel item)
     {
         if (_session is null) return;
         var bytes = _session.GetSource(item.SourceDocumentId);
-        if (!_linkCache.TryGetValue(item.SourceDocumentId, out var cached) || !ReferenceEquals(cached.Bytes, bytes))
-        {
-            try { cached = (bytes, await _navigation.ReadLinksAsync(bytes)); }
-            catch (Exception) { cached = (bytes, []); }
-            _linkCache[item.SourceDocumentId] = cached;
-        }
-        var links = cached.Links.Where(l => l.PageIndex == item.SourcePageIndex).ToList();
+        var all = await CachedReadAsync(_linkCache, item.SourceDocumentId, bytes, () => _navigation.ReadLinksAsync(bytes));
+        var links = all.Where(l => l.PageIndex == item.SourcePageIndex).ToList();
         if (!links.SequenceEqual(item.Links)) item.Links = links;
         await LoadWordsAsync(item, bytes);
     }
 
-    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, IReadOnlyList<TextWord> Words)> _wordCache = [];
+    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, Task<IReadOnlyList<TextWord>> Words)> _wordCache = [];
 
     /// <summary>Loads the page's text words so the preview can offer mouse selection and copy.</summary>
     private async Task LoadWordsAsync(PageItemViewModel item, byte[] bytes)
     {
         var key = (item.SourceDocumentId, item.SourcePageIndex);
-        if (!_wordCache.TryGetValue(key, out var cached) || !ReferenceEquals(cached.Bytes, bytes))
+        var words = await CachedReadAsync(_wordCache, key, bytes, () => _textExtractor.ExtractWordsAsync(bytes, item.SourcePageIndex));
+        if (!ReferenceEquals(words, item.Words)) item.Words = words;
+    }
+
+    /// <summary>Forgets the overlay data of the previous document (it holds that document's bytes alive).</summary>
+    private void ClearPageDataCaches()
+    {
+        _fieldCache.Clear();
+        _placedCache.Clear();
+        _linkCache.Clear();
+        _wordCache.Clear();
+    }
+
+    /// <summary>
+    /// Reads per-page (or per-document) data once per source version. The cache holds the task itself, so a read that
+    /// is still running is shared: scrolling and resizing call this for the same pages many times a second, and each
+    /// read parses the whole PDF, so caching only finished results let those calls pile up into dozens of parallel
+    /// parses that froze the app and ran it out of memory. A failed read yields an empty list (the page stays view-only).
+    /// </summary>
+    private static Task<IReadOnlyList<T>> CachedReadAsync<TKey, T>(Dictionary<TKey, (byte[] Bytes, Task<IReadOnlyList<T>> Task)> cache,
+        TKey key, byte[] bytes, Func<Task<IReadOnlyList<T>>> read) where TKey : notnull
+    {
+        if (cache.TryGetValue(key, out var cached) && ReferenceEquals(cached.Bytes, bytes)) return cached.Task;
+        var task = ReadOrEmptyAsync(read);
+        cache[key] = (bytes, task);
+        return task;
+
+        static async Task<IReadOnlyList<T>> ReadOrEmptyAsync(Func<Task<IReadOnlyList<T>>> read)
         {
-            try { cached = (bytes, await _textExtractor.ExtractWordsAsync(bytes, item.SourcePageIndex)); }
-            catch (Exception) { cached = (bytes, []); }
-            _wordCache[key] = cached;
+            try { return await read(); }
+            catch (Exception) { return []; }
         }
-        if (!ReferenceEquals(cached.Words, item.Words)) item.Words = cached.Words;
     }
 
     /// <summary>Goes to a link's page, or opens its web address after confirmation (http, https, mailto only).</summary>

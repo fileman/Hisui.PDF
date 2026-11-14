@@ -86,19 +86,12 @@ public partial class MainViewModel
         _placedLayerWasVisible = IsPlacedLayerVisible;
     }
 
-    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, IReadOnlyList<PlacedAnnotation> Placed)> _placedCache = [];
+    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, Task<IReadOnlyList<PlacedAnnotation>> Placed)> _placedCache = [];
 
     private async Task LoadPlacedAsync(PageItemViewModel item, byte[] bytes)
     {
         var key = (item.SourceDocumentId, item.SourcePageIndex);
-        IReadOnlyList<PlacedAnnotation> placed;
-        if (_placedCache.TryGetValue(key, out var cached) && ReferenceEquals(cached.Bytes, bytes)) placed = cached.Placed;
-        else
-        {
-            try { placed = await _annotations.ReadPlacedAsync(bytes, item.SourcePageIndex); }
-            catch (Exception) { placed = []; }
-            _placedCache[key] = (bytes, placed);
-        }
+        var placed = await CachedReadAsync(_placedCache, key, bytes, () => _annotations.ReadPlacedAsync(bytes, item.SourcePageIndex));
         if (!placed.SequenceEqual(item.Placed)) item.Placed = placed;
     }
 

@@ -39,6 +39,9 @@ public partial class PageItemViewModel : ObservableObject
     [ObservableProperty]
     private double _imageHeight = ThumbSlotHeight;
 
+    /// <summary>The source bytes this page's overlays (fields, annotations, links, words) were last loaded from.</summary>
+    internal byte[]? OverlaySource { get; set; }
+
     /// <summary>Full-size render, loaded lazily while the page is near the viewport in continuous view.</summary>
     [ObservableProperty]
     private IImage? _preview;

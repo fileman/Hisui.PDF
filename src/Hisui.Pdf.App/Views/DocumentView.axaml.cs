@@ -97,7 +97,7 @@ public partial class DocumentView : UserControl
                     Avalonia.Threading.Dispatcher.UIThread.Post(ScrollToSelectedPage, Avalonia.Threading.DispatcherPriority.Loaded);
                     break;
                 case nameof(MainViewModel.PreviewImage): // a cache invalidation re-rendered the page: refresh the stack too
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => UpdateContinuousPages(select: false), Avalonia.Threading.DispatcherPriority.Loaded);
+                    QueueContinuousUpdate(select: false);
                     break;
                 case nameof(MainViewModel.PreviewDisplayHeight):
                     ApplyPendingEdge();
@@ -171,7 +171,7 @@ public partial class DocumentView : UserControl
             scroll.AddHandler(PointerWheelChangedEvent, OnPreviewWheel, RoutingStrategies.Tunnel);
         }
         PreviewScroll.ScrollChanged += (_, _) => _lastScrollTick = Environment.TickCount64;
-        ContinuousScroll.ScrollChanged += (_, e) => UpdateContinuousPages(select: e.OffsetDelta.Y != 0 && !_suppressSelect);
+        ContinuousScroll.ScrollChanged += (_, e) => QueueContinuousUpdate(select: e.OffsetDelta.Y != 0 && !_suppressSelect);
 
         _annotCanvas = this.FindControl<Canvas>("AnnotationCanvas");
         if (_annotCanvas is null) return;
@@ -539,25 +539,52 @@ public partial class DocumentView : UserControl
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
+    private bool _continuousUpdateQueued, _continuousUpdateSelects;
+
+    /// <summary>
+    /// Runs <see cref="UpdateContinuousPages"/> once after the current burst of events. Scrolling, and resizing the
+    /// window (which moves the viewport), raise ScrollChanged many times per frame; doing the page work on each one
+    /// flooded the app with redundant loads.
+    /// </summary>
+    private void QueueContinuousUpdate(bool select)
+    {
+        _continuousUpdateSelects |= select;
+        if (_continuousUpdateQueued) return;
+        _continuousUpdateQueued = true;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var selects = _continuousUpdateSelects;
+            _continuousUpdateQueued = _continuousUpdateSelects = false;
+            UpdateContinuousPages(selects);
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
     /// <summary>Loads previews for pages near the viewport and, when scrolled, selects the most visible page.</summary>
     private void UpdateContinuousPages(bool select)
     {
         if (DataContext is not MainViewModel { ShowContinuousPages: true } vm) return;
         var viewport = ContinuousScroll.Viewport.Height;
+        if (viewport <= 0) return; // not laid out yet (or collapsed)
         var top = ContinuousScroll.Offset.Y - ContinuousMargin;
         var bottom = top + viewport;
         PageItemViewModel? best = null;
         var bestVisible = double.MinValue;
+        var near = new List<PageItemViewModel>();
         var y = 0.0;
         foreach (var page in vm.Pages)
         {
             var height = SlotHeight(page) - PageGap;
             var visible = Math.Min(y + height, bottom) - Math.Max(y, top);
             if (visible > bestVisible) { bestVisible = visible; best = page; }
-            if (y + height > top - viewport && y < bottom + viewport) vm.EnsurePagePreview(page); // one viewport of look-ahead
+            if (y + height > top - viewport && y < bottom + viewport) // one viewport of look-ahead
+            {
+                near.Add(page);
+                vm.EnsurePagePreview(page);
+            }
             y += height + PageGap;
             if (y > bottom + viewport) break;
         }
+        vm.TrimPagePreviews(near);
 
         if (!select || best is null || ReferenceEquals(best, vm.SelectedPage)) return;
         _followingScroll = true;
