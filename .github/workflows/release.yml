@@ -196,7 +196,10 @@ jobs:
           # URLs of the latest published version and swap in the new version number.
           $api = 'https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/f/Fileman/HisuiPDF'
           $headers = @{ Authorization = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN"; 'User-Agent' = 'hisui-release' }
-          $prev = Invoke-RestMethod $api -Headers $headers |
+          # Assign first: Invoke-RestMethod emits a JSON array as one object, so piping it directly hands the
+          # whole array to Where-Object/Sort-Object instead of one folder at a time.
+          $entries = Invoke-RestMethod $api -Headers $headers
+          $prev = $entries |
             Where-Object { $_.type -eq 'dir' -and $_.name -match '^\d+(\.\d+){1,3}$' } |
             Sort-Object { [version]$_.name } | Select-Object -Last 1 -ExpandProperty name
           if (-not $prev) { throw "No published version of $id found in winget-pkgs" }
