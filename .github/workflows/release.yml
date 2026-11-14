@@ -173,7 +173,7 @@ jobs:
               --notes-file notes.md
           fi
 
-  # Submits stable releases to winget. Enable after the package's first manual submission:
+  # Submits stable releases to winget and closes the PRs of older versions still in review. Enable after the package's first manual submission:
   #   wingetcreate new <MSI release URL>   (id Fileman.HisuiPDF)
   # then set repo variable WINGET_ENABLED=true and secret WINGET_TOKEN (classic PAT, public_repo).
   winget:
@@ -212,3 +212,29 @@ jobs:
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
           ./wingetcreate.exe update $id --version $ver --urls @($urls) --submit
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Each release opens its own winget PR; an older one still waiting for review is now superseded.
+      # Best-effort: a failure here doesn't fail the release.
+      - name: Close superseded winget PRs
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          BUILD_VERSION: ${{ needs.version.outputs.ver }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $id = 'Fileman.HisuiPDF'
+          $new = [version]$env:BUILD_VERSION
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'hisui-release'; Accept = 'application/vnd.github+json' }
+          $login = (Invoke-RestMethod https://api.github.com/user -Headers $headers).login
+          $q = [uri]::EscapeDataString("repo:microsoft/winget-pkgs is:pr is:open author:$login in:title $id")
+          $prs = (Invoke-RestMethod "https://api.github.com/search/issues?q=$q&per_page=50" -Headers $headers).items
+          foreach ($pr in $prs) {
+            # wingetcreate titles: "New version: Fileman.HisuiPDF version 0.1.101"
+            if ($pr.title -notmatch [regex]::Escape($id) -or $pr.title -notmatch 'version\s+(\d+(?:\.\d+){1,3})\s*$') { continue }
+            if ([version]$Matches[1] -ge $new) { continue }
+            Write-Host "Closing #$($pr.number): $($pr.title)"
+            $body = @{ body = "Superseded by version $new of $id; closing this one." } | ConvertTo-Json
+            Invoke-RestMethod "https://api.github.com/repos/microsoft/winget-pkgs/issues/$($pr.number)/comments" -Method Post -Headers $headers -Body $body | Out-Null
+            Invoke-RestMethod "https://api.github.com/repos/microsoft/winget-pkgs/pulls/$($pr.number)" -Method Patch -Headers $headers -Body (@{ state = 'closed' } | ConvertTo-Json) | Out-Null
+          }
