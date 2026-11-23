@@ -203,15 +203,37 @@ internal sealed class PdfAnnotationService : IPdfAnnotationService
             using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
             if ((uint)pageIndex >= (uint)doc.PageCount)
                 throw new ArgumentOutOfRangeException(nameof(pageIndex), $"Page {pageIndex} does not exist (page count = {doc.PageCount}).");
-            var result = new List<PlacedAnnotation>();
-            foreach (var item in doc.Pages[pageIndex].Contents.Elements)
+            return PagePlaced(doc.Pages[pageIndex]);
+        }, ct);
+    }
+
+    public Task<IReadOnlyList<IReadOnlyList<PlacedAnnotation>>> ReadAllPlacedAsync(byte[] pdf, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<IReadOnlyList<IReadOnlyList<PlacedAnnotation>>>(() =>
+        {
+            using var stream = new MemoryStream(pdf, writable: false);
+            using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+            var result = new IReadOnlyList<PlacedAnnotation>[doc.PageCount];
+            for (var p = 0; p < result.Length; p++)
             {
-                if (Resolve(item) is not PdfDictionary content) continue;
-                if (content.Elements.GetDictionary(AnnotKey) is { } d && ReadTag(d) is { } placed) result.Add(placed);
-                else if (content.Elements.GetDictionary(LegacyFreeTextKey) is { } legacy) result.Add(ReadTag(legacy, AnnotationTool.FreeText));
+                ct.ThrowIfCancellationRequested();
+                result[p] = PagePlaced(doc.Pages[p]);
             }
             return result;
         }, ct);
+    }
+
+    private static IReadOnlyList<PlacedAnnotation> PagePlaced(PdfPage page)
+    {
+        var result = new List<PlacedAnnotation>();
+        foreach (var item in page.Contents.Elements)
+        {
+            if (Resolve(item) is not PdfDictionary content) continue;
+            if (content.Elements.GetDictionary(AnnotKey) is { } d && ReadTag(d) is { } placed) result.Add(placed);
+            else if (content.Elements.GetDictionary(LegacyFreeTextKey) is { } legacy) result.Add(ReadTag(legacy, AnnotationTool.FreeText));
+        }
+        return result;
     }
 
     public Task<byte[]> RemovePlacedAsync(byte[] pdf, int pageIndex, string id, CancellationToken ct = default)

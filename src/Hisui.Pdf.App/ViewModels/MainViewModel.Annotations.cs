@@ -86,12 +86,14 @@ public partial class MainViewModel
         _placedLayerWasVisible = IsPlacedLayerVisible;
     }
 
-    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, Task<IReadOnlyList<PlacedAnnotation>> Placed)> _placedCache = [];
+    // Placed annotations of every page of a source, valid while the source bytes are the same array. One parse per
+    // source version, like _fieldCache: a single page's read parses the whole PDF anyway.
+    private readonly Dictionary<int, (byte[] Bytes, Task<IReadOnlyList<IReadOnlyList<PlacedAnnotation>>> Placed)> _placedCache = [];
 
     private async Task LoadPlacedAsync(PageItemViewModel item, byte[] bytes)
     {
-        var key = (item.SourceDocumentId, item.SourcePageIndex);
-        var placed = await CachedReadAsync(_placedCache, key, bytes, () => _annotations.ReadPlacedAsync(bytes, item.SourcePageIndex));
+        var all = await CachedReadAsync(_placedCache, item.SourceDocumentId, bytes, () => _annotations.ReadAllPlacedAsync(bytes));
+        var placed = (uint)item.SourcePageIndex < (uint)all.Count ? all[item.SourcePageIndex] : [];
         if (!placed.SequenceEqual(item.Placed)) item.Placed = placed;
     }
 
