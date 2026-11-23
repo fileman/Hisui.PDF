@@ -40,6 +40,9 @@ public interface IPdfAnnotationService
     /// </summary>
     Task<IReadOnlyList<PlacedAnnotation>> ReadPlacedAsync(byte[] pdf, int pageIndex, CancellationToken ct = default);
 
+    /// <summary>The placed annotations of every page (index = page index), parsing the document once.</summary>
+    Task<IReadOnlyList<IReadOnlyList<PlacedAnnotation>>> ReadAllPlacedAsync(byte[] pdf, CancellationToken ct = default);
+
     /// <summary>Removes the placed annotation with <paramref name="id"/> (from <see cref="ReadPlacedAsync"/>) from a page.</summary>
     Task<byte[]> RemovePlacedAsync(byte[] pdf, int pageIndex, string id, CancellationToken ct = default);
 
