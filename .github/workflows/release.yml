@@ -187,32 +187,78 @@ jobs:
         env:
           # wingetcreate reads the token from this variable (keeps it off the command line and out of the log).
           WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          # Only for the fallback that lists this repo's releases.
+          GITHUB_TOKEN: ${{ github.token }}
           BUILD_VERSION: ${{ needs.version.outputs.ver }}
         run: |
           $ErrorActionPreference = 'Stop'
           $id = 'Fileman.HisuiPDF'
           $ver = $env:BUILD_VERSION
+          $headers = @{ Authorization = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN"; 'User-Agent' = 'hisui-release' }
+
+          # GitHub answers reads of the huge winget-pkgs repo with 429 "gitmon refuses to schedule us" (backend
+          # throttling, not our rate limit) or a 5xx now and then; both pass. Retry with backoff, honouring Retry-After.
+          function Invoke-GitHub([string]$uri, [hashtable]$hdrs = $headers, [int]$attempts = 6) {
+            for ($i = 1; ; $i++) {
+              try { return Invoke-RestMethod $uri -Headers $hdrs }
+              catch {
+                $code = [int]$_.Exception.Response.StatusCode
+                $retryable = $code -eq 0 -or $code -eq 429 -or $code -ge 500 -or
+                  ($code -eq 403 -and "$_" -match 'rate limit|secondary')
+                if (-not $retryable -or $i -ge $attempts) { throw }
+                $wait = [math]::Min(120, 5 * [math]::Pow(2, $i - 1))
+                $ra = $_.Exception.Response.Headers.RetryAfter
+                if ($ra -and $ra.Delta) { $wait = [math]::Max($wait, $ra.Delta.TotalSeconds) }
+                Write-Host "::warning::HTTP $code from $uri (attempt $i/$attempts); retrying in $([int]$wait)s"
+                Start-Sleep -Seconds $wait
+              }
+            }
+          }
+
           # `update` needs as many installer URLs as the published manifest has (e.g. MSI + Setup.exe), so take the
           # URLs of the latest published version and swap in the new version number.
           $api = 'https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/f/Fileman/HisuiPDF'
-          $headers = @{ Authorization = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN"; 'User-Agent' = 'hisui-release' }
-          # Assign first: Invoke-RestMethod emits a JSON array as one object, so piping it directly hands the
-          # whole array to Where-Object/Sort-Object instead of one folder at a time.
-          $entries = Invoke-RestMethod $api -Headers $headers
-          $prev = $entries |
-            Where-Object { $_.type -eq 'dir' -and $_.name -match '^\d+(\.\d+){1,3}$' } |
-            Sort-Object { [version]$_.name } | Select-Object -Last 1 -ExpandProperty name
-          if (-not $prev) { throw "No published version of $id found in winget-pkgs" }
-          $file = Invoke-RestMethod "$api/$prev/$id.installer.yaml" -Headers $headers
-          $yaml = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($file.content))
+          $raw = 'https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/f/Fileman/HisuiPDF'
+          $prev = $null; $yaml = $null
+          try {
+            # Assign first: Invoke-RestMethod emits a JSON array as one object, so piping it directly hands the
+            # whole array to Where-Object/Sort-Object instead of one folder at a time.
+            $entries = Invoke-GitHub $api
+            $prev = $entries |
+              Where-Object { $_.type -eq 'dir' -and $_.name -match '^\d+(\.\d+){1,3}$' } |
+              Sort-Object { [version]$_.name } | Select-Object -Last 1 -ExpandProperty name
+            if (-not $prev) { throw "No published version of $id found in winget-pkgs" }
+            $file = Invoke-GitHub "$api/$prev/$id.installer.yaml"
+            $yaml = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($file.content))
+          }
+          catch {
+            # Fallback that skips the contents API: walk our own stable releases newest first and take the first
+            # version whose manifest is on winget-pkgs master (raw.githubusercontent.com is served from a cache).
+            Write-Host "::warning::winget-pkgs contents API failed ($_); falling back to our release tags"
+            $gh = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; 'User-Agent' = 'hisui-release' }
+            $releases = Invoke-GitHub "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases?per_page=30" $gh
+            $candidates = $releases |
+              Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -match '^v(\d+(\.\d+){1,3})$' } |
+              ForEach-Object { $_.tag_name.Substring(1) } |
+              Where-Object { [version]$_ -lt [version]$ver } |
+              Sort-Object { [version]$_ } -Descending
+            $prev = $null
+            foreach ($c in $candidates) {
+              try { $yaml = Invoke-GitHub "$raw/$c/$id.installer.yaml" @{ 'User-Agent' = 'hisui-release' } }  # 404: not on winget
+              catch { if ([int]$_.Exception.Response.StatusCode -eq 404) { continue } else { throw } }
+              $prev = $c; break
+            }
+            if (-not $prev) { throw "No published version of $id found in winget-pkgs (via contents API or release tags)" }
+          }
           $urls = [regex]::Matches($yaml, '(?m)^\s*-?\s*InstallerUrl:\s*(\S+)') |
             ForEach-Object { $_.Groups[1].Value.Trim("'`"").Replace($prev, $ver) } | Select-Object -Unique
           if (-not $urls) { throw "No InstallerUrl in the $prev manifest" }
           Write-Host "Previous version $prev; installers for $($ver):"
           $urls | ForEach-Object { Write-Host "  $_" }
-          foreach ($u in $urls) { Invoke-WebRequest $u -Method Head -UseBasicParsing | Out-Null } # every asset must exist
+          # Every asset must exist.
+          foreach ($u in $urls) { Invoke-WebRequest $u -Method Head -UseBasicParsing -MaximumRetryCount 3 -RetryIntervalSec 5 | Out-Null }
 
-          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe -MaximumRetryCount 3 -RetryIntervalSec 5
           ./wingetcreate.exe update $id --version $ver --urls @($urls) --submit
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
