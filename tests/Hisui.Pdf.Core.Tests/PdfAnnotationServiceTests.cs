@@ -146,6 +146,24 @@ public class PdfAnnotationServiceTests
     }
 
     [Fact]
+    public async Task ReadAllPlaced_MatchesPerPageRead()
+    {
+        var pdf = PdfFixtureBuilder.Create(3);
+        pdf = await _sut.AddHighlightAsync(pdf, 0, new PdfRect(0.1, 0.1, 0.4, 0.15));
+        pdf = await _sut.AddFreeTextAsync(pdf, 0, new PdfRect(0.2, 0.3, 0.6, 0.35), "zero", background: false);
+        pdf = await _sut.AddRectangleAsync(pdf, 2, new PdfRect(0.5, 0.5, 0.8, 0.7), fillHex: "#00FF00");
+
+        var all = await _sut.ReadAllPlacedAsync(pdf);
+
+        Assert.Equal(3, all.Count);
+        for (var p = 0; p < all.Count; p++)
+            Assert.Equal(await _sut.ReadPlacedAsync(pdf, p), all[p]);
+        Assert.Equal(2, all[0].Count);
+        Assert.Empty(all[1]);
+        Assert.Single(all[2]);
+    }
+
+    [Fact]
     public async Task AddFreeText_CanBeReadBackAndRemoved()
     {
         var pdf = PdfFixtureBuilder.Create(1);
