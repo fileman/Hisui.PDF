@@ -171,9 +171,11 @@ $staging = "$root\build\.staging\win"
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 New-Item -ItemType Directory -Path "$staging\Assets" -Force | Out-Null
 
-# Copy EXE only — .pdb excluded (debug symbols), empty dirs excluded
-# tessdata is bundled inside the single-file EXE (self-extracting at first run)
+# Copy the EXE plus the native DLLs beside it (not self-extracted: see win-x64.pubxml) — .pdb excluded
 Copy-Item "$publishDir\Hisui.Pdf.App.exe" $staging -Force
+Copy-Item "$publishDir\*.dll" $staging -Force
+Copy-Item "$publishDir\x64" "$staging\x64" -Recurse -Force
+Copy-Item "$publishDir\tessdata" "$staging\tessdata" -Recurse -Force
 
 # License files alongside the app in the package
 foreach ($licFile in @("LICENSE","THIRD-PARTY-NOTICES.txt")) {

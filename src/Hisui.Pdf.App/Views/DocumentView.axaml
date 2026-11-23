@@ -1352,7 +1352,13 @@
                     <!-- Continuous view: every page stacked; previews load lazily as pages near the viewport (code-behind) -->
                     <ScrollViewer x:Name="ContinuousScroll" IsVisible="{Binding ShowContinuousPages}"
                                   HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Pages}" Margin="16" HorizontalAlignment="Center">
+                        <ItemsControl x:Name="ContinuousItems" ItemsSource="{Binding Pages}" Margin="16" HorizontalAlignment="Center">
+                            <!-- Virtualized: only pages on screen get a container (and their overlay layers). -->
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PageItemViewModel">
                                     <LayoutTransformControl Margin="0,0,0,12" HorizontalAlignment="Center">
@@ -1362,6 +1368,8 @@
                                         <Border Width="{Binding DisplayWidth}" Height="{Binding DisplayHeight}"
                                                 Background="{DynamicResource RibbonPageBrush}">
                                             <Panel>
+                                                <!-- The thumbnail stands in (blurry) until the full render arrives and covers it. -->
+                                                <Image Source="{Binding Thumbnail}" Stretch="Fill" />
                                                 <Image Source="{Binding Preview}" Stretch="Fill" />
                                                 <views:TextSelectionLayer Page="{Binding}" />
                                                 <views:LinkLayer Page="{Binding}" />

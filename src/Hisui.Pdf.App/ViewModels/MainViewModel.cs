@@ -20,7 +20,8 @@ namespace Hisui.Pdf.App.ViewModels;
 /// </summary>
 public partial class MainViewModel : ObservableObject
 {
-    private const int ThumbnailDpi = 40;
+    // 40 DPI made each A4 thumbnail ~600 KB for a 94x128 slot; 32 stays sharp up to ~280% display scaling.
+    private const int ThumbnailDpi = 32;
 
     private readonly IPdfPageService _pageService;
     private readonly IPdfRenderer _renderer;
@@ -51,7 +52,13 @@ public partial class MainViewModel : ObservableObject
 
     private readonly Dictionary<(int Source, int Page), IImage> _thumbCache = [];
     private readonly Dictionary<(int Source, int Page), IImage> _previewCache = [];
-    private readonly HashSet<(int Source, int Page)> _renderingPreviews = [];
+    private readonly Dictionary<(int Source, int Page), Task<IImage?>> _renderingPreviews = [];
+    private IReadOnlySet<PageItemViewModel> _nearPages = new HashSet<PageItemViewModel>();
+    private readonly SemaphoreSlim _previewGate = new(1, 1); // one full-size render at a time; "still near?" checked per turn
+    private int _previewRendersPending;
+    private CancellationTokenSource? _thumbCts;
+    // Page sizes (points) per source, read up front so pages lay out (and the first one shows) without rendering.
+    private readonly Dictionary<int, (byte[] Bytes, IReadOnlyList<PdfPageSize> Sizes)> _pageSizes = [];
 
     private PdfDocumentSession? _session;
     private CancellationTokenSource? _cts;
@@ -219,12 +226,15 @@ public partial class MainViewModel : ObservableObject
 
             var count = await _pageService.GetPageCountAsync(bytes, ct);
 
+            _thumbCts?.Cancel();
             _session = new PdfDocumentSession();
             _session.AddSource(bytes, count);
             _savedVersion = _session.Version;
             _thumbCache.Clear();
             _previewCache.Clear();
+            _pageSizes.Clear();
             ClearPageDataCaches();
+            await LoadPageSizesAsync(ct);
 
             SyncPagesFromSession();
             SetOpenedFromEncrypted(wasEncrypted); // enables "remove password" only for once-encrypted files
@@ -232,8 +242,9 @@ public partial class MainViewModel : ObservableObject
             Title = $"Hisui PDF — {Path.GetFileName(path)}";
             _settings.AddRecentFile(path);
             RefreshRecentFiles();
-            await RenderThumbnailsAsync(ct);
+            // Show the first page right away; thumbnails fill in behind it.
             SelectedPage = Pages.FirstOrDefault();
+            await RenderThumbnailsAsync(ct);
         });
     }
 
@@ -631,6 +642,7 @@ public partial class MainViewModel : ObservableObject
             var count = await _pageService.GetPageCountAsync(bytes, ct);
             _session.AddSource(bytes, count);
             if (wasEncrypted) SetOpenedFromEncrypted(true); // a merged encrypted source enables "remove password"
+            await LoadPageSizesAsync(ct);
             SyncPagesFromSession();
             await RenderThumbnailsAsync(ct);
         });
@@ -682,30 +694,74 @@ public partial class MainViewModel : ObservableObject
             SelectedPage = Pages[Math.Clamp(index, 0, Pages.Count - 1)];
     }
 
-    private async Task RenderThumbnailsAsync(CancellationToken ct = default)
+    /// <summary>Reads the page sizes of sources not seen yet or edited since (cheap: no rendering). True when any changed.</summary>
+    private async Task<bool> LoadPageSizesAsync(CancellationToken ct = default)
     {
-        if (_session is null) return;
-
-        foreach (var item in Pages)
+        if (_session is not { } session) return false;
+        var changed = false;
+        foreach (var id in session.Pages.Select(p => p.SourceDocumentId).Distinct().ToList())
         {
-            ct.ThrowIfCancellationRequested();
-            if (item.Thumbnail is not null) continue;
-
-            var key = (item.SourceDocumentId, item.SourcePageIndex);
-            if (!_thumbCache.TryGetValue(key, out var thumb))
+            var bytes = session.GetSource(id);
+            if (_pageSizes.TryGetValue(id, out var known) && ReferenceEquals(known.Bytes, bytes)) continue;
+            try
             {
-                var source = _session.GetSource(item.SourceDocumentId);
-                var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, ThumbnailDpi, ct);
-                thumb = BitmapConversions.ToFrozenBitmap(page);
-                _thumbCache[key] = thumb;
+                var sizes = await _renderer.GetPageSizesAsync(bytes, ct);
+                if (!ReferenceEquals(_session, session)) return false;
+                changed |= known.Sizes is null || !known.Sizes.SequenceEqual(sizes);
+                _pageSizes[id] = (bytes, sizes);
             }
-
-            item.Thumbnail = thumb;
-            PreparePage(item);
+            catch (Exception ex) when (ex is not OperationCanceledException) { } // sizes fall back to the thumbnail/A4
         }
+        return changed;
     }
 
-    /// <summary>Gives a page its continuous-view size: the cached render's, else estimated from the thumbnail.</summary>
+    /// <summary>
+    /// Starts (re)filling missing thumbnails in the background and returns at once: the document is usable while
+    /// they arrive (opening no longer waits for every page's thumbnail), and full-size renders go first.
+    /// </summary>
+    private Task RenderThumbnailsAsync(CancellationToken ct = default)
+    {
+        _thumbCts?.Cancel();
+        var cts = _thumbCts = new CancellationTokenSource();
+        _ = RenderThumbnailsCoreAsync(cts.Token);
+        return Task.CompletedTask;
+    }
+
+    private async Task RenderThumbnailsCoreAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Yield(); // let the caller finish (e.g. select the first page) before the first render
+            if (await LoadPageSizesAsync(ct)) // an edit changed a page's size: re-lay the stack out
+                foreach (var item in Pages) PreparePage(item);
+            foreach (var item in Pages.ToList())
+            {
+                if (ct.IsCancellationRequested || _session is not { } session) return;
+                if (item.Thumbnail is not null) continue;
+
+                var key = (item.SourceDocumentId, item.SourcePageIndex);
+                if (!_thumbCache.TryGetValue(key, out var thumb))
+                {
+                    while (_previewRendersPending > 0) await Task.Delay(15, ct); // a page on screen is rendering
+                    var source = session.GetSource(item.SourceDocumentId);
+                    var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, ThumbnailDpi, ct);
+                    // Stale when the document was edited or replaced meanwhile: a newer pass renders it again.
+                    if (ct.IsCancellationRequested || !ReferenceEquals(_session, session) ||
+                        !ReferenceEquals(session.GetSource(item.SourceDocumentId), source)) return;
+                    thumb = BitmapConversions.ToFrozenBitmap(page);
+                    _thumbCache[key] = thumb;
+                }
+
+                item.Thumbnail = thumb;
+                if (!_pageSizes.ContainsKey(item.SourceDocumentId)) PreparePage(item); // no size read: use the thumbnail's
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { StatusMessage = _loc.Format("Status.RenderError", ex.Message); }
+    }
+
+    /// <summary>Gives a page its continuous-view size: the cached render's, else the page size read on open
+    /// (same pixel rounding as the renderer), else estimated from the thumbnail.</summary>
     private void PreparePage(PageItemViewModel item)
     {
         item.SetZoom(ZoomLevel);
@@ -715,11 +771,22 @@ public partial class MainViewModel : ObservableObject
             item.SetBaseSize(preview.Size);
             return;
         }
-        var scale = (double)_settings.Settings.PreviewDpi / ThumbnailDpi;
+        var dpi = _settings.Settings.PreviewDpi;
+        // A size read before an edit is still the best guess until the background pass re-reads it.
+        if (_pageSizes.TryGetValue(item.SourceDocumentId, out var known) && (uint)item.SourcePageIndex < (uint)known.Sizes.Count)
+        {
+            var size = known.Sizes[item.SourcePageIndex];
+            item.SetBaseSize(new Avalonia.Size(ToPixels(size.Width, dpi), ToPixels(size.Height, dpi)));
+            return;
+        }
+        var scale = (double)dpi / ThumbnailDpi;
         item.SetBaseSize(item.Thumbnail is { } t
             ? new Avalonia.Size(t.Size.Width * scale, t.Size.Height * scale)
-            : new Avalonia.Size(8.27 * _settings.Settings.PreviewDpi, 11.69 * _settings.Settings.PreviewDpi)); // A4
+            : new Avalonia.Size(8.27 * dpi, 11.69 * dpi)); // A4
     }
+
+    // Matches the renderer's rounding (whole points, then truncating), so the slot is exactly the render's size.
+    private static double ToPixels(double points, int dpi) => Math.Max(1, (int)(Math.Round(points) * dpi / 72.0));
 
     /// <summary>Renders <paramref name="item"/>'s full-size preview for continuous view (shared cache with the single-page preview).</summary>
     public async void EnsurePagePreview(PageItemViewModel item)
@@ -738,15 +805,9 @@ public partial class MainViewModel : ObservableObject
             if (!ReferenceEquals(item.Preview, cached)) { item.Preview = cached; item.SetBaseSize(cached.Size); }
             return;
         }
-        if (!_renderingPreviews.Add(key)) return;
-        var stale = false;
         try
         {
-            var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, _settings.Settings.PreviewDpi);
-            // Edited (or closed) while rendering: this render is out of date, so it is redone below instead of cached.
-            if (_session is null || !ReferenceEquals(_session.GetSource(item.SourceDocumentId), source)) { stale = true; return; }
-            var preview = BitmapConversions.ToFrozenBitmap(page);
-            _previewCache[key] = preview;
+            if (await GetPreviewAsync(item, onlyIfNear: true) is not { } preview) return;
             item.Preview = preview;
             item.SetBaseSize(preview.Size);
         }
@@ -754,10 +815,54 @@ public partial class MainViewModel : ObservableObject
         {
             StatusMessage = _loc.Format("Status.RenderError", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// The cached full-size render of <paramref name="item"/>'s page, rendered once however many callers ask meanwhile
+    /// (the continuous stack and the single-page preview used to render the selected page twice). Renders run one at a
+    /// time; with <paramref name="onlyIfNear"/> a render whose page scrolled away from the viewport before its turn is
+    /// skipped (null), so a fast scroll doesn't leave a queue of off-screen pages ahead of the visible one.
+    /// </summary>
+    private Task<IImage?> GetPreviewAsync(PageItemViewModel item, bool onlyIfNear)
+    {
+        var key = (item.SourceDocumentId, item.SourcePageIndex);
+        if (_previewCache.TryGetValue(key, out var cached)) return Task.FromResult<IImage?>(cached);
+        // A pending render that may be skipped is not reused by a caller that needs the page regardless.
+        if (onlyIfNear && _renderingPreviews.TryGetValue(key, out var pending)) return pending;
+        var task = RenderPreviewAsync(item, key, onlyIfNear);
+        if (!task.IsCompleted) _renderingPreviews[key] = task;
+        return task;
+    }
+
+    private async Task<IImage?> RenderPreviewAsync(PageItemViewModel item, (int Source, int Page) key, bool onlyIfNear)
+    {
+        _previewRendersPending++;
+        try
+        {
+            await _previewGate.WaitAsync();
+            try
+            {
+                if (_previewCache.TryGetValue(key, out var done)) return done; // rendered by an earlier turn
+                if (_session is not { } session) return null;
+                if (onlyIfNear && !_nearPages.Contains(item) && !ReferenceEquals(item, SelectedPage)) return null;
+                RenderedPage page;
+                byte[] source;
+                do // edited while rendering: that render is out of date, so render the new bytes instead of caching it
+                {
+                    source = session.GetSource(key.Source);
+                    page = await _renderer.RenderPageAsync(source, key.Page, _settings.Settings.PreviewDpi);
+                    if (!ReferenceEquals(_session, session)) return null;
+                } while (!ReferenceEquals(session.GetSource(key.Source), source));
+                var preview = BitmapConversions.ToFrozenBitmap(page);
+                _previewCache[key] = preview;
+                return preview;
+            }
+            finally { _previewGate.Release(); }
+        }
         finally
         {
+            _previewRendersPending--;
             _renderingPreviews.Remove(key);
-            if (stale && _session is not null && Pages.Contains(item)) EnsurePagePreview(item);
         }
     }
 
@@ -765,12 +870,14 @@ public partial class MainViewModel : ObservableObject
     private const int MaxContinuousPreviews = 24;
 
     /// <summary>
-    /// Drops the full-size previews of pages away from the viewport once more than <see cref="MaxContinuousPreviews"/>
-    /// are held, so scrolling through a long document (or two, in split view) doesn't keep every page rendered. The
-    /// pages keep their size, and a dropped preview is rendered again when its page comes back near the viewport.
+    /// Records the pages near the viewport (renders queued for other pages are skipped) and drops the full-size previews
+    /// of pages away from it once more than <see cref="MaxContinuousPreviews"/> are held, so scrolling through a long
+    /// document (or two, in split view) doesn't keep every page rendered. The pages keep their size, and a dropped
+    /// preview is rendered again when its page comes back near the viewport.
     /// </summary>
     public void TrimPagePreviews(IReadOnlyCollection<PageItemViewModel> keep)
     {
+        _nearPages = keep.ToHashSet();
         if (_previewCache.Count <= MaxContinuousPreviews) return;
         var kept = new HashSet<(int, int)>(keep.Select(p => (p.SourceDocumentId, p.SourcePageIndex)));
         if (SelectedPage is { } selected) kept.Add((selected.SourceDocumentId, selected.SourcePageIndex));
@@ -795,23 +902,14 @@ public partial class MainViewModel : ObservableObject
 
         PreviewRotationAngle = item.RotationAngle;
 
-        var key = (item.SourceDocumentId, item.SourcePageIndex);
-        if (!_previewCache.TryGetValue(key, out var preview))
+        IImage? preview;
+        try { preview = await GetPreviewAsync(item, onlyIfNear: false); }
+        catch (Exception ex)
         {
-            try
-            {
-                var source = _session.GetSource(item.SourceDocumentId);
-                var previewDpi = _settings.Settings.PreviewDpi;
-                var page = await _renderer.RenderPageAsync(source, item.SourcePageIndex, previewDpi);
-                preview = BitmapConversions.ToFrozenBitmap(page);
-                _previewCache[key] = preview;
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = _loc.Format("Status.RenderError", ex.Message);
-                return;
-            }
+            StatusMessage = _loc.Format("Status.RenderError", ex.Message);
+            return;
         }
+        if (preview is null || !ReferenceEquals(item, SelectedPage)) return; // superseded while rendering
 
         PreviewImage = preview;
         await LoadFieldsAsync(item);

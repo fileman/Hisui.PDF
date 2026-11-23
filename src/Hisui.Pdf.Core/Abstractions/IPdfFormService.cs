@@ -14,6 +14,9 @@ public interface IPdfFormService
     /// <summary>The form widgets on one page, in /Annots order (empty when there are none).</summary>
     Task<IReadOnlyList<PdfFormWidget>> ReadWidgetsAsync(byte[] pdf, int pageIndex, CancellationToken ct = default);
 
+    /// <summary>The form widgets of every page (index = page index), parsing the document once.</summary>
+    Task<IReadOnlyList<IReadOnlyList<PdfFormWidget>>> ReadAllWidgetsAsync(byte[] pdf, CancellationToken ct = default);
+
     /// <summary>Moves/resizes the widget at <paramref name="annotIndex"/> of the page's /Annots to <paramref name="rect"/>
     /// (normalised, rendered orientation).</summary>
     Task<byte[]> SetWidgetRectAsync(byte[] pdf, int pageIndex, int annotIndex, PdfRect rect, CancellationToken ct = default);

@@ -172,6 +172,8 @@ public partial class DocumentView : UserControl
         }
         PreviewScroll.ScrollChanged += (_, _) => _lastScrollTick = Environment.TickCount64;
         ContinuousScroll.ScrollChanged += (_, e) => QueueContinuousUpdate(select: e.OffsetDelta.Y != 0 && !_suppressSelect);
+        // Pages realized without a scroll (first show, zoom, resize) need their previews too.
+        ContinuousItems.ContainerPrepared += (_, _) => QueueContinuousUpdate(select: false);
 
         _annotCanvas = this.FindControl<Canvas>("AnnotationCanvas");
         if (_annotCanvas is null) return;
@@ -534,8 +536,20 @@ public partial class DocumentView : UserControl
         ContinuousScroll.Offset = new Vector(ContinuousScroll.Offset.X, y);
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            _suppressSelect = false;
-            UpdateContinuousPages(select: false);
+            // The virtualizing panel only estimates pages it has not laid out: with mixed page sizes the computed
+            // offset can miss, so align on the selected page's real container once it is realized.
+            var index = vm.Pages.IndexOf(selected);
+            if (index >= 0 && ReferenceEquals(vm.SelectedPage, selected))
+            {
+                if (ContinuousItems.ContainerFromIndex(index) is null) ContinuousItems.ScrollIntoView(index);
+                if (ContinuousItems.ContainerFromIndex(index)?.TranslatePoint(default, ContinuousScroll) is { } p && Math.Abs(p.Y) > 1)
+                    ContinuousScroll.Offset = new Vector(ContinuousScroll.Offset.X, ContinuousScroll.Offset.Y + p.Y);
+            }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                _suppressSelect = false;
+                UpdateContinuousPages(select: false);
+            }, Avalonia.Threading.DispatcherPriority.Background);
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
@@ -559,32 +573,38 @@ public partial class DocumentView : UserControl
         }, Avalonia.Threading.DispatcherPriority.Loaded);
     }
 
-    /// <summary>Loads previews for pages near the viewport and, when scrolled, selects the most visible page.</summary>
+    /// <summary>Loads previews for the pages on screen plus one screenful each way and, when scrolled, selects the
+    /// most visible page. Positions come from the realized (virtualized) containers, so they are exact whatever the
+    /// page sizes.</summary>
     private void UpdateContinuousPages(bool select)
     {
         if (DataContext is not MainViewModel { ShowContinuousPages: true } vm) return;
         var viewport = ContinuousScroll.Viewport.Height;
-        if (viewport <= 0) return; // not laid out yet (or collapsed)
-        var top = ContinuousScroll.Offset.Y - ContinuousMargin;
-        var bottom = top + viewport;
+        if (viewport <= 0 || ContinuousItems.ItemsPanelRoot is not { } panel) return; // not laid out yet (or collapsed)
         PageItemViewModel? best = null;
-        var bestVisible = double.MinValue;
-        var near = new List<PageItemViewModel>();
-        var y = 0.0;
-        foreach (var page in vm.Pages)
+        var bestVisible = 0.0;
+        int first = int.MaxValue, last = -1;
+        foreach (var child in panel.Children)
         {
-            var height = SlotHeight(page) - PageGap;
-            var visible = Math.Min(y + height, bottom) - Math.Max(y, top);
+            if (!child.IsVisible || child.DataContext is not PageItemViewModel page) continue;
+            if (child.TranslatePoint(default, ContinuousScroll) is not { } p) continue;
+            var visible = Math.Min(p.Y + child.Bounds.Height - PageGap, viewport) - Math.Max(p.Y, 0);
+            if (visible <= 0) continue;
+            var index = ContinuousItems.IndexFromContainer(child);
+            if (index < 0) continue;
+            first = Math.Min(first, index);
+            last = Math.Max(last, index);
             if (visible > bestVisible) { bestVisible = visible; best = page; }
-            if (y + height > top - viewport && y < bottom + viewport) // one viewport of look-ahead
-            {
-                near.Add(page);
-                vm.EnsurePagePreview(page);
-            }
-            y += height + PageGap;
-            if (y > bottom + viewport) break;
         }
-        vm.TrimPagePreviews(near);
+        if (last < 0) return;
+
+        // On screen first, then the next screenful (the usual scroll direction), then the previous one.
+        var ahead = last - first + 1;
+        var near = new List<PageItemViewModel>();
+        for (var i = first; i <= Math.Min(last + ahead, vm.Pages.Count - 1); i++) near.Add(vm.Pages[i]);
+        for (var i = first - 1; i >= Math.Max(0, first - ahead); i--) near.Add(vm.Pages[i]);
+        vm.TrimPagePreviews(near); // before rendering: renders queued for pages no longer near are skipped
+        foreach (var page in near) vm.EnsurePagePreview(page);
 
         if (!select || best is null || ReferenceEquals(best, vm.SelectedPage)) return;
         _followingScroll = true;

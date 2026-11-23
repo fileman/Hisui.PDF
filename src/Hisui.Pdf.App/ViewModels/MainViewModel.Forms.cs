@@ -106,16 +106,17 @@ public partial class MainViewModel
     private (PageItemViewModel Page, PdfFormWidget Field, string Value)? _pendingFieldEdit;
 
     /// <summary>Loads <paramref name="item"/>'s widgets, keeping the current list (and live editors) when unchanged.</summary>
-    // Widgets per source page, valid while the source bytes are the same array (continuous view asks on every scroll).
-    private readonly Dictionary<(int Source, int Page), (byte[] Bytes, Task<IReadOnlyList<PdfFormWidget>> Widgets)> _fieldCache = [];
+    // Widgets of every page of a source, valid while the source bytes are the same array. One parse per source version:
+    // reading a single page's widgets parses the whole PDF anyway, so a per-page read cost a full parse per page scrolled.
+    private readonly Dictionary<int, (byte[] Bytes, Task<IReadOnlyList<IReadOnlyList<PdfFormWidget>>> Widgets)> _fieldCache = [];
 
     private async Task LoadFieldsAsync(PageItemViewModel item)
     {
         if (_session is null) return;
-        var key = (item.SourceDocumentId, item.SourcePageIndex);
         var bytes = _session.GetSource(item.SourceDocumentId);
         // Unreadable form structure: the page stays view-only.
-        var widgets = await CachedReadAsync(_fieldCache, key, bytes, () => _forms.ReadWidgetsAsync(bytes, item.SourcePageIndex));
+        var all = await CachedReadAsync(_fieldCache, item.SourceDocumentId, bytes, () => _forms.ReadAllWidgetsAsync(bytes));
+        var widgets = (uint)item.SourcePageIndex < (uint)all.Count ? all[item.SourcePageIndex] : [];
         if (!widgets.SequenceEqual(item.Fields, FieldEquality.Instance)) item.Fields = widgets;
         await LoadPlacedAsync(item, bytes);
         await LoadLinksAsync(item);
@@ -180,8 +181,10 @@ public partial class MainViewModel
             // ponytail: only this page re-renders; a field repeated on other pages refreshes there on the next render.
             InvalidatePageCache(id, page.SourcePageIndex);
 
-            var widgets = await _forms.ReadWidgetsAsync(updated, page.SourcePageIndex);
-            _fieldCache[(id, page.SourcePageIndex)] = (updated, Task.FromResult(widgets));
+            var all = _forms.ReadAllWidgetsAsync(updated);
+            _fieldCache[id] = (updated, all);
+            var pages = await all;
+            var widgets = (uint)page.SourcePageIndex < (uint)pages.Count ? pages[page.SourcePageIndex] : [];
             if (rebuild) page.Fields = widgets;
             else page.SetFieldsSilently(widgets);
             await RenderThumbnailsAsync();

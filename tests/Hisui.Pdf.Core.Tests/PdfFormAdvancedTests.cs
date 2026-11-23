@@ -48,6 +48,16 @@ public class PdfFormAdvancedTests
         Assert.Equal(["Nome"], (await _sut.ReadWidgetsAsync(pdf, 0)).Select(w => w.Name));
     }
 
+    [Fact]
+    public async Task ReadAllWidgets_MatchesPerPageRead()
+    {
+        var pdf = await TwoFieldsAsync();
+        var all = await _sut.ReadAllWidgetsAsync(pdf);
+        var page0 = await _sut.ReadWidgetsAsync(pdf, 0);
+        Assert.Equal(page0.Select(w => (w.Name, w.Type, w.AnnotIndex, w.Value)), all[0].Select(w => (w.Name, w.Type, w.AnnotIndex, w.Value)));
+        Assert.NotEmpty(all[0]);
+    }
+
     [Theory]
     [InlineData(FormDataFormat.Xfdf)]
     [InlineData(FormDataFormat.Fdf)]

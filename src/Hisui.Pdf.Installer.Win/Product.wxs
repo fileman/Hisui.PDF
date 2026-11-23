@@ -25,6 +25,7 @@
         <!-- licenses\ subdirectory -->
         <Directory Id="LicensesFolder" Name="licenses" />
         <Directory Id="TessdataFolder" Name="tessdata" />
+        <Directory Id="NativeX64Folder" Name="x64" />
       </Directory>
     </StandardDirectory>
 
@@ -58,6 +59,14 @@
               Source="..\..\bin\publish\win-x64\Hisui.Pdf.App.exe"
               KeyPath="yes" />
       </Component>
+
+      <!-- Native libraries sit beside the EXE (not self-extracted to %TEMP% at startup; see win-x64.pubxml). -->
+      <Component Id="NativePdfium" Guid="*"><File Source="..\..\bin\publish\win-x64\pdfium.dll" /></Component>
+      <Component Id="NativeSkia" Guid="*"><File Source="..\..\bin\publish\win-x64\libSkiaSharp.dll" /></Component>
+      <Component Id="NativeHarfBuzz" Guid="*"><File Source="..\..\bin\publish\win-x64\libHarfBuzzSharp.dll" /></Component>
+      <Component Id="NativeAngle" Guid="*"><File Source="..\..\bin\publish\win-x64\av_libglesv2.dll" /></Component>
+      <Component Id="NativeLeptonica" Directory="NativeX64Folder" Guid="*"><File Source="..\..\bin\publish\win-x64\x64\leptonica-1.82.0.dll" /></Component>
+      <Component Id="NativeTesseract" Directory="NativeX64Folder" Guid="*"><File Source="..\..\bin\publish\win-x64\x64\tesseract50.dll" /></Component>
 
     </ComponentGroup>
   </Fragment>

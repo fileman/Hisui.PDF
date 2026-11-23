@@ -97,7 +97,30 @@ internal sealed partial class PdfFormService : IPdfFormService
             using var stream = new MemoryStream(pdf, writable: false);
             using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
             if ((uint)pageIndex >= (uint)doc.PageCount) return [];
-            var page = doc.Pages[pageIndex];
+            return PageWidgets(doc.Pages[pageIndex], pageIndex);
+        }, ct);
+    }
+
+    public Task<IReadOnlyList<IReadOnlyList<PdfFormWidget>>> ReadAllWidgetsAsync(byte[] pdf, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        return Task.Run<IReadOnlyList<IReadOnlyList<PdfFormWidget>>>(() =>
+        {
+            using var stream = new MemoryStream(pdf, writable: false);
+            using var doc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+            var result = new IReadOnlyList<PdfFormWidget>[doc.PageCount];
+            for (var p = 0; p < result.Length; p++)
+            {
+                ct.ThrowIfCancellationRequested();
+                result[p] = PageWidgets(doc.Pages[p], p);
+            }
+            return result;
+        }, ct);
+    }
+
+    private static IReadOnlyList<PdfFormWidget> PageWidgets(PdfPage page, int pageIndex)
+    {
+        {
             var annots = page.Elements.GetArray("/Annots");
             if (annots is null) return [];
 
@@ -158,7 +181,7 @@ internal sealed partial class PdfFormService : IPdfFormService
                 });
             }
             return result;
-        }, ct);
+        }
     }
 
     public Task<byte[]> SetWidgetRectAsync(byte[] pdf, int pageIndex, int annotIndex, PdfRect rect, CancellationToken ct = default) =>
